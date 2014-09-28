@@ -1,0 +1,20 @@
+(module packet racket/base
+	(provide login-server-packet/login-fail)
+	(require "../../packet.scm")
+	
+	(define (login-server-packet/login-fail buffer)
+		(let ((s (open-input-bytes buffer)))
+			(list
+				(cons 'id (read-byte s))
+				(cons 'reason (case (read-byte s)
+					((#x01) 'system-error)
+					((#x02) 'password-wrong)
+					((#x03) 'auth-pair-wrong)
+					((#x04) 'access-failed)
+					((#x07) 'account-in-use)
+					((#x09) 'account-banned)
+				))
+			)
+		)
+	)
+)
