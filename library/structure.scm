@@ -1,13 +1,20 @@
 (module structure racket/base
-	(require (except-in racket/contract any) srfi/1)
+	(require
+		(rename-in racket/contract (any all/c))
+		srfi/1
+		"extension.scm"
+	)
 	(provide (contract-out
-		(get-field (list? symbol? . -> . any/c))
+		;(get-field (list? symbol? . -> . any/c))
 		(set-field (list? symbol? any/c . -> . list?))
-		(get-fields (->* (list?) #:rest (listof symbol?) (listof any/c)))
-		(get-chain (->* (list?) #:rest (listof symbol?) any/c))
+		(get-fields (->* (list?) #:rest (listof symbol?) all/c))
+		;(get-chain (->* (list?) #:rest (listof symbol?) any/c))
 		(get-box-field (box? symbol? . -> . any/c))
 		(set-box-field! (box? symbol? any/c . -> . void?))
 	))
+	(provide
+		(rename-out (get-chain get-field))
+	)
 	
 	(define (get-field struct field)
 		(let ((value (assoc field struct)))
@@ -21,11 +28,12 @@
 	)
 	
 	(define (get-fields struct . fields)
-		(void) ; TODO
+		(apply values (map (bind-head get-field struct) fields))
 	)
 	
 	(define (get-chain struct . chain)
-		(void) ; TODO
+		(define (f a b) (if b (get-field b a) #f))
+		(fold f (get-field struct (car chain)) (cdr chain))
 	)
 	
 	(define (get-box-field struct field)

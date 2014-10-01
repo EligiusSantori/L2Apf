@@ -1,6 +1,7 @@
 (module extension racket/base
 	(require srfi/1)
 	(provide
+		bind
 		bind-head
 		bind-tail
 		bind-wrap
@@ -34,14 +35,14 @@
 	
 	; Хотя бы один элемент списка l равны значению v, используя для сравнения предикат p
 	(define (any-is v l . t)
-		(define p (null? t) equal? (car t))
+		(define p (if (null? t) equal? (car t)))
 		(define (is i) (p v i))
 		(apply any is l)
 	)
 	
 	; Все элементы списка l равен значению v, используя для сравнения предикат p
 	(define (every-is v l . t)
-		(define p (null? t) equal? (car t))
+		(define p (if (null? t) equal? (car t)))
 		(define (is i) (p v i))
 		(apply every is l)
 	)

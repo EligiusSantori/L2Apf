@@ -1,11 +1,19 @@
 (module network racket/base
-	(require racket/contract "structure.scm")
+	(require
+		racket/contract
+		racket/async-channel
+		"structure.scm"
+	)
 	(provide (contract-out
-		(receive (box? . -> . bytes?))
-		(send (box? bytes? . -> . void?))
+	;	(smart-receive receive (box? . -> . bytes?))
+	;	(smart-send send (box? bytes? . -> . void?))
 		(disconnect (box? . -> . void?))
-		(get-packet-id ((or/c bytes? false/c) . -> . (or/c byte? false/c)))
+		(get-packet-id (bytes? . -> . byte?))
 	))
+	(provide
+		(rename-out (smart-receive receive))
+		(rename-out (smart-send send))
+	)
 	
 	(define (print-dump label data)
 		(display label)
@@ -14,8 +22,13 @@
 	)
 	
 	(define (read-buffer port)
-		(let ((size (integer-bytes->integer (read-bytes 2 port) #f)))
-			(if (> size 2) (read-bytes (- size 2) port) #f)
+		(let loop ()
+			(let ((size (integer-bytes->integer (read-bytes 2 port) #f)))
+				(if (> size 2)
+					(read-bytes (- size 2) port)
+					(loop) ; skip empty packets
+				)
+			)
 		)
 	)
 	(define (write-buffer buffer port)
@@ -26,32 +39,52 @@
 		)
 	)
 	
-	(define (receive connection)
-		(define input-port (get-box-field connection 'input-port))
-		(define crypter (get-box-field connection 'crypter))
-	
+	(define (receive input-port crypter)
 		(let ((buffer (read-buffer input-port)))
-			(print-dump "buffer <-: " buffer)
+			;(print-dump "buffer <-: " buffer)
 			(let ((buffer (if crypter (crypter buffer #f) buffer)))
-				(print-dump "packet <-: " buffer)
+				;(print-dump "packet <-: " buffer)
 				buffer
 			)
 		)
 	)
-	(define (send connection buffer)
-		(define output-port (get-box-field connection 'output-port))
-		(define crypter (get-box-field connection 'crypter))
-		
-		(print-dump "packet ->: " buffer)
+	
+	(define (send buffer output-port crypter)
+		;(print-dump "packet ->: " buffer)
 		(let ((buffer (if crypter (crypter buffer #t) buffer)))
-			(print-dump "buffer ->: " buffer)
+			;(print-dump "buffer ->: " buffer)
 			(write-buffer buffer output-port)
 			(void)
 		)
 	)
 	
+	(define (smart-receive connection)
+		(define read-thread (get-box-field connection 'read-thread))
+		(if (and read-thread (not (equal? read-thread (current-thread))))
+			(async-channel-get (get-box-field connection 'input-channel))
+			(let-values (((input-port crypter) (get-fields (unbox connection) 'input-port 'crypter)))
+				(receive input-port crypter)
+			)
+		)
+	)
+	(define (smart-send connection buffer)
+		(define send-thread (get-box-field connection 'send-thread))
+		(if (and send-thread (not (equal? send-thread (current-thread))))
+			(async-channel-put (get-box-field connection 'output-channel) buffer)
+			(let-values (((output-port crypter) (get-fields (unbox connection) 'output-port 'crypter)))
+				(send buffer output-port crypter)
+			)
+		)
+	)
+	
 	(define (disconnect connection)
 		(begin
+			(let ((read-thread (get-box-field connection 'read-thread)))
+				(if read-thread (kill-thread read-thread) (void))
+			)
+			(let ((send-thread (get-box-field connection 'send-thread)))
+				(if send-thread (kill-thread send-thread) (void))
+			)
 			(close-input-port (get-box-field connection 'input-port))
 			(close-output-port (get-box-field connection 'output-port))
 			(void)
@@ -59,6 +92,6 @@
 	)
 	
 	(define (get-packet-id buffer)
-		(if buffer (bytes-ref buffer 0) #f)
+		(bytes-ref buffer 0)
 	)
 )
