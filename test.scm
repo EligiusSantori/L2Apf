@@ -1,34 +1,36 @@
 #lang racket
-(require srfi/1 "l2apf.scm")
+(require srfi/1 "library/extension.scm" "library/structure.scm" "l2apf.scm")
 
-(define channel #f)
-(define world #f)
-(define me #f)
+; TODO Параметры командной строки
 
-(define (find-character name characters)
-	(find (lambda (c) (equal? (cdr (assoc 'name c)) "test")) characters)
+(define (format-chat-message e)
+	(string-append
+		"[" (string-titlecase (last (string-split (symbol->string (get-field e 'channel)) "/"))) "] "
+		(get-field e 'author) ": " (get-field e 'text)
+	)
 )
 
-(let ((connection (connect "127.0.0.1")))
-	(let ((servers (login connection "test" "123456")))
-		(let ((characters (select-server connection (first servers))))
-			(let ((events (select-character connection (find-character "test" characters))))
+(letone connection (connect "127.0.0.1")
+	(letone world (first (login connection "test" "123456"))
+		(letone me (get-field (select-server connection world) "test")
+			(letone events (select-character connection me)
+
+				(set-interval connection 'party-time 7000)
 			
-				(set-interval connection 'party-time 30000)
-				
 				(let loop ()
-					(let ((event (sync events)))
-						(case (cdr (assoc 'name event))
+					(letone event (sync events)
+						(case (get-field event 'name)
 							((party-time)
-								(displayln "It's party time!") ; TODO (social-action 'social-action/dance)
+								(social-action connection 'social-action/dance)
 							)
 							((message)
-								
+								(displayln (format-chat-message event))
 							)
 						)
-						(loop)
 					)
+					(loop)
 				)
+				
 			)
 		)
 	)

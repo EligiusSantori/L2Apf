@@ -38,7 +38,7 @@
 							(loop)
 						))
 						((#x04) (let ((packet (login-server-packet/server-list buffer)))
-							(get-field packet 'list)
+							(map make-hash (get-field packet 'list))
 						))
 						(else #f)
 					)

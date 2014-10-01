@@ -1,4 +1,4 @@
-(module api racket/base
+(module system racket/base
 	(require
 		racket/async-channel
 		"../library/structure.scm"

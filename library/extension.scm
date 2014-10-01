@@ -7,6 +7,8 @@
 		bind-wrap
 		any-is
 		every-is
+		alist-flip
+		letone
 	)
 	
 	(define (bind f . args)
@@ -46,4 +48,13 @@
 		(define (is i) (p v i))
 		(apply every is l)
 	)
+	
+	(define (alist-flip l)
+		(map (compose xcons car+cdr) l)
+	)
+	
+	(define-syntax letone (syntax-rules () (
+		(letone id value body ...)
+		((lambda (id) body ...) value)
+	)))
 )

@@ -5,9 +5,10 @@
 		"structure.scm"
 	)
 	(provide (contract-out
-		(create-protagonist (list? . -> . box? ))
-		(create-antagonist (list? . -> . box? ))
-		(create-npc (list? . -> . box? ))
+		(create-world (list? . -> . hash?))
+		(create-protagonist (list? . -> . box?))
+		(create-antagonist (list? . -> . box?))
+		(create-npc (list? . -> . box?))
 		;( ( . -> . ))
 	))
 	
@@ -67,5 +68,12 @@
 	)
 	(define (update-protagonist protagonist struct)
 		(void) ; TODO
+	)
+	
+	(define (create-world me)
+		(make-hash (list
+			(cons 'me me)
+			(cons (get-box-field me 'object-id) me)
+		))
 	)
 )

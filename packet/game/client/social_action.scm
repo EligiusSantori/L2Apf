@@ -1,0 +1,32 @@
+(module packet racket/base
+	(require srfi/1 "../../../library/extension.scm" "../../packet.scm")
+	(provide game-client-packet/social-action)
+
+	(define actions (alist-flip (list
+		(cons 2 'social-action/hello)
+		(cons 3 'social-action/victory)
+		(cons 4 'social-action/charge)
+		(cons 5 'social-action/no)
+		(cons 6 'social-action/yes)
+		(cons 7 'social-action/bow)
+		(cons 8 'social-action/unaware)
+		(cons 9 'social-action/waiting)
+		(cons 10 'social-action/laugh)
+		(cons 11 'social-action/applause)
+		(cons 12 'social-action/dance)
+		(cons 13 'social-action/sad)
+		(cons 15 'social-action/level-up)
+	)))
+	
+	(define (game-client-packet/social-action action)
+		(let ((s (open-output-bytes)))
+			(let ((id (cdr (assoc action actions))))
+				(begin
+					(write-byte #x1b s)
+					(write-int32 id #f s)
+					(get-output-bytes s)
+				)
+			)
+		)
+	)
+)
