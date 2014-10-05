@@ -14,8 +14,8 @@
 		"refresh_skill_list.scm"
 		"../system/read_thread.scm"
 		"../system/send_thread.scm"
-		"../system/time_thread.scm"
-		"../system/main_thread.scm"
+		"../system/timers.scm"
+		"../system/events.scm"
 	)
 	(provide select-character)
 	
@@ -28,12 +28,11 @@
 			(let ((buffer (receive connection)))
 				(case (get-packet-id buffer)
 					((#x15) (let ((packet (game-server-packet/player-character buffer)))
-						(define world (get-box-field connection 'world))
-
-						(set-box! character (unbox (create-protagonist (get-field packet 'me))))
-						(hash-clear! world)
-						(hash-set! world 'me character)
-						(hash-set! world (get-box-field character 'object-id) character)
+						(let ((world (@: connection 'world)) (me (create-protagonist (@: packet 'me))))
+							(hash-clear! world)
+							(set-box! character (unbox me))
+							(hash-set! world 'me character)
+						)
 
 						(refresh-manor-list connection)
 						(refresh-quest-list connection)
@@ -58,12 +57,11 @@
 			(let ((time (thread (bind time-thread connection))))
 				(set-box-field! connection 'time-thread time)
 			)
-			(set-box-field! connection 'events (make-async-channel))
-			(let ((main (thread (bind main-thread connection))))
-				(set-box-field! connection 'thread main)
-			)
 			
-			(get-box-field connection 'events)
+			(let ((events (make-event-channel connection)))
+				(set-box-field! connection 'event-channel events)
+				events
+			)
 		)
 	)
 )

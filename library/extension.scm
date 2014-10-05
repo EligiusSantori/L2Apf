@@ -5,10 +5,9 @@
 		bind-head
 		bind-tail
 		bind-wrap
-		any-is
-		every-is
+		any-is?
+		every-is?
 		alist-flip
-		letone
 	)
 	
 	(define (bind f . args)
@@ -36,14 +35,14 @@
 	)
 	
 	; Хотя бы один элемент списка l равны значению v, используя для сравнения предикат p
-	(define (any-is v l . t)
+	(define (any-is? v l . t)
 		(define p (if (null? t) equal? (car t)))
 		(define (is i) (p v i))
 		(apply any is l)
 	)
 	
 	; Все элементы списка l равен значению v, используя для сравнения предикат p
-	(define (every-is v l . t)
+	(define (every-is? v l . t)
 		(define p (if (null? t) equal? (car t)))
 		(define (is i) (p v i))
 		(apply every is l)
@@ -53,8 +52,8 @@
 		(map (compose xcons car+cdr) l)
 	)
 	
-	(define-syntax letone (syntax-rules () (
-		(letone id value body ...)
-		((lambda (id) body ...) value)
-	)))
+	;(define-syntax letone (syntax-rules () (
+	;	(letone id value body ...)
+	;	((lambda (id) body ...) value)
+	;)))
 )

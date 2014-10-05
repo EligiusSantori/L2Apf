@@ -8,6 +8,8 @@
 		(string->bytes/utf-16 (string? . -> . bytes?))
 		(string->bytes/utf-16le (string? . -> . bytes?))
 		(string->bytes/utf-16ge (string? . -> . bytes?))
+		(hash-filter (hash? procedure? . -> . list?))
+		(hash-find (hash? procedure? . -> . any/c))
 	))
 
 	(define (convert data from to)
@@ -52,5 +54,29 @@
 		(let ((data (string->bytes/locale s)))
 			(convert data "" "UTF-16GE")
 		)
+	)
+
+	;(define (hash-map p . hs)
+	;		
+	;)
+	
+	(define (hash-filter h p)
+		(define l (list))
+		(hash-for-each h (lambda (k v)
+			(when (p k v)
+				(set! l (cons (cons k v) l))
+			)
+		))
+		l
+	)
+	
+	(define (hash-find h p)
+		(define i #f)
+		(hash-for-each h (lambda (k v)
+			(when (p k v)
+				(set! i (cons k v)) ; TODO return immediately using continuation
+			)
+		))
+		i
 	)
 )

@@ -17,14 +17,14 @@
 
 	(define (select-server connection server)
 		(set-box-field! connection 'world server)
-		(let () ; Взаимодействие с login-сервером
-			(define input-port (get-box-field connection 'input-port))
-			(define output-port (get-box-field connection 'output-port))
-			(define crypter (get-box-field connection 'crypter))
+		(let () ; login-server interaction
+			(define input-port (@: connection 'input-port))
+			(define output-port (@: connection 'output-port))
+			(define crypter (@: connection 'crypter))
 			
 			(send connection (login-client-packet/select-server (list
 				(cons 'server-id (hash-ref server 'id))
-				(cons 'login-key (get-box-field connection 'login-key))
+				(cons 'login-key (@: connection 'login-key))
 			)))
 			
 			(let loop ()
@@ -37,7 +37,7 @@
 						))
 						((#x07) (let ((packet (login-server-packet/play-ok buffer)))
 							(begin
-								(set-box-field! connection 'game-key (get-field packet 'game-key))
+								(set-box-field! connection 'game-key (@: packet 'game-key))
 								(set-box-field! connection 'session-id #f)
 								(set-box-field! connection 'crypter #f)
 								(set-box-field! connection 'rsa-key #f)
@@ -50,15 +50,15 @@
 			)
 		)
 		
-		(if (get-box-field connection 'game-key) ; Взаимодействие с game-сервером
-			(let ((host (hash-ref server 'address)) (port (hash-ref server 'port)))
+		(if (@: connection 'game-key) ; game-server interaction
+			(let ((host (@: server 'address)) (port (@: server 'port)))
 				(let-values (((input-port output-port) (tcp-connect host port)))
 					
 					(set-box-field! connection 'input-port input-port)
 					(set-box-field! connection 'output-port output-port)
 				
 					(send connection (game-client-packet/protocol-version (list
-						(cons 'protocol (get-box-field connection 'protocol))
+						(cons 'protocol (@: connection 'protocol))
 					)))
 				
 					(let loop ()
@@ -66,14 +66,14 @@
 							(case (get-packet-id buffer)
 								((#x00) (let ((packet (game-server-packet/key-packet buffer)))
 									(begin
-										(let ((crypter (make-crypter (get-field packet 'key))))
+										(let ((crypter (make-crypter (@: packet 'key))))
 											(set-box-field! connection 'crypter crypter)
 										)
 										
 										(send connection (game-client-packet/validate-auth (list
-											(cons 'login (get-box-field connection 'account))
-											(cons 'login-key (get-box-field connection 'login-key))
-											(cons 'game-key (get-box-field connection 'game-key))
+											(cons 'login (@: connection 'account))
+											(cons 'login-key (@: connection 'login-key))
+											(cons 'game-key (@: connection 'game-key))
 										)))
 										(loop)
 									)
@@ -86,7 +86,7 @@
 									(set-box-field! connection 'login-key #f)
 									(set-box-field! connection 'game-key #f)
 									
-									(map transform (get-field packet 'list))
+									(map transform (@: packet 'list))
 								))
 								(else #f)
 							)

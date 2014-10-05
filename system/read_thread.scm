@@ -7,7 +7,7 @@
 	(provide read-thread)
 	
 	(define (read-thread connection)
-		(define channel (get-box-field connection 'input-channel))
+		(define channel (@: connection 'input-channel))
 		
 		(let loop ()
 			(async-channel-put channel (receive connection))

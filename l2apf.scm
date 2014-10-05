@@ -10,74 +10,24 @@
 
 (module l2apf racket/base
 	(require
-		srfi/1
-		racket/function
-		(except-in racket/contract any)
-		"api/connect.scm"
-		"api/login.scm"
-		"api/logout.scm"
-		"api/refresh_manor_list.scm"
-		"api/refresh_quest_list.scm"
-		"api/refresh_skill_list.scm"
-		"api/restart.scm"
-		"api/select_character.scm"
-		"api/select_server.scm"
-		"api/social_action.scm"
+		racket/contract
 		"library/structure.scm"
-		"system/time_thread.scm"
-	)
-	(provide
-		connect
-		login
-		select-server
-		select-character
-		refresh-manor-list
-		refresh-quest-list
-		refresh-skill-list
-		social-action
-		restart
-		logout
 	)
 	(provide (contract-out
-		(set-timeout (box? symbol? (or/c integer? false/c) . -> . void?))
-		(set-interval (box? symbol? (or/c integer? false/c) . -> . void?))
 		(get-events (box? . -> . evt?))
 		(get-world (box? . -> . box?))
 		(get-me (box? . -> . box?))
-		;( ( . -> . ))
 	))
 	
 	(define (get-me connection)
-		(get-box-field connection 'me)
+		(@: connection 'me)
 	)
 	
 	(define (get-world connection)
-		(get-box-field connection 'world)
+		(@: connection 'world)
 	)
 	
 	(define (get-events connection)
-		(get-box-field connection 'events)
+		(@: connection 'event-channel)
 	)
-	
-	(define (set-timeout connection name timeout) ; precise timeout
-		(let ((timeout (if timeout (+ (current-inexact-milliseconds) timeout) #f)))
-			(let ((thread (get-box-field connection 'time-thread)))
-				(thread-send thread (list 'set-timeout name timeout))
-				(void)
-			)
-		)
-	)
-	
-	(define (set-interval connection name time-or-fn) ; may have shifted
-		(let ((fn (if (integer? time-or-fn) (const time-or-fn) time-or-fn)))
-			(let ((thread (get-box-field connection 'time-thread)))
-				(thread-send thread (list 'set-interval name fn))
-				(void)
-			)
-		)
-	)
-	
-	;(define (run-event name ?))
-	;(define (set-event name checker handler))
-
 )

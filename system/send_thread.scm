@@ -7,7 +7,7 @@
 	(provide send-thread)
 	
 	(define (send-thread connection)
-		(define channel (get-box-field connection 'output-channel))
+		(define channel (@: connection 'output-channel))
 		
 		(let loop ()
 			(send connection (async-channel-get channel))

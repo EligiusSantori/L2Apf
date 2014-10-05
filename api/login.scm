@@ -18,8 +18,8 @@
 			(send connection (login-client-packet/login-auth (list
 				(cons 'login login)
 				(cons 'password password)
-				(cons 'session-id (get-box-field connection 'session-id))
-				(cons 'rsa-key (get-box-field connection 'rsa-key))
+				(cons 'session-id (@: connection 'session-id))
+				(cons 'rsa-key (@: connection 'rsa-key))
 			)))
 			
 			(let loop ()
@@ -31,14 +31,14 @@
 							(disconnect connection)
 						))
 						((#x03) (let ((packet (login-server-packet/login-ok buffer)))
-							(set-box-field! connection 'login-key (get-field packet 'login-key))
+							(set-box-field! connection 'login-key (@: packet 'login-key))
 							(send connection (login-client-packet/server-list (list
-								(cons 'login-key (get-field packet 'login-key))
+								(cons 'login-key (@: packet 'login-key))
 							)))
 							(loop)
 						))
 						((#x04) (let ((packet (login-server-packet/server-list buffer)))
-							(map make-hash (get-field packet 'list))
+							(map make-hash (@: packet 'list))
 						))
 						(else #f)
 					)

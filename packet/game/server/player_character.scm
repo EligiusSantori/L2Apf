@@ -1,27 +1,9 @@
 (module packet racket/base
 	(provide game-server-packet/player-character)
-	(require "../../../library/geometry.scm")
-	(require "../../packet.scm")
-	
-	(define (read-equipment s)
-		(list
-			(cons 'underwear (read-int32 #f s))
-			(cons 'right-earing (read-int32 #f s))
-			(cons 'left-earing (read-int32 #f s))
-			(cons 'neck (read-int32 #f s))
-			(cons 'right-finger (read-int32 #f s))
-			(cons 'left-finger (read-int32 #f s))
-			(cons 'head (read-int32 #f s))
-			(cons 'right-hand (read-int32 #f s))
-			(cons 'left-hand (read-int32 #f s))
-			(cons 'gloves (read-int32 #f s))
-			(cons 'chest (read-int32 #f s))
-			(cons 'legs (read-int32 #f s))
-			(cons 'feet (read-int32 #f s))
-			(cons 'back (read-int32 #f s))
-			(cons 'both-hand (read-int32 #f s))
-			(cons 'hair (read-int32 #f s))
-		)
+	(require
+		"../../../library/geometry.scm"
+		"../../packet.scm"
+		"../clothing.scm"
 	)
 	
 	(define (game-server-packet/player-character buffer)
@@ -41,7 +23,7 @@
 					(cons 'race (read-int32 #f s))
 					(cons 'base-class-id (read-int32 #f s))
 					(cons 'is-active (not (= (read-int32 #f s) 0)))
-					(cons 'position (point3d
+					(cons 'position (point/3d
 						(read-int32 #t s)
 						(read-int32 #t s)
 						(read-int32 #t s)
@@ -53,23 +35,25 @@
 					(cons 'level (read-int32 #f s))
 					(cons 'karma (read-int32 #f s))
 					
-					(cons 'INT (begin
-						(read-int32 #f s)
-						(read-int32 #f s)
+					(cons 'statements (list
+						(cons 'INT (begin
+							(read-int32 #f s)
+							(read-int32 #f s)
+						))
+						(cons 'STR (read-int32 #f s))
+						(cons 'CON (read-int32 #f s))
+						(cons 'MEN (read-int32 #f s))
+						(cons 'DEX (read-int32 #f s))
+						(cons 'WIT (read-int32 #f s))
 					))
-					(cons 'STR (read-int32 #f s))
-					(cons 'CON (read-int32 #f s))
-					(cons 'MEN (read-int32 #f s))
-					(cons 'DEX (read-int32 #f s))
-					(cons 'WIT (read-int32 #f s))
 					
 					(cons 'equipment (begin
 						(read-int32 #f s)
 						(read-int32 #f s)
-						(read-equipment s)
+						(read-clothing s)
 					))
 					
-					(cons 'clothing (read-equipment s))
+					(cons 'clothing (read-clothing s))
 					
 					; TODO other data
 				))

@@ -25,12 +25,12 @@
 				(let ((buffer (receive connection)))
 					(case (get-packet-id buffer)
 						((#x00) (let ((packet (login-server-packet/init buffer)))
-							(set-box-field! connection 'session-id (get-field packet 'session-id))
+							(set-box-field! connection 'session-id (@: packet 'session-id))
 							(set-box-field! connection 'crypter (make-blowfish-crypter token))
-							(set-box-field! connection 'rsa-key (get-field packet 'rsa-key))
+							(set-box-field! connection 'rsa-key (@: packet 'rsa-key))
 						
 							(send connection (login-client-packet/gg-auth (list
-								(cons 'session-id (get-field packet 'session-id))
+								(cons 'session-id (@: packet 'session-id))
 							)))
 							
 							(loop)
