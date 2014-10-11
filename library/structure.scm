@@ -10,6 +10,15 @@
 		(set-box-field! (box? symbol? any/c . -> . void?))
 	))
 	
+	(define (struct-transfer target source . fields)
+		(let ((fields (filter (lambda (i) (assoc i source)) fields))) ; only exist fields
+			(append
+				(filter (lambda (i) (member (car i) fields)) source)
+				(filter (lambda (i) (not (member (car i) fields))) target)
+			)
+		)
+	)
+	
 	(define (set-field struct field value)
 		(let ((struct (alist-delete field struct)))
 			(if value (alist-cons field value struct) struct)

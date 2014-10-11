@@ -2,11 +2,17 @@
 	(require
 		racket/contract
 		racket/list
+		racket/math
 		"../library/ral.scm"
+		"../library/geometry.scm"
 	)
 	(provide (contract-out
 		(scramble (bytes? . -> . bytes?))
 		(checksum ((and/c bytes? longer-then-4? multiple-of-4?) . -> . bytes?))
+		(heading->angle (integer? . -> . real?))
+		(angle->heading (real? . -> . integer?))
+		(read-point (input-port? . -> . point/3d?))
+		(write-point (point/3d? output-port? . -> . void?))
 		(read-int16 (boolean? input-port? . -> . integer?))
 		(write-int16 (integer? boolean? output-port? . -> . void?))
 		(read-int32 (boolean? input-port? . -> . integer?))
@@ -138,6 +144,31 @@
 		(write-bytes (string->bytes/utf-16le s) port)
 		(write-bytes (bytes 0 0) port)
 		(void)
+	)
+	
+	(define (read-point port)
+		(point/3d
+			(read-int32 #t port)
+			(read-int32 #t port)
+			(read-int32 #t port)
+		)
+	)
+	(define (write-point p port)
+		(write-int32 (point/3d-x p) #t port)
+		(write-int32 (point/3d-y p) #t port)
+		(write-int32 (point/3d-z p) #t port)
+		(void)
+	)
+	
+	(define (modulo a b) ; real modulo
+		(- a (* b (truncate (/ a b))))
+	)
+	
+	(define (heading->angle heading)
+		(modulo (degrees->radians (/ heading 182.044444444)) (* 2 pi))
+	)
+	(define (angle->heading angle)
+		(round (* (radians->degrees (modulo angle (* 2 pi))) 182.044444444))
 	)
 	
 	(define (longer-then-4? data)

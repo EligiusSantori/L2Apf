@@ -12,13 +12,15 @@
 				(cons 'id (read-byte s))
 				(cons 'me (list
 					(cons 'name (read-utf16 s))
-					(cons 'object-id (read-int32 #f s))
-					(cons 'title (read-utf16 s))
+					(cons 'title (begin
+						(read-int32 #f s) ; must be object-id, but trash
+						(read-utf16 s)
+					))
 					(cons 'session-id (read-int32 #f s))
 					(cons 'clan-id (read-int32 #f s))
 					(cons 'gender (begin
 						(read-int32 #f s)
-						(if (= (read-int32 #f s) 0) 'male 'female)
+						(if (= (read-int32 #f s) 0) 'gender/male 'gender/female)
 					))
 					(cons 'race (read-int32 #f s))
 					(cons 'base-class-id (read-int32 #f s))

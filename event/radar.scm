@@ -14,11 +14,10 @@
 	
 	(define (set-radar-event! connection name radius . temp)
 		(define suitable? (if (null? temp) object? (car temp)))
-		(define (predicate k v) (and (integer? k) (suitable? v)))
 	
 		(let* ((world (@: connection 'world)) (me (@: world 'me)) (storage (make-hash)))
-			(define (handle object)
-				(let ((object-id (@: object 'object-id)))
+			(define (handle-new-or-known pair)
+				(let-values (((object-id object) (car+cdr pair)))
 					(unless (hash-has-key? storage object-id)
 						(hash-set! storage object-id (cons #f object))
 					)
@@ -44,24 +43,28 @@
 				)
 			)
 			
-			(define (get-missed objects)
-				(let ((ids (lset-difference = (map (lambda (i) (@: i 'object-id)) objects) (hash-keys storage))))
+			(define (handle-missed object)
+				(run-event connection name (list
+					(cons 'object object)
+					(cons 'action 'leave)
+				))
+			)
+			
+			(define (get-missed pairs)
+				(let ((ids (lset-difference = (map car pairs) (hash-keys storage))))
 					(map (lambda (object-id) (cdr (hash-ref storage object-id))) ids)
 				)
 			)
 		
+			(define (predicate k v)
+				(and (integer? k) (not (= k (@: me 'object-id))) (suitable? v))
+			)
+		
 			(define (checker event)
 				(when (equal? temp-interval-event (@: event 'name)) ; check if it's my interval event
-					(let ((objects (hash-filter world predicate)))
-						(map handle objects) ; handle new and known objects
-						(let ((missed (get-missed objects)))
-							(map (lambda (object) ; handle missed objects
-								(run-event connection name (list
-									(cons 'object object)
-									(cons 'action 'leave)
-								))
-							) objects)
-						)
+					(let ((pairs (hash-filter world predicate)))
+						(map handle-new-or-known pairs)
+						(map handle-missed (get-missed pairs))
 					)
 				)
 				

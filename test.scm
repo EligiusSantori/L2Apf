@@ -14,6 +14,7 @@
 	"api/social_action.scm"
 	"api/move_to.scm"
 	"api/move_on.scm"
+	"system/contract.scm"
 	"event/radar.scm"
 	"l2apf.scm"
 )
@@ -40,7 +41,15 @@
 		(let ((me (@: (select-server connection world) config/name)))
 			(let ((events (select-character connection me)))
 
-				(set-radar-event! connection 'he-so-close 1000)
+				(set-radar-event! connection 'he-so-close 250)
+				(define move-on/sync (make-contract move-on (lambda (event)
+					(and
+						(equal? (@: event 'name) 'change-moving)
+						(equal? (@: event 'action) 'stop)
+						(equal? (@: event 'object-id) (@: me 'object-id))
+						(sleep 1/3) ; overspeed interaction fix
+					)
+				)))
 				
 				(let loop ()
 					(let ((event (sync events)))
@@ -48,8 +57,8 @@
 							; custom events
 							((he-so-close)
 								(let ((object (@: event 'object)))
-									(when (and (antagonist? object) (equal? (@: object 'name) config/admin))
-										(move-on connection 10 (objects-angle me object) #t) ; turn toward
+									(when (and (antagonist? object) (string-ci=? (@: object 'name) config/admin))
+										(move-on/sync connection 25 (objects-angle me object) #f) ; turn toward
 										(case (@: event 'action) ; greetings and goodbye
 											((come) (social-action connection 'social-action/hello))
 											((leave) (social-action connection 'social-action/bow))
@@ -60,9 +69,6 @@
 							; standard events
 							((message)
 								(displayln (format-chat-message event))
-							)
-							((unhandled-packet)
-								(displayln (format "unhandled packet #~x" (@: event 'id)))
 							)
 							((logout)
 								(exit)

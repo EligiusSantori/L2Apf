@@ -1,5 +1,6 @@
 (module packet racket/base
 	(require
+		racket/math
 		"../../../library/extension.scm"
 		"../../../library/geometry.scm"
 		"../../packet.scm"
@@ -16,12 +17,12 @@
 		(let ((s (open-output-bytes)))
 			(begin
 				(write-byte #x01 s)
-				(write-int32 (point/3d-x target) #t s)
-				(write-int32 (point/3d-y target) #t s)
-				(write-int32 (point/3d-z target) #t s)
-				(write-int32 (point/3d-x origin) #t s)
-				(write-int32 (point/3d-y origin) #t s)
-				(write-int32 (point/3d-z origin) #t s)
+				(write-int32 (exact-round (point/3d-x target)) #t s)
+				(write-int32 (exact-round (point/3d-y target)) #t s)
+				(write-int32 (exact-round (point/3d-z target)) #t s)
+				(write-int32 (exact-round (point/3d-x origin)) #t s)
+				(write-int32 (exact-round (point/3d-y origin)) #t s)
+				(write-int32 (exact-round (point/3d-z origin)) #t s)
 				(write-int32 (cdr (assoc device (alist-flip devices))) #f s)
 				(get-output-bytes s)
 			)
