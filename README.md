@@ -10,3 +10,8 @@ Racket .\test.scm l2apf://login:password@host:port/player
 ```
 "C:\Program Files\Racket\Racket" .\test.scm l2apf://JohnDoe:123456@localhost:2106/Feynriel
 ```
+
+# Requirements
+* racket version 6
+* openssl library (installed on your computer)
+* l2j c4 server (660 protocol version)
