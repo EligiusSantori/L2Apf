@@ -1,25 +1,6 @@
 (module packet racket/base
 	(provide game-server-packet/chat-message)
-	(require "../../packet.scm")
-	
-	(define channels (list
-		(cons 0 'chat-channel/all)
-		(cons 1 'chat-channel/shout)
-		(cons 2 'chat-channel/tell)
-		(cons 3 'chat-channel/party)
-		(cons 4 'chat-channel/clan)
-		(cons 5 'chat-channel/game-master)
-		(cons 6 'chat-channel/petition-player)
-		(cons 7 'chat-channel/petition-game-master)
-		(cons 8 'chat-channel/trade)
-		(cons 9 'chat-channel/alliance)
-		(cons 10 'chat-channel/announce)
-		(cons 11 'chat-channel/boat)
-		(cons 15 'chat-channel/party-member)
-		(cons 16 'chat-channel/party-leader)
-		(cons 16 'chat-channel/hero-voice)
-		(cons -1 'chat-channel/friend)
-	))
+	(require "../../packet.scm" "../channel.scm")
 	
 	(define (game-server-packet/chat-message buffer)
 		(let ((s (open-input-bytes buffer)))

@@ -5,7 +5,14 @@
 		racket/async-channel
 		"../library/structure.scm"
 		(only-in "../library/network.scm" get-packet-id disconnect)
-		"../library/logic.scm"
+		"../logic/main.scm"
+		"../logic/world.scm"
+		"../logic/object.scm"
+		"../logic/creature.scm"
+		"../logic/npc.scm"
+		"../logic/character.scm"
+		"../logic/antagonist.scm"
+		"../logic/protagonist.scm"
 		"../packet/game/server/chat_message.scm"
 		"../packet/game/server/social_action.scm"
 		"../packet/game/server/die.scm"
@@ -16,6 +23,13 @@
 		"../packet/game/server/npc_info.scm"
 		"../packet/game/server/move_to_point.scm"
 		"../packet/game/server/stop_moving.scm"
+		"../packet/game/server/status_update.scm"
+		"../packet/game/server/target_selected.scm"
+		"../packet/game/server/target_unselected.scm"
+		"../packet/game/server/ask_join_alliance.scm"
+		"../packet/game/server/ask_join_clan.scm"
+		"../packet/game/server/ask_join_party.scm"
+		"../packet/game/server/ask_be_friends.scm"
 		"make_event.scm"
 	)
 
@@ -35,6 +49,16 @@
 		)
 	)
 	
+	(define (set-proxy-event! connection name . tail)
+		(define handler (if (null? tail) values (car tail)))
+		(define (checker event) (equal? name (@: 'name event)))
+
+		(let ((proxy (gensym)))
+			(set-event! connection proxy checker handler)
+			proxy
+		)
+	)
+	
 	(define (run-event connection name data)
 		(let ((channel (@: connection 'custom-channel)))
 			(async-channel-put channel (make-event name data))
@@ -46,7 +70,7 @@
 		(case (get-packet-id buffer)
 			((#x01) (let ((packet (game-server-packet/move-to-point buffer)))
 				(let ((object-id (@: packet 'object-id)) (p (@: packet 'position)) (d (@: packet 'destination)))
-					(let ((a (points-angle p d)) (moving? (not (equal? p d))))
+					(let ((moving? (not (equal? p d))))
 						(define struct (list
 							(cons 'position p)
 							(cons 'destination d)
@@ -54,7 +78,7 @@
 						))
 						(update-creature!
 							(get-object world object-id)
-							(if a (alist-cons 'angle a struct) struct)
+							(if moving? (alist-cons 'angle (points-angle p d) struct) struct)
 						)
 						
 						(make-event 'change-moving (list
@@ -72,9 +96,8 @@
 					))
 				)
 			))
-			
 			((#x04) (let ((packet (game-server-packet/user-info buffer)))
-				(let ((me (get-object world 'me)))
+				(let ((me (@: world 'me)))
 					(update-protagonist! me packet)
 					(register-object! world me)
 					(make-event 'creature-update (list
@@ -82,24 +105,41 @@
 					))
 				)
 			))
-			
 			;((#x05) ; Attack
 			;	
 			;)
-			
-			((#x06) (let ((packet (game-server-packet/die buffer))) ; TODO toggle object state
+			((#x06) (let ((packet (game-server-packet/die buffer)))
+				(let ((creature (get-object world (@: packet 'object-id))) (spoiled? (@: packet 'spoiled?)))
+					(let ((data (list (cons 'moving? #f) (cons 'alike-dead? #t))))
+						(cond
+							((and (protagonist? creature) (<= 0 (@: creature 'hp)))
+								(update-protagonist! creature (alist-cons 'died? #t data))
+							)
+							((npc? creature)
+								(update-npc! creature (alist-cons 'spoiled? spoiled? data))
+							)
+							(else (update-creature! creature data))
+						)
+					)
+				)
+				
 				(make-event 'die (list
 					(cons 'object-id (@: packet 'object-id))
-					(cons 'spoiled? (@: packet 'spoiled?))
 					(cons 'return (@: packet 'return))
 				))
 			))
-			((#x07) (let ((packet (game-server-packet/revive buffer))) ; TODO toggle object state
+			((#x07) (let ((packet (game-server-packet/revive buffer)))
+				(let ((creature (get-object world (@: packet 'object-id))))
+					(if (protagonist? creature)
+						(update-protagonist! creature (list (cons 'died? #f) (cons 'alike-dead? #f)))
+						(update-creature! creature (list (cons 'alike-dead? #f)))
+					)
+				)
+			
 				(make-event 'revive (list
 					(cons 'object-id (@: packet 'object-id))
 				))
 			))
-			
 			;((#x0b) ; SpawnItem
 			;	; (register-object item world)
 			;)
@@ -109,22 +149,27 @@
 			;((#x0d) ; GetItem
 			;	
 			;)
+			((#x0e) (let ((packet (game-server-packet/status-update buffer)))
+				(let ((creature (get-object world (@: packet 'object-id))))
+					(cond
+						((protagonist? creature) (update-protagonist! creature packet))
+						((antagonist? creature) (update-antagonist! creature packet))
+						((npc? creature) (update-npc! creature packet))
+					)
+				)
 			
-			#|
-			((#x0e) ; StatusUpdate
-			
-			)
-			|#
-			
+				(make-event 'creature-update (list
+					(cons 'object-id (@: packet 'object-id))
+				))
+			))
 			((#x12) (let ((packet (game-server-packet/object-deleted buffer)))
-				(let ((object-id (@: packet 'object-id)))
-					(make-event 'object-deleted (list
-						(cons 'object-id object-id)
+				(let ((object (get-object world (@: packet 'object-id))))
+					(discard-object! world object)
+					(make-event 'object-delete (list
+						(cons 'object object) ; TODO return object-id but discard in next cycle
 					))
-					(discard-object! world object-id)
 				)
 			))
-			
 			((#x16) (let ((packet (game-server-packet/npc-info buffer)))
 				(let ((npc (create-npc packet)))
 					(register-object! world npc)
@@ -133,28 +178,57 @@
 					))
 				)
 			))
-			
 			;((#x1b) ; ItemList
 			;	(void)
 			;)
-			
-			;((#x29) ; TargetSelected
-			;	; (set-target! object target)
-			;)
-			;((#x2a) ; TargetUnselected
-			;	; (set-target! object #f)
-			;)
-			
+			((#x29) (let ((packet (game-server-packet/target-selected buffer)))
+				(let ((creature (get-object world (@: packet 'object-id))))
+					(update-creature! creature (list
+						(cons 'target-id (@: packet 'target-id))
+						(cons 'position (@: packet 'position))
+					))
+				)
+				
+				(make-event 'change-target (list
+					(cons 'object-id (@: packet 'object-id))
+					(cons 'target-id (@: packet 'target-id))
+				))
+			))
+			((#x2a) (let ((packet (game-server-packet/target-unselected buffer)))
+				(let ((creature (get-object world (@: packet 'object-id))))
+					(update-creature! creature (list
+						(cons 'target-id #f)
+						(cons 'position (@: packet 'position))
+					))
+				)
+				
+				(make-event 'change-target (list
+					(cons 'object-id (@: packet 'object-id))
+					(cons 'target-id #f)
+				))
+			))
 			((#x2d) (let ((packet (game-server-packet/social-action buffer)))
 				(make-event 'social-action (list
 					(cons 'object-id (@: packet 'object-id))
 					(cons 'action (@: packet 'action))
-				)
-			)))
+				))
+			))
+			((#x32) (let ((packet (game-server-packet/ask-join-clan buffer)))
+				(make-event 'ask (list
+					(cons 'question 'ask/join-clan)
+					(cons 'clan (@: packet 'name))
+				))
+			))
+			((#x39) (let ((packet (game-server-packet/ask-join-party buffer)))
+				(make-event 'ask (list
+					(cons 'question 'ask/join-party)
+					(cons 'player (@: packet 'name))
+					(cons 'loot (@: packet 'loot))
+				))
+			))
 			;((#x45) ; ShortcutInit
 			;	(void)
 			;)
-
 			((#x47) (let ((packet (game-server-packet/stop-moving buffer)))
 				(let ((object-id (@: packet 'object-id)) (p (@: packet 'position)) (a (@: packet 'angle)))
 					(update-creature! (get-object world object-id) (list
@@ -184,6 +258,12 @@
 			;((#x64) ; SystemMessage
 			;	(void)
 			;)
+			((#x7d) (let ((packet (game-server-packet/ask-be-friends buffer)))
+				(make-event 'ask (list
+					(cons 'question 'ask/be-friends)
+					(cons 'player (@: packet 'name))
+				))
+			))
 			((#x7e) ; logout
 				(make-event 'logout)
 			)
@@ -193,9 +273,12 @@
 			;((#x80) ; QuestList
 			;	(void)
 			;)
-			;((#xa6) ; MyTargetSelected
-			;	
-			;)
+			((#xa8) (let ((packet (game-server-packet/ask-join-alliance buffer)))
+				(make-event 'ask (list
+					(cons 'question 'ask/join-alliance)
+					(cons 'alliance (@: packet 'name))
+				))
+			))
 			;((#xe4) ; HennaInfo
 			;	(void)
 			;)
@@ -219,9 +302,7 @@
 		(let ((world (@: connection 'world)))
 			(wrap-evt
 				(@: connection 'input-channel)
-				(lambda (buffer)
-					(handle-packet buffer world)
-				)
+				(lambda (buffer) (handle-packet buffer world))
 			)
 		)
 	)

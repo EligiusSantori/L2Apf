@@ -10,6 +10,7 @@
 		(string->bytes/utf-16ge (string? . -> . bytes?))
 		(hash-filter (hash? procedure? . -> . list?))
 		(hash-find (hash? procedure? . -> . any/c))
+		(alist-ref (any/c list? . -> . any/c))
 	))
 
 	(define (convert data from to)
@@ -22,6 +23,17 @@
 			)
 		)
 	)
+	
+	(define (alist-ref k l)
+		(let ((p (assoc k l)))
+			(if p (cdr p) p)
+		)
+	)
+	
+	;(define (alist-merge alist1 alist2 . tail)
+	;	(define deep? (if (null? tail) #f (car tail)))
+	;	
+	;)
 
 	(define (bytes->string/utf-16 data)
 		(let ((data (convert data "UTF-16" "")))

@@ -31,9 +31,8 @@
 				(let ((buffer (receive connection)))
 					(case (get-packet-id buffer)
 						((#x06) (let ((packet (login-server-packet/play-fail buffer)))
-							(display "play fail: ")
-							(displayln (cdr (assoc 'reason packet))) ; TODO message
 							(disconnect connection)
+							(error (string-append "Connection failed: " (symbol->string (@: packet 'reason))))					
 						))
 						((#x07) (let ((packet (login-server-packet/play-ok buffer)))
 							(begin

@@ -3,7 +3,7 @@
 		srfi/1
 		"../library/ral.scm"
 		"../library/structure.scm"
-		"../library/logic.scm"
+		"../logic/object.scm"
 		"../system/events.scm"
 		"../system/timers.scm"
 	)

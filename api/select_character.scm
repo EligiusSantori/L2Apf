@@ -5,17 +5,17 @@
 		"../library/extension.scm"
 		"../library/structure.scm"
 		"../library/network.scm"
-		"../library/logic.scm"
 		"../packet/game/client/select_character.scm"
 		"../packet/game/server/player_character.scm"
 		"../packet/game/client/enter_world.scm"
-		"refresh_manor_list.scm"
-		"refresh_quest_list.scm"
-		"refresh_skill_list.scm"
+		"../logic/protagonist.scm"
 		"../system/read_thread.scm"
 		"../system/send_thread.scm"
 		"../system/timers.scm"
 		"../system/events.scm"
+		"refresh_manor_list.scm"
+		"refresh_quest_list.scm"
+		"refresh_skill_list.scm"
 	)
 	(provide select-character)
 	

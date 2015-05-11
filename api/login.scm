@@ -26,9 +26,8 @@
 				(let ((buffer (receive connection)))
 					(case (get-packet-id buffer)
 						((#x01) (let ((packet (login-server-packet/login-fail buffer)))
-							(display "login fail: ")
-							(displayln (cdr (assoc 'reason packet))) ; TODO message
 							(disconnect connection)
+							(error (string-append "Authentication failed: " (symbol->string (@: packet 'reason))))						
 						))
 						((#x03) (let ((packet (login-server-packet/login-ok buffer)))
 							(set-box-field! connection 'login-key (@: packet 'login-key))

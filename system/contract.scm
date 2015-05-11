@@ -9,8 +9,9 @@
 		(make-contract (->* (procedure? procedure?) #:rest (or/c false/c (listof any/c)) procedure?))
 	))
 
+	; TODO make-contract => make-sync-api
 	(define (make-contract fn checker . tail)
-		(define handler (if (> (length tail) 0) (first tail) void))
+		(define handler (if (> (length tail) 0) (first tail) values))
 		(define timeout (if (> (length tail) 1) (/ (second tail) 1000) #f))
 		
 		(lambda (connection . args)
