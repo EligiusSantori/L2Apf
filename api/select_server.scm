@@ -23,7 +23,7 @@
 			(define crypter (@: connection 'crypter))
 			
 			(send connection (login-client-packet/select-server (list
-				(cons 'server-id (hash-ref server 'id))
+				(cons 'server-id (@: server 'id))
 				(cons 'login-key (@: connection 'login-key))
 			)))
 			

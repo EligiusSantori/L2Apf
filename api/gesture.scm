@@ -3,9 +3,9 @@
 		"../library/network.scm"
 		"../packet/game/client/social_action.scm"
 	)
-	(provide social-action)
+	(provide gesture)
 	
-	(define (social-action connection action)
+	(define (gesture connection action)
 		(send connection (game-client-packet/social-action action))
 	)
 )

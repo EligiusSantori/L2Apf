@@ -1,0 +1,276 @@
+(module system racket/base
+	(require
+		srfi/1
+		racket/function
+		"../library/structure.scm"
+		"../logic/main.scm"
+		"../logic/world.scm"
+		"../logic/object.scm"
+		"../logic/creature.scm"
+		"../logic/npc.scm"
+		"../logic/character.scm"
+		"../logic/antagonist.scm"
+		"../logic/protagonist.scm"
+		;"../logic/quest.scm"
+		"../logic/skill.scm"
+		;"../logic/item.scm"
+		"../packet/game/server/chat_message.scm"
+		"../packet/game/server/social_action.scm"
+		"../packet/game/server/die.scm"
+		"../packet/game/server/revive.scm"
+		"../packet/game/server/object_deleted.scm"
+		"../packet/game/server/user_info.scm"
+		"../packet/game/server/char_info.scm"
+		"../packet/game/server/npc_info.scm"
+		"../packet/game/server/move_to_point.scm"
+		"../packet/game/server/stop_moving.scm"
+		"../packet/game/server/status_update.scm"
+		"../packet/game/server/target_selected.scm"
+		"../packet/game/server/target_unselected.scm"
+		"../packet/game/server/ask_join_alliance.scm"
+		"../packet/game/server/ask_join_clan.scm"
+		"../packet/game/server/ask_join_party.scm"
+		"../packet/game/server/ask_be_friends.scm"
+		"../packet/game/server/change_move_type.scm"
+		"../packet/game/server/change_wait_type.scm"
+		"../packet/game/server/skill_list.scm"
+	)
+	
+	(provide packet-handlers-table)
+
+	; handlers
+	
+	(define (packet-handler/move-to-point world packet)
+		(let ((object-id (@: packet 'object-id)) (p (@: packet 'position)) (d (@: packet 'destination)))
+			(let ((moving? (not (equal? p d))))
+				(define struct (list
+					(cons 'position p)
+					(cons 'destination d)
+					(cons 'moving? moving?)
+				))
+				(update-creature!
+					(object-ref world object-id)
+					(if moving? (alist-cons 'angle (points-angle p d) struct) struct)
+				)
+				(values object-id)
+			)
+		)
+	)
+
+	(define (packet-handler/char-info world packet)
+		(let ((antagonist (create-antagonist packet)))
+			(register-object! world antagonist)
+			(values (@: antagonist 'object-id))
+		)
+	)
+
+	(define (packet-handler/user-info world packet)
+		(let ((me (@: world 'me)))
+			(update-protagonist! me packet)
+			(register-object! world me)
+			(values (@: me 'object-id))
+		)
+	)
+
+	(define (packet-handler/die world packet)
+		(let* ((object-id (@: packet 'object-id)) (creature (object-ref world object-id)) (spoiled? (@: packet 'spoiled?)))
+			(let ((data (list (cons 'moving? #f) (cons 'alike-dead? #t))))
+				(cond
+					((and (protagonist? creature) (<= 0 (@: creature 'hp)))
+						(update-protagonist! creature (alist-cons 'died? #t data))
+					)
+					((npc? creature)
+						(update-npc! creature (alist-cons 'spoiled? spoiled? data))
+					)
+					(else (update-creature! creature data))
+				)
+			)
+			(let ((return (if (equal? object-id (@: world 'me 'object-id)) (@: packet 'return) #f)))
+				(values object-id return)
+			)
+		)
+	)
+
+	(define (packet-handler/revive world packet)
+		(let* ((object-id (@: packet 'object-id)) (creature (object-ref world object-id)))
+			(if (protagonist? creature)
+				(update-protagonist! creature (list (cons 'died? #f) (cons 'alike-dead? #f)))
+				(update-creature! creature (list (cons 'alike-dead? #f)))
+			)
+			(values object-id)
+		)
+	)
+
+	(define (packet-handler/status-update world packet)
+		(let* ((object-id (@: packet 'object-id)) (creature (object-ref world object-id)))
+			(cond
+				((protagonist? creature) (update-protagonist! creature packet))
+				((antagonist? creature) (update-antagonist! creature packet))
+				((npc? creature) (update-npc! creature packet))
+			)
+			(values object-id)
+		)
+	)
+
+	(define (packet-handler/object-deleted world packet)
+		(let ((object-id (@: packet 'object-id)))
+			(discard-object! world object-id)
+			(values object-id) ; TODO return object-id but discard after event handle
+		)
+	)
+
+	(define (packet-handler/npc-info world packet)
+		(let ((npc (create-npc packet)))
+			(register-object! world npc)
+			(values (@: npc 'object-id))
+		)
+	)
+
+	(define (packet-handler/target-selected world packet)
+		(let ((object-id (@: packet 'object-id)) (target-id (@: packet 'target-id)))
+			(update-creature! (object-ref world object-id) (list
+				(cons 'target-id target-id)
+				(cons 'position (@: packet 'position))
+			))
+			(values object-id target-id)
+		)
+	)
+
+	(define (packet-handler/target-unselected world packet)
+		(let ((object-id (@: packet 'object-id)))
+			(update-creature! (object-ref world object-id) (list
+				(cons 'target-id #f)
+				(cons 'position (@: packet 'position))
+			))
+			(values object-id #f)
+		)
+	)
+
+	(define (packet-handler/social-action world packet)
+		(values (@: packet 'object-id) (@: packet 'action))
+	)
+
+	(define (packet-handler/change-move-type world packet)
+		(let* ((object-id (@: packet 'object-id)) (creature (object-ref world object-id)))
+			(when (creature? creature) (update-creature! creature packet))
+			(values object-id)
+		)
+	)
+
+	(define (packet-handler/change-wait-type world packet)
+		(let* ((object-id (@: packet 'object-id)) (creature (object-ref world object-id)))
+			(when (creature? creature) (update-creature! creature packet))
+			(values object-id)
+		)
+	)
+
+	(define (packet-handler/ask-join-clan world packet)
+		(values 'ask/join-clan (list
+			(cons 'clan (@: packet 'name))
+		))
+	)
+
+	(define (packet-handler/ask-join-party world packet)
+		(values 'ask/join-party (list
+			(cons 'player (@: packet 'name))
+			(cons 'loot (@: packet 'loot))
+		))
+	)
+
+	(define (packet-handler/stop-moving world packet)
+		(let ((object-id (@: packet 'object-id)) (p (@: packet 'position)) (a (@: packet 'angle)))
+			(update-creature! (object-ref world object-id) (list
+				(cons 'angle a)
+				(cons 'position p)
+				(cons 'destination p)
+				(cons 'moving? #f)
+			))
+			(values object-id)
+		)
+	)
+
+	(define (packet-handler/chat-message world packet)
+		(values
+			(@: packet 'object-id)
+			(@: packet 'channel)
+			(@: packet 'author)
+			(@: packet 'text)
+		)
+	)
+
+	(define (packet-handler/ask-be-friends world packet)
+		(values 'ask/be-friends (list
+			(cons 'player (@: packet 'name))
+		))
+	)
+
+	(define (packet-handler/ask-join-alliance world packet)
+		(values 'ask/join-alliance (list
+			(cons 'alliance (@: packet 'name))
+		))
+	)
+	
+	(define (packet-handler/skill-list world packet)
+		(define (f i)
+			(let ((skill-id (@: i 'skill-id)) (level (@: i 'level)) (active? (@: i 'active?)))
+				(list skill-id (make-skill skill-id level active?))
+			)
+		)
+	
+		(let ((skills (@: world 'skills)) (l (@: packet 'list)))
+			(hash-clear! skills)
+			(apply hash-set*! skills (apply append (map f l)))
+			(values (hash-values skills))
+		)
+	)
+	
+	; skill-reuse set! last-usage 0
+
+	; table
+	
+	(define (applicate row)
+		(let-values (((id name packet handler) (apply values row)))
+			(list id name (lambda (world buffer) (handler world (packet buffer))))
+		)
+	)
+	
+	(define packet-handlers-table (make-hash (map applicate (list ; id, name, handler(world, buffer)
+		(list #x01 'change-moving game-server-packet/move-to-point packet-handler/move-to-point)
+		(list #x03 'creature-create game-server-packet/char-info packet-handler/char-info)
+		(list #x04 'creature-update game-server-packet/user-info packet-handler/user-info)
+		;(list #x05 ' game-server-packet/attack packet-handler/attack)
+		(list #x06 'die game-server-packet/die packet-handler/die)
+		(list #x07 'revive game-server-packet/revive packet-handler/revive)
+		;(list #x0b ' game-server-packet/spawn-item packet-handler/spawn-item)
+		;(list #x0c ' game-server-packet/drop-item packet-handler/drop-item)
+		;(list #x0d ' game-server-packet/get-item packet-handler/get-item)
+		(list #x0e 'creature-update game-server-packet/status-update packet-handler/status-update)
+		(list #x12 'object-delete game-server-packet/object-deleted packet-handler/object-deleted)
+		(list #x16 'creature-create game-server-packet/npc-info packet-handler/npc-info)
+		;(list #x1b ' game-server-packet/item-list packet-handler/item-list)
+		(list #x29 'change-target game-server-packet/target-selected packet-handler/target-selected)
+		(list #x2a 'change-target game-server-packet/target-unselected packet-handler/target-unselected)
+		(list #x2d 'gesture game-server-packet/social-action packet-handler/social-action)
+		(list #x2e 'creature-update game-server-packet/change-move-type packet-handler/change-move-type)
+		(list #x2f 'creature-update game-server-packet/change-wait-type packet-handler/change-wait-type)
+		(list #x32 'ask game-server-packet/ask-join-clan packet-handler/ask-join-clan)
+		(list #x39 'ask game-server-packet/ask-join-party packet-handler/ask-join-party)
+		;(list #x45 'shortcut-list game-server-packet/shortcut-init packet-handler/shortcut-init)
+		(list #x47 'change-moving game-server-packet/stop-moving packet-handler/stop-moving)
+		(list #x4a 'message game-server-packet/chat-message packet-handler/chat-message)
+		(list #x58 'skill-list game-server-packet/skill-list packet-handler/skill-list)
+		;(list #x64 'system-message game-server-packet/system-message packet-handler/system-message)
+		(list #x7d 'ask game-server-packet/ask-be-friends packet-handler/ask-be-friends)
+		(list #x7e 'logout void (const (list)))
+		;(list #x7f ' game-server-packet/ packet-handler/)
+		;(list #x80 'quest-list game-server-packet/quest-list packet-handler/quest-list)
+		;(list #xa7 ' game-server-packet/ packet-handler/)
+		(list #xa8 'ask game-server-packet/ask-join-alliance packet-handler/ask-join-alliance)
+		;(list #xe4 'henna-info game-server-packet/henna-info packet-handler/henna-info)
+		;(list #xe7 'macro-list game-server-packet/macro-list packet-handler/macro-list)
+		;(list #xf8 'signs-sky game-server-packet/signs-sky packet-handler/signs-sky)
+		;(list #xfe 'Ex* game-server-packet/ packet-handler/)
+		
+		;(list # ' game-server-packet/ packet-handler/)
+	))))
+)

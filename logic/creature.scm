@@ -18,7 +18,7 @@
 		(if (member 'creature (@: object 'type)) #t #f)
 	)
 
-	(define (create-creature struct)
+	(define (create-creature struct) ; TODO make-creature
 		(let ((object (create-object struct)))
 			(let ((type (cons 'creature (@: object 'type))))
 				(append (alist-delete 'type object) (list
@@ -35,8 +35,9 @@
 					(cons 'max-mp (@: struct 'max-mp))
 					
 					(cons 'moving? (@: struct 'moving?))
+					(cons 'sitting? (@: struct 'sitting?))
 					(cons 'running? (@: struct 'running?))
-					(cons 'in-combat? (@: struct 'in-combat?))
+					(cons 'in-combat? (@: struct 'in-combat?)) ; TODO fighting?
 					(cons 'alike-dead? (@: struct 'alike-dead?))
 					
 					(cons 'angle (@: struct 'angle))
@@ -72,7 +73,7 @@
 				'mp
 				'max-hp
 				'max-mp
-				'moving?
+				'sitting?
 				'running?
 				'in-combat?
 				'alike-dead?

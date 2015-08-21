@@ -8,6 +8,9 @@
 		any-is?
 		every-is?
 		alist-flip
+		alist-ref
+		string-starts?
+		string-ends?
 	)
 	
 	(define (bind f . args)
@@ -52,8 +55,34 @@
 		(map (compose xcons car+cdr) l)
 	)
 	
+	(define (alist-ref l k) ; TODO list key [predicate] => assf
+		(cdr (assoc k l))
+	)
+	
+	(define (string-starts? s t)
+		(let ((ls (string-length s)) (lt (string-length t)))
+			(and
+				(>= ls lt)
+				(string=? (substring s 0 lt) t)
+			)
+		)
+	)
+	
+	(define (string-ends? s t)
+		(let ((ls (string-length s)) (lt (string-length t)))
+			(and
+				(>= ls lt)
+				(string=? (substring s (- ls lt)) t)
+			)
+		)
+	)
+	
 	;(define-syntax letone (syntax-rules () (
 	;	(letone id value body ...)
 	;	((lambda (id) body ...) value)
 	;)))
+	
+	; let-alist (((a b c) (k1 k2 k3) alist)) body
+	
+	; let-list (((a b c) list)) body
 )

@@ -3,7 +3,7 @@
 		srfi/1
 		"../../../library/extension.scm"
 		"../../packet.scm"
-		"../social_action.scm"
+		"../gesture.scm"
 	)
 	(provide game-client-packet/social-action)
 	

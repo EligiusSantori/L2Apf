@@ -1,7 +1,8 @@
 (module packet racket/base
 	(require
+		"../../../library/extension.scm"
 		"../../packet.scm"
-		"../social_action.scm"
+		"../gesture.scm"
 	)
 	(provide game-server-packet/social-action)
 	
@@ -10,7 +11,7 @@
 			(list
 				(cons 'id (read-byte s))
 				(cons 'object-id (read-int32 #f s))
-				(cons 'action (cdr (assoc (read-int32 #f s) actions)))
+				(cons 'action (alist-ref actions (read-int32 #f s)))
 			)
 		)
 	)

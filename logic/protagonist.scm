@@ -28,7 +28,7 @@
 					(cons 'load (@: struct 'load))
 					(cons 'max-load (@: struct 'max-load))
 
-					(cons 'died #f)
+					(cons 'died? #f)
 					(cons 'clan-leader? (@: struct 'clan-leader?))
 					(cons 'dwarven-craft? (@: struct 'dwarven-craft?))
 					

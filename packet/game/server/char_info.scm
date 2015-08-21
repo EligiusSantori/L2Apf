@@ -62,7 +62,7 @@
 				(cons 'ally-id (read-int32 #f s))
 				(cons 'ally-crest-id (read-int32 #f s))
 				
-				(cons 'moving? (begin
+				(cons 'sitting? (begin
 					(read-int32 #f s)
 					(zero? (read-byte s))
 				))

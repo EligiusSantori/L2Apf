@@ -1,0 +1,21 @@
+(module packet racket/base
+	(provide actions)
+
+	(define actions (list
+		(cons 0 'gesture/unknown)
+		(cons 1 'gesture/unknown)
+		(cons 2 'gesture/hello)
+		(cons 3 'gesture/victory)
+		(cons 4 'gesture/charge)
+		(cons 5 'gesture/no)
+		(cons 6 'gesture/yes)
+		(cons 7 'gesture/bow)
+		(cons 8 'gesture/unaware)
+		(cons 9 'gesture/waiting)
+		(cons 10 'gesture/laugh)
+		(cons 11 'gesture/applause)
+		(cons 12 'gesture/dance)
+		(cons 13 'gesture/sad)
+		(cons 15 'gesture/level-up)
+	))
+)

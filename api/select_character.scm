@@ -29,7 +29,6 @@
 				(case (get-packet-id buffer)
 					((#x15) (let ((packet (game-server-packet/player-character buffer)))
 						(let ((world (@: connection 'world)) (me (create-protagonist (@: packet 'me))))
-							(hash-clear! world)
 							(set-box! character (unbox me))
 							(hash-set! world 'me character)
 						)

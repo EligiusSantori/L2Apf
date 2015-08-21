@@ -1,11 +1,12 @@
 (module api racket/base
 	(require
+		srfi/1
 		"../library/network.scm"
 		"../packet/game/client/say.scm"
 	)
 	(provide say)
 	
-	(define (parse-args args)
+	(define (parse-args tail)
 		(if (null? tail)
 			(values 'chat-channel/all "")
 			(cond

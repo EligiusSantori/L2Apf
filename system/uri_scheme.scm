@@ -12,13 +12,13 @@
 		(let ((t (regexp-match #rx"^l2apf://([0-9A-Za-z]+):([0-9A-Za-z]+)@([0-9A-Za-z\\.\\-]+):?([0-9]*)/([0-9A-Za-z]+)[\\?#/]?" uri)))
 			(if t
 				(list
-					(cons 'login (second t))
-					(cons 'password (third t))
-					(cons 'host (fourth t))
-					(cons 'port (let ((port (fifth t)))
+					(second t) ; login
+					(third t) ; password
+					(fourth t) ; host
+					(let ((port (fifth t))) ; port
 						(if (string-null? port) 2106 (string->number port))					
-					))
-					(cons 'name (sixth t))
+					)
+					(sixth t) ; name
 				)
 				#f
 			)

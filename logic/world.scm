@@ -4,34 +4,63 @@
 		(rename-in racket/contract (any all/c))
 		"../library/ral.scm"
 		"../library/structure.scm"
+		"skill.scm"
 		"object.scm"
 		"character.scm"
 	)
 	(provide (contract-out
-		(register-object! (hash? object? . -> . void?))
-		(discard-object! (hash? (or/c object? integer?) . -> . void?))
-		(get-object (hash? integer? . -> . box?))
+		(world? (any/c . -> . boolean?))
+		(make-world ((listof pair?) . -> . world?))
+		(register-object! (world? object? . -> . void?))
+		(discard-object! (world? integer? . -> . void?))
+		(object-ref (world? integer? . -> . (or/c box? false/c)))
+		(skill-ref (world? integer? . -> . (or/c skill? false/c)))
 		(find-character-by-name (box? string? . -> . (or/c box? false/c)))
 	))
+	
+	(define (world? a)
+		(hash? a) ; TODO temporary
+	)
+	
+	(define (make-world server)
+		(let ((world (make-hash server)))
+			(hash-set! world 'me #f)
+			(hash-set! world 'skills (make-hash))
+			(hash-set! world 'quests (make-hash))
+			(hash-set! world 'party (make-hash))
+			(hash-set! world 'clans (make-hash))
+			(hash-set! world 'alliances (make-hash))
+			;(hash-set! world 'inventory (mutable-set))
+			world
+		)
+	)
 
 	(define (register-object! world object)
 		(let ((object-id (@: object 'object-id)))
 			(hash-set! world object-id object)
+			; TODO set character name key
+			; TODO set ski
 			(void)
 		)
 	)
-	(define (discard-object! world object)
-		(let ((object-id (if (integer? object) object (@: object 'object-id))))
-			(if (hash-has-key? world object-id)
-				(hash-remove! world object-id)
-				(void)
-			)
+	(define (discard-object! world object-id)
+		(if (hash-has-key? world object-id)
+			(hash-remove! world object-id)
+			(void)
 		)
 	)
 
-	(define (get-object world id)
-		(hash-ref world id #f)
+	(define (object-ref world object-id)
+		(hash-ref world object-id #f)
 	)
+	
+	(define (skill-ref world skill-id)
+		(hash-ref (hash-ref world 'skills) skill-id #f)
+	)
+	
+	;(define (inventory-ref world object-id)
+	
+	;)
 	
 	(define (find-character-by-name world name)
 		(hash-find world (lambda (k v)

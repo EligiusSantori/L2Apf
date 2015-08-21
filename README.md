@@ -12,6 +12,6 @@ Racket .\test.scm l2apf://login:password@host:port/player
 ```
 
 # Requirements
-* racket version 6
-* openssl library (installed on your computer)
-* l2j c4 server (660 protocol version)
+* Racket language (version 6 or newer)
+* OpenSSL library (installed on your computer)
+* L2J Chronicle 4 server (660 protocol version)

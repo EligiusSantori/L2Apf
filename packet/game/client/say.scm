@@ -7,7 +7,7 @@
 			(begin
 				(write-byte #x38 s)
 				(write-utf16 message s)
-				(write-int32 (cdr (assoc (alist-flip channels))) s)
+				(write-int32 (cdr (assoc channel (alist-flip channels))) #t s)
 				(when (and (equal? channel 'chat-channel/tell) (not (string=? target "")))
 					(write-utf16 target s)
 				)

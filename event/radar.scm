@@ -26,14 +26,14 @@
 						(cond
 							((and (not include?) (<= distance radius))
 								(hash-set! storage object-id (cons #t object))
-								(run-event connection name (list
+								(trigger-event connection name (list
 									(cons 'object object)
 									(cons 'action 'come)
 								))
 							)
 							((and include? (> distance radius))
 								(hash-set! storage object-id (cons #f object))
-								(run-event connection name (list
+								(trigger-event connection name (list
 									(cons 'object object)
 									(cons 'action 'leave)
 								))
@@ -44,7 +44,7 @@
 			)
 			
 			(define (handle-missed object)
-				(run-event connection name (list
+				(trigger-event connection name (list
 					(cons 'object object)
 					(cons 'action 'leave)
 				))
@@ -72,7 +72,7 @@
 			)
 			
 			(set-interval! connection temp-interval-event sampling-frequency)
-			(set-event! connection name checker)
+			(listen-event! connection name checker)
 		)
 	)
 )

@@ -5,13 +5,13 @@
 	"library/structure.scm"
 	"logic/object.scm"
 	"logic/antagonist.scm"
-	;(only-in "system/events.scm" set-event! run-event)
+	;(only-in "system/events.scm" listen-event! trigger-event)
 	;(only-in "system/timers.scm" set-timeout! set-interval!)
 	"api/connect.scm"
 	"api/login.scm"
 	"api/select_server.scm"
 	"api/select_character.scm"
-	"api/social_action.scm"
+	"api/gesture.scm"
 	"api/move_to.scm"
 	"api/move_on.scm"
 	"api/logout.scm"
@@ -40,20 +40,25 @@
 )
 
 (let ((config (get-config (current-command-line-arguments))))
-	(let ((connection (connect (@: config 'host) (@: config 'port))))
-		(let ((world (first (login connection (@: config 'login) (@: config 'password)))))
-			(let ((me (@: (select-server connection world) (@: config 'name))))
+	(let ((connection (connect (@: config 'host) (@: config 'port)))) ; TODO or die?
+		(let ((world (first (login connection (@: config 'login) (@: config 'password))))) ; TODO or die?
+			(let ((me (@: (select-server connection world) (@: config 'name)))) ; TODO or die?
 				(let ((events (select-character connection me)))
 
-					(set-radar-event! connection 'he-so-close 250)
 					(define move-on/sync (make-contract move-on (lambda (event)
 						(and
 							(equal? (@: event 'name) 'change-moving)
 							(equal? (@: event 'action) 'stop)
 							(equal? (@: event 'object-id) (@: me 'object-id))
-							(sleep 1/3) ; overspeed interaction fix
 						)
 					)))
+					
+					(define (turn-to-face/sync connection to)
+						(move-on/sync connection 25 (objects-angle me to) #f)
+						(sleep 1/3) ; overspeed interaction fix
+					)
+					
+					(set-radar-event! connection 'he-so-close 250)
 					
 					(let loop ()
 						(let ((event (sync events)))
@@ -62,10 +67,10 @@
 								((he-so-close)
 									(let ((object (@: event 'object)))
 										(when (and (antagonist? object) (string-ci=? (@: object 'name) "Awe"))
-											(move-on/sync connection 25 (objects-angle me object) #f) ; turn toward
+											(turn-to-face/sync connection object)
 											(case (@: event 'action) ; greetings and goodbye
-												((come) (social-action connection 'social-action/hello))
-												((leave) (social-action connection 'social-action/bow))
+												((come) (gesture connection 'gesture/hello))
+												((leave) (gesture connection 'gesture/bow))
 											)
 										)
 									)

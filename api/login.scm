@@ -3,6 +3,7 @@
 		racket/contract
 		"../library/structure.scm"
 		"../library/network.scm"
+		"../logic/world.scm"
 		"../packet/login/client/login_auth.scm"
 		"../packet/login/server/login_fail.scm"
 		"../packet/login/server/login_ok.scm"
@@ -37,7 +38,7 @@
 							(loop)
 						))
 						((#x04) (let ((packet (login-server-packet/server-list buffer)))
-							(map make-hash (@: packet 'list))
+							(map make-world (@: packet 'list))
 						))
 						(else #f)
 					)
