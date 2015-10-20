@@ -37,6 +37,7 @@
 					(cons 'moving? (@: struct 'moving?))
 					(cons 'sitting? (@: struct 'sitting?))
 					(cons 'running? (@: struct 'running?))
+					(cons 'casting? (@: struct 'casting?))
 					(cons 'in-combat? (@: struct 'in-combat?)) ; TODO fighting?
 					(cons 'alike-dead? (@: struct 'alike-dead?))
 					
@@ -69,15 +70,17 @@
 			(struct-transfer creature struct
 				'name
 				'title
+				'target-id
 				'hp
 				'mp
 				'max-hp
 				'max-mp
+				'moving?
 				'sitting?
 				'running?
+				'casting?
 				'in-combat?
 				'alike-dead?
-				'target-id
 				'angle
 				'position
 				'destination

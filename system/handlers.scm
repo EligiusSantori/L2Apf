@@ -1,6 +1,7 @@
 (module system racket/base
 	(require
 		srfi/1
+		racket/dict
 		racket/function
 		"../library/structure.scm"
 		"../logic/main.scm"
@@ -34,6 +35,9 @@
 		"../packet/game/server/change_move_type.scm"
 		"../packet/game/server/change_wait_type.scm"
 		"../packet/game/server/skill_list.scm"
+		"../packet/game/server/skill_started.scm"
+		"../packet/game/server/skill_launched.scm"
+		"../packet/game/server/skill_canceled.scm"
 	)
 	
 	(provide packet-handlers-table)
@@ -224,6 +228,56 @@
 		)
 	)
 	
+	(define (packet-handler/skill-started world packet)
+		(let ((object-id (@: packet 'object-id)) (skill-id (@: packet 'skill-id)) (level (@: packet 'level)))
+			(update-creature! (object-ref world object-id) (list
+				(cons 'target-id (@: packet 'target-id))
+				(cons 'position (@: packet 'position))
+				(cons 'casting? #t)
+			))
+			
+			(let* ((skills (@: world 'skills)) (skill (hash-ref skills skill-id #f)))
+				(when skill
+					(hash-set! skills skill-id (struct-transfer skill
+						(list
+							(cons 'last-usage (current-milliseconds)) ; (@: packet 'cast-origin)
+							(cons 'reuse-delay (@: packet 'reuse-delay))
+						)
+						'last-usage
+						'reuse-delay
+					))
+				)
+			)
+			
+			(values object-id skill-id level)
+		)
+	)
+	
+	(define (packet-handler/skill-launched world packet)
+		(let ((object-id (@: packet 'object-id)) (skill-id (@: packet 'skill-id)) (level (@: packet 'level)))
+			(update-creature! (object-ref world object-id) (list
+				(cons 'target-id (@: packet 'target-id))
+				(cons 'casting? #f)
+			))
+			
+			(values object-id skill-id level)
+		)
+	)
+	
+	(define (packet-handler/skill-canceled world packet)
+		(let ((object-id (@: packet 'object-id)))
+			(update-creature! (object-ref world object-id) (list
+				(cons 'casting? #f)
+			))
+			
+			(values object-id)
+		)
+	)
+	
+	(define (packet-handler/system-message world packet)
+		; TODO spoiled?
+	)
+	
 	; skill-reuse set! last-usage 0
 
 	; table
@@ -238,18 +292,26 @@
 		(list #x01 'change-moving game-server-packet/move-to-point packet-handler/move-to-point)
 		(list #x03 'creature-create game-server-packet/char-info packet-handler/char-info)
 		(list #x04 'creature-update game-server-packet/user-info packet-handler/user-info)
-		;(list #x05 ' game-server-packet/attack packet-handler/attack)
+		;(list #x05 ' game-server-packet/attack packet-handler/attack) Attack
 		(list #x06 'die game-server-packet/die packet-handler/die)
 		(list #x07 'revive game-server-packet/revive packet-handler/revive)
-		;(list #x0b ' game-server-packet/spawn-item packet-handler/spawn-item)
-		;(list #x0c ' game-server-packet/drop-item packet-handler/drop-item)
+		; #x0a AttackCanceld
+		;(list #x0b ' game-server-packet/spawn-item packet-handler/spawn-item) SpawnItem | SpawnItemPoly
+		;(list #x0c ' game-server-packet/drop-item packet-handler/drop-item) DropItem
 		;(list #x0d ' game-server-packet/get-item packet-handler/get-item)
 		(list #x0e 'creature-update game-server-packet/status-update packet-handler/status-update)
+		; #x10 SellList
 		(list #x12 'object-delete game-server-packet/object-deleted packet-handler/object-deleted)
+		; #x13 CharSelectInfo
+		; #x15 CharSelected
+		; #x17 CharTemplates
 		(list #x16 'creature-create game-server-packet/npc-info packet-handler/npc-info)
 		;(list #x1b ' game-server-packet/item-list packet-handler/item-list)
+		; #x25 ActionFailed
 		(list #x29 'change-target game-server-packet/target-selected packet-handler/target-selected)
 		(list #x2a 'change-target game-server-packet/target-unselected packet-handler/target-unselected)
+		; #x2b ?
+		; #x2c ?
 		(list #x2d 'gesture game-server-packet/social-action packet-handler/social-action)
 		(list #x2e 'creature-update game-server-packet/change-move-type packet-handler/change-move-type)
 		(list #x2f 'creature-update game-server-packet/change-wait-type packet-handler/change-wait-type)
@@ -257,18 +319,41 @@
 		(list #x39 'ask game-server-packet/ask-join-party packet-handler/ask-join-party)
 		;(list #x45 'shortcut-list game-server-packet/shortcut-init packet-handler/shortcut-init)
 		(list #x47 'change-moving game-server-packet/stop-moving packet-handler/stop-moving)
+		(list #x48 'skill-started game-server-packet/skill-started packet-handler/skill-started)
+		(list #x49 'skill-canceled game-server-packet/skill-canceled packet-handler/skill-canceled)
 		(list #x4a 'message game-server-packet/chat-message packet-handler/chat-message)
+		; #x4b EquipUpdate
+		; #x4c DoorInfo
+		; #x4d DoorStatusUpdate
 		(list #x58 'skill-list game-server-packet/skill-list packet-handler/skill-list)
+		; #x60 MoveToPawn
 		;(list #x64 'system-message game-server-packet/system-message packet-handler/system-message)
+		; #x65 StartPledgeWar
+		; #x6d SetupGauge
+		; #x6f ChooseInventoryItem
+		(list #x76 'skill-launched game-server-packet/skill-launched packet-handler/skill-launched)
+		; #x76 SetToLocation
 		(list #x7d 'ask game-server-packet/ask-be-friends packet-handler/ask-be-friends)
 		(list #x7e 'logout void (const (list)))
-		;(list #x7f ' game-server-packet/ packet-handler/)
+		;(list #x7f ' game-server-packet/ packet-handler/) MagicEffectIcons
 		;(list #x80 'quest-list game-server-packet/quest-list packet-handler/quest-list)
+		; #x81 EnchantResult
+		; #x86 Ride
+		; #x98 PlaySound
+		; #x99 StaticObject
+		; #xa6 MyTargetSelected
 		;(list #xa7 ' game-server-packet/ packet-handler/)
 		(list #xa8 'ask game-server-packet/ask-join-alliance packet-handler/ask-join-alliance)
+		; #xc4 Earthquake
+		; #xc8 NormalCamera
+		; #xd0 MultiSellList
+		; #xd4 Dice
+		; #xd5 Snoop
 		;(list #xe4 'henna-info game-server-packet/henna-info packet-handler/henna-info)
 		;(list #xe7 'macro-list game-server-packet/macro-list packet-handler/macro-list)
-		;(list #xf8 'signs-sky game-server-packet/signs-sky packet-handler/signs-sky)
+		; #xee PartySpelled
+		; #xf5 SSQStatus
+		;(list #xf8 'signs-sky game-server-packet/signs-sky packet-handler/signs-sky) SignsSky
 		;(list #xfe 'Ex* game-server-packet/ packet-handler/)
 		
 		;(list # ' game-server-packet/ packet-handler/)

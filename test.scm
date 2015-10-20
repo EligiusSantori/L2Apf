@@ -20,36 +20,36 @@
 	"event/radar.scm"
 )
 
-(define (get-config command-line)
+(define (parse-config command-line)
 	(if (> (vector-length command-line) 0)
-		(or
-			(parse-uri (vector-ref command-line 0))
-			(error "Authentication failed because URI is broken")
+		(let ((uri (parse-uri (vector-ref command-line 0))))
+			(if uri
+				(apply values uri)
+				(error "Authentication failed because URI is broken")
+			)
 		)
 		(error "Authentication failed because URI is missed")
 	)
 )
 
-(define (format-chat-message e)
-	(let ((channel (symbol->string (@: e 'channel))))
-		(string-append
-			"[" (string-titlecase (last (string-split channel "/"))) "] "
-			(@: e 'author) ": " (@: e 'text)
-		)
+(define (format-chat-message object-id channel author text)
+	(let ((channel (string-titlecase (last (string-split (symbol->string channel) "/")))))
+		(string-append "[" channel "] " author ": " text)
 	)
 )
 
-(let ((config (get-config (current-command-line-arguments))))
-	(let ((connection (connect (@: config 'host) (@: config 'port)))) ; TODO or die?
-		(let ((world (first (login connection (@: config 'login) (@: config 'password))))) ; TODO or die?
-			(let ((me (@: (select-server connection world) (@: config 'name)))) ; TODO or die?
+(let-values (((account password host port name) (parse-config (current-command-line-arguments))))
+	(let ((connection (connect host port)))
+		(let ((world (first (login connection account password))))
+			(let ((me (@: (select-server connection world) name)))
 				(let ((events (select-character connection me)))
-
+					
 					(define move-on/sync (make-contract move-on (lambda (event)
 						(and
-							(equal? (@: event 'name) 'change-moving)
-							(equal? (@: event 'action) 'stop)
-							(equal? (@: event 'object-id) (@: me 'object-id))
+							(equal? (first event) 'change-moving)
+							(equal? (second event) (@: me 'object-id))
+							(not (@: me 'moving?))
+							
 						)
 					)))
 					
@@ -58,12 +58,13 @@
 						(sleep 1/3) ; overspeed interaction fix
 					)
 					
-					(set-radar-event! connection 'he-so-close 250)
+					;(set-radar-event! connection 'he-so-close 250)
 					
 					(let loop ()
 						(let ((event (sync events)))
-							(case (if event (@: event 'name) #f)
+							(case (if event (car event) #f)
 								; custom events
+								#|
 								((he-so-close)
 									(let ((object (@: event 'object)))
 										(when (and (antagonist? object) (string-ci=? (@: object 'name) "Awe"))
@@ -75,10 +76,11 @@
 										)
 									)
 								)
+								|#
 								; standard events
-								((message)
-									(displayln (format-chat-message event))
-								)
+								((message) (let-values (((object-id channel author text) (apply values (cdr event))))
+									(displayln (format-chat-message object-id channel author text))
+								))
 								((logout)
 									(exit)
 								)

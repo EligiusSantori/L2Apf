@@ -174,8 +174,15 @@
 											(sit connection #f)
 										)
 										(cond
-											((artisan? me) (use-skill connection skill-id/stun-attack))
-											((scavenger? me) (use-skill connection skill-id/spoil))
+											((artisan? me) (if (stun-attack-pointful?)
+												(use-skill connection skill-id/stun-attack)
+												(attack connection)
+											))
+											((scavenger? me) (cond
+												((spoil-pointful?) (use-skill connection skill-id/spoil))
+												((wild-sweep-pointful?) (use-skill connection skill-id/wild-sweep))
+												(else (attack connection))
+											))
 											(else (attack connection))
 										)
 									)
