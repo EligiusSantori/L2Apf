@@ -7,6 +7,8 @@
 		(only-in "../library/network.scm" get-packet-id disconnect)
 		"make_event.scm"
 		"handlers.scm"
+		"timers.scm"
+		"../logic/world.scm"
 	)
 
 	(provide (contract-out
@@ -60,6 +62,24 @@
 			(listen-event! connection (gensym) ; disconnect via custom events
 				(lambda (e) (equal? (car e) 'logout))
 				(lambda (e) (begin (disconnect connection) #f))
+			)
+			(listen-event! connection (gensym)
+				(lambda (e) (and
+					(equal? (first e) 'skill-started)
+					(= (second e) (@: connection 'world 'me 'object-id))
+				))
+				(lambda (e)
+					(let-values (((name object-id skill-id level) (apply values e)))
+						(let ((skill (skill-ref (@: connection 'world) skill-id)))
+							(let ((last-usage (@: skill 'last-usage)) (reuse-delay (@: skill 'reuse-delay)))
+								(when (and reuse-delay (> reuse-delay 0))
+									(set-alarm! connection 'skill-reused (+ last-usage reuse-delay) object-id skill-id level)
+								)
+							)
+						)
+					)
+					#f
+				)
 			)
 		
 			(wrap-evt

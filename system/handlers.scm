@@ -16,6 +16,7 @@
 		"../logic/skill.scm"
 		;"../logic/item.scm"
 		"../packet/game/server/chat_message.scm"
+		"../packet/game/server/system_message.scm"
 		"../packet/game/server/social_action.scm"
 		"../packet/game/server/die.scm"
 		"../packet/game/server/revive.scm"
@@ -46,17 +47,16 @@
 	
 	(define (packet-handler/move-to-point world packet)
 		(let ((object-id (@: packet 'object-id)) (p (@: packet 'position)) (d (@: packet 'destination)))
-			(let ((moving? (not (equal? p d))))
+			(let ((moving? (not (equal? p d))) (creature (object-ref world object-id)))
 				(define struct (list
 					(cons 'position p)
 					(cons 'destination d)
 					(cons 'moving? moving?)
 				))
-				(update-creature!
-					(object-ref world object-id)
-					(if moving? (alist-cons 'angle (points-angle p d) struct) struct)
+				(when creature
+					(update-creature! creature (if moving? (alist-cons 'angle (points-angle p d) struct) struct))
 				)
-				(values object-id)
+				(values object-id p (if moving? d #f))
 			)
 		)
 	)
@@ -86,7 +86,9 @@
 					((npc? creature)
 						(update-npc! creature (alist-cons 'spoiled? spoiled? data))
 					)
-					(else (update-creature! creature data))
+					(creature
+						(update-creature! creature data)
+					)
 				)
 			)
 			(let ((return (if (equal? object-id (@: world 'me 'object-id)) (@: packet 'return) #f)))
@@ -97,9 +99,13 @@
 
 	(define (packet-handler/revive world packet)
 		(let* ((object-id (@: packet 'object-id)) (creature (object-ref world object-id)))
-			(if (protagonist? creature)
-				(update-protagonist! creature (list (cons 'died? #f) (cons 'alike-dead? #f)))
-				(update-creature! creature (list (cons 'alike-dead? #f)))
+			(cond
+				((protagonist? creature)
+					(update-protagonist! creature (list (cons 'died? #f) (cons 'alike-dead? #f)))
+				)
+				(creature
+					(update-creature! creature (list (cons 'alike-dead? #f)))
+				)
 			)
 			(values object-id)
 		)
@@ -131,21 +137,25 @@
 	)
 
 	(define (packet-handler/target-selected world packet)
-		(let ((object-id (@: packet 'object-id)) (target-id (@: packet 'target-id)))
-			(update-creature! (object-ref world object-id) (list
-				(cons 'target-id target-id)
-				(cons 'position (@: packet 'position))
-			))
+		(let* ((object-id (@: packet 'object-id)) (target-id (@: packet 'target-id)) (creature (object-ref world object-id)))
+			(when creature
+				(update-creature! creature (list
+					(cons 'target-id target-id)
+					(cons 'position (@: packet 'position))
+				))
+			)
 			(values object-id target-id)
 		)
 	)
 
 	(define (packet-handler/target-unselected world packet)
-		(let ((object-id (@: packet 'object-id)))
-			(update-creature! (object-ref world object-id) (list
-				(cons 'target-id #f)
-				(cons 'position (@: packet 'position))
-			))
+		(let* ((object-id (@: packet 'object-id)) (creature (object-ref world object-id)))
+			(when creature
+				(update-creature! creature (list
+					(cons 'target-id #f)
+					(cons 'position (@: packet 'position))
+				))
+			)
 			(values object-id #f)
 		)
 	)
@@ -182,14 +192,16 @@
 	)
 
 	(define (packet-handler/stop-moving world packet)
-		(let ((object-id (@: packet 'object-id)) (p (@: packet 'position)) (a (@: packet 'angle)))
-			(update-creature! (object-ref world object-id) (list
-				(cons 'angle a)
-				(cons 'position p)
-				(cons 'destination p)
-				(cons 'moving? #f)
-			))
-			(values object-id)
+		(let* ((object-id (@: packet 'object-id)) (p (@: packet 'position)) (a (@: packet 'angle)) (creature (object-ref world object-id)))
+			(when creature
+				(update-creature! creature (list
+					(cons 'angle a)
+					(cons 'position p)
+					(cons 'destination p)
+					(cons 'moving? #f)
+				))
+			)
+			(values object-id p #f)
 		)
 	)
 
@@ -229,12 +241,14 @@
 	)
 	
 	(define (packet-handler/skill-started world packet)
-		(let ((object-id (@: packet 'object-id)) (skill-id (@: packet 'skill-id)) (level (@: packet 'level)))
-			(update-creature! (object-ref world object-id) (list
-				(cons 'target-id (@: packet 'target-id))
-				(cons 'position (@: packet 'position))
-				(cons 'casting? #t)
-			))
+		(let* ((object-id (@: packet 'object-id)) (skill-id (@: packet 'skill-id)) (level (@: packet 'level)) (creature (object-ref world object-id)))
+			(when creature
+				(update-creature! creature (list
+					(cons 'target-id (@: packet 'target-id))
+					(cons 'position (@: packet 'position))
+					(cons 'casting? #t)
+				))
+			)
 			
 			(let* ((skills (@: world 'skills)) (skill (hash-ref skills skill-id #f)))
 				(when skill
@@ -254,31 +268,39 @@
 	)
 	
 	(define (packet-handler/skill-launched world packet)
-		(let ((object-id (@: packet 'object-id)) (skill-id (@: packet 'skill-id)) (level (@: packet 'level)))
-			(update-creature! (object-ref world object-id) (list
-				(cons 'target-id (@: packet 'target-id))
-				(cons 'casting? #f)
-			))
-			
+		(let* ((object-id (@: packet 'object-id)) (skill-id (@: packet 'skill-id)) (level (@: packet 'level)) (creature (object-ref world object-id)))
+			(when creature
+				(update-creature! creature (list
+					(cons 'target-id (@: packet 'target-id))
+					(cons 'casting? #f)
+				))
+			)
 			(values object-id skill-id level)
 		)
 	)
 	
 	(define (packet-handler/skill-canceled world packet)
-		(let ((object-id (@: packet 'object-id)))
-			(update-creature! (object-ref world object-id) (list
-				(cons 'casting? #f)
-			))
-			
+		(let* ((object-id (@: packet 'object-id)) (creature (object-ref world object-id)))
+			(when creature (update-creature! creature (list (cons 'casting? #f))))
 			(values object-id)
 		)
 	)
 	
 	(define (packet-handler/system-message world packet)
-		; TODO spoiled?
+		(let ((message-id (@: packet 'message-id)) (arguments (@: packet 'arguments)))
+			
+			; set spoiled state here bacause no other way
+			(when (or (= message-id 612) (= message-id 357))
+				(let ((target-id (@: world 'me 'target-id)))
+					(update-npc! (object-ref world target-id) (list
+						(cons 'spoiled? #t)
+					))
+				)
+			)
+			
+			(values message-id arguments)
+		)
 	)
-	
-	; skill-reuse set! last-usage 0
 
 	; table
 	
@@ -325,9 +347,11 @@
 		; #x4b EquipUpdate
 		; #x4c DoorInfo
 		; #x4d DoorStatusUpdate
+		; #x4e ?
+		; #x52 ?
 		(list #x58 'skill-list game-server-packet/skill-list packet-handler/skill-list)
 		; #x60 MoveToPawn
-		;(list #x64 'system-message game-server-packet/system-message packet-handler/system-message)
+		(list #x64 'system-message game-server-packet/system-message packet-handler/system-message)
 		; #x65 StartPledgeWar
 		; #x6d SetupGauge
 		; #x6f ChooseInventoryItem

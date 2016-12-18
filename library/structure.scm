@@ -23,7 +23,7 @@
 		)
 	)
 
-	; struct-ref
+	; TODO struct-ref
 	(define (@: struct . chain) ; ultimate dictionary path extractor
 		(define (f a b) (if b (dict-ref (if (box? b) (unbox b) b) a #f) #f))
 		(fold f (f (car chain) struct) (cdr chain))

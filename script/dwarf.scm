@@ -1,36 +1,38 @@
 #lang racket
 (require
 	srfi/1
-	"library/extension.scm"
-	"library/structure.scm"
-	"system/contract.scm"
-	"system/uri_scheme.scm"
-	"logic/object.scm"
-	"logic/creature.scm"
-	"logic/npc.scm"
-	"logic/character.scm"
-	"logic/antagonist.scm"
-	"logic/protagonist.scm"
-	"logic/skill.scm"
-	"logic/world.scm"
-	"api/connect.scm"
-	"api/login.scm"
-	"api/select_server.scm"
-	"api/select_character.scm"
-	"api/use_skill.scm"
-	"api/gesture.scm"
-	"api/move_to.scm"
-	"api/move_on.scm"
-	"api/pick_up.scm"
-	"api/target.scm"
-	"api/cancel.scm"
-	"api/action.scm"
-	"api/attack.scm"
-	"api/reply.scm"
-	"api/say.scm"
-	"api/run.scm"
-	"api/sit.scm"
-	"api/logout.scm"
+	"_misc.scm"
+	(relative-in "../.."
+		"library/extension.scm"
+		"library/structure.scm"
+		"system/contract.scm"
+		"logic/object.scm"
+		"logic/creature.scm"
+		"logic/npc.scm"
+		"logic/character.scm"
+		"logic/antagonist.scm"
+		"logic/protagonist.scm"
+		"logic/skill.scm"
+		"logic/world.scm"
+		"api/connect.scm"
+		"api/login.scm"
+		"api/select_server.scm"
+		"api/select_character.scm"
+		"api/use_skill.scm"
+		"api/gesture.scm"
+		"api/move_to.scm"
+		"api/move_on.scm"
+		"api/pick_up.scm"
+		"api/target.scm"
+		"api/cancel.scm"
+		"api/action.scm"
+		"api/attack.scm"
+		"api/reply.scm"
+		"api/say.scm"
+		"api/run.scm"
+		"api/sit.scm"
+		"api/logout.scm"
+	)
 )
 
 (define skill-id/stun-attack 100)
@@ -70,36 +72,12 @@
 	)
 )
 
-(define (parse-config command-line)
-	(if (> (vector-length command-line) 0)
-		(let ((uri (parse-uri (vector-ref command-line 0))))
-			(if uri
-				(apply values uri)
-				(error "Authentication failed because URI is broken")
-			)
-		)
-		(error "Authentication failed because URI is missed")
-	)
-)
+; TODO traveling
+; TODO escaping
+; TODO following
+; TODO autologout
 
-(define (parse-command text)
-	(let ((t (string-trim (string-downcase text))))
-		(if (string-starts? t "/")
-			(let ((l (map string-trim (string-split t " "))))
-				(cons (substring (car l) 1) (cdr l))
-			)
-			#f
-		)
-	)
-)
-
-(define (format-chat-message object-id channel author text)
-	(let ((channel (string-titlecase (last (string-split (symbol->string channel) "/")))))
-		(string-append "[" channel "] " author ": " text)
-	)
-)
-
-(let-values (((account password host port name) (parse-config (current-command-line-arguments))))
+(let-values (((account password host port name) (parse-protocol (current-command-line-arguments))))
 	(let ((connection (connect host port)))
 		(let ((world (first (login connection account password))))
 			(let ((me (@: (select-server connection world) name)))
@@ -229,12 +207,26 @@
 								; custom events
 								
 								; standard events
+								((skill-reused) (let-values (((object-id skill-id level) (apply values (cdr event))))
+									(when (= object-id (@: me 'object-id)) (cond
+										((and (= skill-id skill-id/stun-attack) (stun-attack-pointful?))
+											(use-skill connection skill-id/stun-attack)
+										)
+										((or (= skill-id skill-id/spoil) (= skill-id skill-id/wild-sweep)) (cond
+											((spoil-pointful?) (use-skill connection skill-id/spoil))
+											((wild-sweep-pointful?) (use-skill connection skill-id/wild-sweep))
+										))
+									))
+								))
+								; TODO skill failed => attack
 								((die) (let-values (((object-id return) (apply values (cdr event))))
 									(when (equal? object-id (@: me 'target-id))
 										(sleep 1/3)
-										(if (scavenger? me) ; TODO and when target spoiled?
-											(use-skill connection skill-id/sweep)
-											(relax) ; TODO autorelax when monster die and if no agressive lock party members in near
+										(let ((target (object-ref world object-id)))
+											(if (and target (scavenger? me) (@: target 'spoiled?))
+												(use-skill connection skill-id/sweep)
+												(relax) ; TODO autorelax when monster die and if no agressive lock party members in near
+											)
 										)
 									)
 								))

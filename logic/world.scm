@@ -13,8 +13,8 @@
 		(make-world ((listof pair?) . -> . world?))
 		(register-object! (world? object? . -> . void?))
 		(discard-object! (world? integer? . -> . void?))
-		(object-ref (world? integer? . -> . (or/c box? false/c)))
-		(skill-ref (world? integer? . -> . (or/c skill? false/c)))
+		(object-ref (world? (or/c integer? false/c) . -> . (or/c box? false/c)))
+		(skill-ref (world? (or/c integer? false/c) . -> . (or/c skill? false/c)))
 		(find-character-by-name (box? string? . -> . (or/c box? false/c)))
 	))
 	

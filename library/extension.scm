@@ -84,5 +84,5 @@
 	
 	; let-alist (((a b c) (k1 k2 k3) alist)) body
 	
-	; let-list (((a b c) list)) body
+	; let-list (((a b c) list)) body ; receive ?
 )

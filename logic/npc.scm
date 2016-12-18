@@ -4,16 +4,17 @@
 		srfi/1
 		"../library/structure.scm"
 		"main.scm"
+		"object.scm"
 		"creature.scm"
 	)
 	(provide (contract-out
-		(npc? (box? . -> . boolean?))
+		(npc? ((or/c box? false/c) . -> . boolean?))
 		(create-npc (list? . -> . box?))
 		(update-npc! (box? list? . -> . void?))
 	))
 	
 	(define (npc? object)
-		(if (member 'npc (@: object 'type)) #t #f)
+		(if (and object (member 'npc (@: object 'type))) #t #f)
 	)
 	
 	(define (create-npc struct)
