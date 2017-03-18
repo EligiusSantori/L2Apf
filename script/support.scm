@@ -5,6 +5,7 @@
 	(relative-in "../.."
 		"library/extension.scm"
 		"library/structure.scm"
+		"library/geometry.scm"
 		"system/contract.scm"
 		"logic/object.scm"
 		"logic/creature.scm"
@@ -56,7 +57,7 @@
 	;'state/caring
 	;'state/partying
 	'state/following
-	;'state/traveling
+	'state/traveling
 	;'state/escaping
 	'state/resting
 	'state/nothing
@@ -85,7 +86,7 @@
 
 (define (get-buff-list creature) ; TODO filter through current skill table
 	(cond
-		((is-fighter? creature) (list
+		((is-fighter? creature) (list ; TODO extend
 				skill-id/vampiric-rage
 				skill-id/focus
 				skill-id/might
@@ -93,7 +94,7 @@
 				skill-id/mental-shield
 				skill-id/wind-walk
 		))
-		((is-mage? creature) (list
+		((is-mage? creature) (list ; TODO extend
 				skill-id/empower
 				skill-id/concentration
 				skill-id/shield
@@ -133,8 +134,7 @@
 	(let ((connection (connect host port)))
 		(let ((world (first (login connection account password))))
 			(let ((me (@: (select-server connection world) name)))
-				(let ((events (select-character connection me)))
-				
+				(let ((events (select-character connection me)))			
 					(define state 'state/nothing)
 					(define buff-queue (list))
 					;(define response-to)
@@ -153,21 +153,35 @@
 						)
 					)))
 					
+					(define (buff-iterate)
+						(if (not (null? buff-queue))
+							(let ((queue buff-queue))
+								(set! buff-queue (cdr queue))
+								(use-skill connection (car queue))
+							)
+							(set! state 'state/nothing)
+						)
+					)
+					
 					(define (buff master-id)
 						(let ((master (object-ref world master-id)))
 							(if master
 								(let ((queue (get-buff-list master)))
 									(when (not (null? queue))
 										(set! state 'state/buffing)
-										(set! buff-queue (cdr queue))
+										(set! buff-queue queue)
 										(target/sync connection master-id)
-										(use-skill connection (car queue))
+										(buff-iterate)
 									)
 								)
 								(say connection "I don't see you")
 							)
 						)
 					)
+					
+					;(define (follow-iterate)
+					;
+					;)
 					
 					(define (follow master-id)
 						(let ((master (object-ref world master-id)))
@@ -192,6 +206,8 @@
 						)
 					)
 					
+					(define traveller (make-traveller connection))
+					
 					(define (relax)
 						(let ((sitting? (@: me 'sitting?)) (hp (@: me 'hp)) (max-hp (@: me 'max-hp)) (mp (@: me 'mp)) (max-mp (@: me 'max-mp)))
 							(set! state 'state/resting)
@@ -214,23 +230,22 @@
 								; standard events
 								((skill-launched) (let-values (((object-id skill-id level) (apply values (cdr event))))
 									(when (and (equal? state 'state/buffing) (equal? object-id (@: me 'object-id))) ; dequeue and process next buff
-										(if (not (null? buff-queue))
-											(let ((queue buff-queue))
-												(set! buff-queue (cdr queue))
-												(use-skill connection (car queue))
-											)
-											(set! state 'state/nothing)
-										)
+										(buff-iterate)
 									)
 								))
 								((change-moving) (let-values (((object-id position destination) (apply values (cdr event))))
 									(when (and (equal? state 'state/following) (equal? object-id (@: me 'target-id))) ; follow if master
 										(move-to connection (or destination position))
 									)
+									(when (and (equal? state 'state/traveling) (equal? object-id (@: me 'object-id))) ; travel next if it is me
+										(when (zero? (traveller 'next))
+											(logout connection) ;(set! state 'state/nothing)
+										)
+									)
 								))
 								#|((die) (let-values (((object-id return) (apply values (cdr event))))
 									(when (equal? object-id (@: me 'object-id))
-										(say connection "I have died" master)
+										(say connection "I have died" response-to)
 									)
 								))|#
 								((ask) (let-values (((question data) (apply values (cdr event))))
@@ -249,7 +264,22 @@
 													(else object-id) ; me
 												)))
 												(("relax") (relax))
+												(("travel") (if (null? (cdr command))
+													(say connection (format "~a points left" (traveller 'left)) author)
+													(let ((count (traveller (cond
+															((= (length command) 4) (apply point/3d (map string->number (cdr command))))
+															((= (length command) 2) (second command))
+														))))
+														(when (> count 0)
+															(set! state 'state/traveling)
+															(say connection (format "Traveling through ~a points" count) author)
+														)
+													)
+												))
 												; TODO (("travel") point / route [loop?] [speed_ratio] ) ; TODO feedback if died, feedback & logout when finished
+												; TODO use
+												; TODO say
+												; TODO skill
 												; TODO (("return")) ; TODO town, clanhall, ...
 												; TODO route test / route finish
 												(("follow") (follow object-id)) ; TODO normal (by timer), fast (to destination), accurately (full path)

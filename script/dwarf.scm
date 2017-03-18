@@ -5,6 +5,7 @@
 	(relative-in "../.."
 		"library/extension.scm"
 		"library/structure.scm"
+		"library/geometry.scm"
 		"system/contract.scm"
 		"logic/object.scm"
 		"logic/creature.scm"
@@ -44,6 +45,8 @@
 	'state/escaping
 	'state/resting
 	'state/nothing
+	'state/following
+	'state/traveling
 ))
 
 (define (artisan? me)
@@ -157,14 +160,29 @@
 												(attack connection)
 											))
 											((scavenger? me) (cond
-												((spoil-pointful?) (use-skill connection skill-id/spoil))
-												((wild-sweep-pointful?) (use-skill connection skill-id/wild-sweep))
-												(else (attack connection))
+												((sweep-pointful?) (use-skill connection skill-id/sweep)) ; If dead and spoiled use sweep
+												((spoil-pointful?) (use-skill connection skill-id/spoil)) ; Start attack with spoil
+												((wild-sweep-pointful?) (use-skill connection skill-id/wild-sweep)) ; Else attack with skill
+												(else (attack connection)) ; Else attack with hand
 											))
 											(else (attack connection))
 										)
 									)
 								)
+							)
+						)
+					)
+					
+					(define (follow master-id)
+						(let ((master (object-ref world master-id)))
+							(if master
+								(begin
+									(set! state 'state/following)
+									(target connection master-id)
+									(when (@: me 'sitting?) (sit connection #f) (sleep 1/3))
+									(move-to connection (or (@: master 'destination) (@: master 'position)))
+								)
+								(say connection "I don't see you")
 							)
 						)
 					)
@@ -177,6 +195,8 @@
 							(when to (move-to connection (@: to 'position)))
 						)
 					)
+					
+					(define traveller (make-traveller connection))
 					
 					(define (relax)
 						(let ((sitting? (@: me 'sitting?)) (hp (@: me 'hp)) (max-hp (@: me 'max-hp)) (mp (@: me 'mp)) (max-mp (@: me 'max-mp)))
@@ -207,6 +227,17 @@
 								; custom events
 								
 								; standard events
+								((change-moving) (let-values (((object-id position destination) (apply values (cdr event))))
+									(when (and (equal? state 'state/following) (equal? object-id (@: me 'target-id))) ; follow if master
+										(move-to connection (or destination position))
+									)
+									; todo check is finished
+									(when (and (equal? state 'state/traveling) (equal? object-id (@: me 'object-id))) ; travel next if it is me
+										(when (zero? (traveller 'next))
+											(set! state 'state/nothing)
+										)
+									)
+								))
 								((skill-reused) (let-values (((object-id skill-id level) (apply values (cdr event))))
 									(when (= object-id (@: me 'object-id)) (cond
 										((and (= skill-id skill-id/stun-attack) (stun-attack-pointful?))
@@ -241,8 +272,21 @@
 												(("bye") (logout connection))
 												;(("travel") ...)
 												(("assist") (assist object-id))
+												(("follow") (follow object-id))
 												(("return") (return object-id))
 												(("relax") (relax))
+												(("travel") (if (null? (cdr command))
+													(say connection (format "~a points left" (traveller 'left)) author)
+													(let ((count (traveller (cond
+															((= (length command) 4) (apply point/3d (map string->number (cdr command))))
+															((= (length command) 2) (second command))
+														))))
+														(when (> count 0)
+															(set! state 'state/traveling)
+															(say connection (format "Traveling through ~a points" count) author)
+														)
+													)
+												))
 												(("who") (cond
 													((artisan? me) (say connection "I'm an artisan"))
 													((scavenger? me) (say connection "I'm an scavenger"))
