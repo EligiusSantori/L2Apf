@@ -53,7 +53,7 @@
 				((#f "me") (@: (or author (list)) 'object-id))
 				(("self") (@: connection 'world 'me 'object-id))
 				(("my") (@: (or author (list)) 'target-id))
-				(("party")
+				(("us" "party")
 					(displayln (@: connection 'world 'party))
 					(list) ; TODO
 				)

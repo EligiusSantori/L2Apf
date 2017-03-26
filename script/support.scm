@@ -39,6 +39,7 @@
 		"api/cancel_sync.scm"
 		"behavior/travelling.scm"
 		"behavior/following.scm"
+		"behavior/buffing.scm"
 	)
 )
 
@@ -87,29 +88,33 @@
 	))
 )
 
-(define (get-buff-list creature) ; TODO filter through current skill table
-	(cond
-		((is-fighter? creature) (list ; TODO extend
-				skill-id/vampiric-rage
-				skill-id/death-whisper
-				skill-id/focus
-				skill-id/guidance
-				skill-id/might
-				skill-id/shield
-				skill-id/mental-shield
-				skill-id/wind-walk
-		))
-		((is-mage? creature) (list ; TODO extend
-				skill-id/empower
-				skill-id/concentration
-				skill-id/shield
-				skill-id/mental-shield
-				skill-id/wind-walk
-		))
-		(else (list))
+(define (get-buff-list object-id)
+	(let ((creature (object-ref world object-id)))
+		(if creature
+			(cond
+				((is-fighter? creature) (list ; TODO extend
+						skill-id/vampiric-rage
+						skill-id/death-whisper
+						skill-id/focus
+						skill-id/guidance
+						skill-id/might
+						skill-id/shield
+						skill-id/mental-shield
+						skill-id/wind-walk
+				))
+				((is-mage? creature) (list ; TODO extend
+						skill-id/empower
+						skill-id/concentration
+						skill-id/shield
+						skill-id/mental-shield
+						skill-id/wind-walk
+				))
+				(else (list))
+			)
+			(list)
+		)
 	)
 )
-
 
 #|(define (hp-danger? me)
 	(let ((hp (@: me 'hp)) (max-hp (@: me 'max-hp)))
@@ -131,48 +136,13 @@
 	)
 )|#
 
-; TODO follow
-; TODO heal
-; TODO recharge
-
 (let-values (((account password host port name) (parse-protocol (current-command-line-arguments))))
 	(let ((connection (connect host port)))
 		(let ((world (first (login connection account password))))
 			(let ((me (@: (select-server connection world) name)))
 				(let ((events (select-character connection me)))			
 					(define state 'state/nothing)
-					(define buff-queue (list))
 					;(define response-to)
-					
-					(define (buff-iterate)
-						(if (not (null? buff-queue))
-							(let ((queue buff-queue))
-								(set! buff-queue (cdr queue))
-								(if (skill-ref world (car queue))
-									(use-skill connection (car queue))
-									(buff-iterate) ; Skip to next
-								)
-							)
-							(set! state 'state/nothing)
-						)
-					)
-					
-					; TODO (list (cons target skill ...) ...)
-					(define (buff master-id)
-						(let ((master (object-ref world master-id)))
-							(if master
-								(let ((queue (get-buff-list master)))
-									(when (not (null? queue))
-										(set! state 'state/buffing)
-										(set! buff-queue queue)
-										(target/sync connection master-id)
-										(buff-iterate)
-									)
-								)
-								(say connection "I don't see a target")
-							)
-						)
-					)
 					
 					(define (return master-id)
 						(set! state 'state/nothing)
@@ -185,6 +155,7 @@
 					
 					(define follow (make-follower connection))
 					(define travel (make-traveller connection))
+					(define buff (make-buffer connection))
 					
 					(define (relax)
 						(let ((sitting? (@: me 'sitting?)) (hp (@: me 'hp)) (max-hp (@: me 'max-hp)) (mp (@: me 'mp)) (max-mp (@: me 'max-mp)))
@@ -207,8 +178,8 @@
 								
 								; standard events
 								((skill-launched) (let-values (((object-id skill-id level) (apply values (cdr event))))
-									(when (and (equal? state 'state/buffing) (equal? object-id (@: me 'object-id))) ; dequeue and process next buff
-										(buff-iterate)
+									(when (and (equal? state 'state/buffing) (equal? object-id (@: me 'object-id))) ; Process next buff
+										(unless (buff) (set! state 'state/nothing))
 									)
 								))
 								((skill-reused) (let-values (((object-id skill-id level) (apply values (cdr event))))
@@ -220,9 +191,7 @@
 								))
 								((change-moving) (let-values (((object-id position destination) (apply values (cdr event))))
 									(when (and (equal? state 'state/following) (equal? object-id (@: me 'target-id))) ; Follow if master
-										(unless (follow)
-											(set! state 'state/nothing)
-										)
+										(unless (follow) (set! state 'state/nothing))
 									)
 									(when (and (equal? state 'state/traveling) (equal? object-id (@: me 'object-id))) ; Travel next if it is me
 										(when (and (not destination) (zero? (travel 'next)))
@@ -256,10 +225,16 @@
 											(case (car command)
 												(("hello") (gesture connection 'gesture/hello))
 												(("bye") (logout connection))
-												(("buff") (buff (try-first (get-targets (cdr command)))))
+												(("buff") (let ((targets (get-targets (cdr command))))
+													(when (and targets (not (null? targets)))
+														(if (buff (map (lambda (object-id) (cons object-id (get-buff-list object-id))) targets))
+															(set! state 'state/buffing)
+															(say connection "Nothing to buff")
+														)
+													)
+												))
 												(("power") (auto-shot connection (not (string=? (try-second command "") "off")) 'blessed-spiritshot 'd))
-												; TODO support
-												(("support")
+												(("support") ; TODO
 													(target/sync connection author-id)
 													(set! state 'state/supporting)
 													(use-skill connection skill-id/recharge)
