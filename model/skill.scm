@@ -11,7 +11,7 @@
 	))
 	
 	(define (skill? skill)
-		(if (@: skill 'skill-id) #t #f)
+		(if (and skill (@: skill 'skill-id)) #t #f)
 	)
 	
 	(define (skill-ready? skill)

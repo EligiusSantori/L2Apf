@@ -15,7 +15,7 @@
 		(discard-object! (world? integer? . -> . void?))
 		(object-ref (world? (or/c integer? false/c) . -> . (or/c box? false/c)))
 		(skill-ref (world? (or/c integer? false/c) . -> . (or/c skill? false/c)))
-		(find-character-by-name (box? string? . -> . (or/c box? false/c)))
+		(find-character-by-name (world? string? . -> . (or/c character? false/c)))
 	))
 	
 	(define (world? a)
@@ -63,8 +63,12 @@
 	;)
 	
 	(define (find-character-by-name world name)
-		(hash-find world (lambda (k v)
-			(and (integer? k) (character? v) (equal? (@: v 'name) name))
-		))
+		(define (test? k v)
+			(and (integer? k) (character? v) (string-ci=? (@: v 'name) name))
+		)
+	
+		(let ((found (hash-find world test?)))
+			(if found (cdr found) #f)
+		)
 	)
 )

@@ -3,7 +3,7 @@
 		(rename-in racket/contract (any all/c))
 		srfi/1
 		"../library/structure.scm"
-		"main.scm"
+		"../_logic.scm"
 		"object.scm"
 		"creature.scm"
 	)

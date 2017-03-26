@@ -3,7 +3,7 @@
 		racket/contract
 		"../library/structure.scm"
 		"../library/network.scm"
-		"../logic/world.scm"
+		"../model/world.scm"
 		"../packet/login/client/login_auth.scm"
 		"../packet/login/server/login_fail.scm"
 		"../packet/login/server/login_ok.scm"

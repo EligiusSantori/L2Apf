@@ -11,6 +11,9 @@
 		alist-ref
 		string-starts?
 		string-ends?
+		try-first
+		try-second
+		try-third
 	)
 	
 	(define (bind f . args)
@@ -55,8 +58,10 @@
 		(map (compose xcons car+cdr) l)
 	)
 	
-	(define (alist-ref l k) ; TODO list key [predicate] => assf
-		(cdr (assoc k l))
+	(define (alist-ref l k) ; TODO [predicate] (assf)
+		(let ((p (assoc k l)))
+			(if p (cdr p) #f)
+		)
 	)
 	
 	(define (string-starts? s t)
@@ -75,6 +80,18 @@
 				(string=? (substring s (- ls lt)) t)
 			)
 		)
+	)
+	
+	(define (try-first lst [default #f])
+		(if (not (null? lst)) (car lst) default)
+	)
+	
+	(define (try-second lst [default #f])
+		(if (> (length lst) 1) (second lst) default)
+	)
+	
+	(define (try-third lst [default #f])
+		(if (> (length lst) 2) (third lst) default)
 	)
 	
 	;(define-syntax letone (syntax-rules () (

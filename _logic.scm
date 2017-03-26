@@ -3,7 +3,7 @@
 	(require
 		(rename-in racket/contract (any all/c))
 		racket/dict
-		"../library/geometry.scm"
+		"library/geometry.scm"
 	)
 	(provide (contract-out
 		(points-angle (point/3d? point/3d? . -> . (or/c real? false/c)))

@@ -8,7 +8,7 @@
 		"../packet/game/client/select_character.scm"
 		"../packet/game/server/player_character.scm"
 		"../packet/game/client/enter_world.scm"
-		"../logic/protagonist.scm"
+		"../model/protagonist.scm"
 		"../system/read_thread.scm"
 		"../system/send_thread.scm"
 		"../system/timers.scm"
@@ -56,7 +56,6 @@
 			(let ((time (thread (bind time-thread connection))))
 				(set-box-field! connection 'time-thread time)
 			)
-			
 			(let ((events (make-event-channel connection)))
 				(set-box-field! connection 'event-channel events)
 				events

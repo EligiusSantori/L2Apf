@@ -2,9 +2,9 @@
 	(require
 		"../library/structure.scm"
 		"../library/network.scm"
-		"../logic/creature.scm"
-		"../logic/item.scm"
-		"../logic/world.scm"
+		"../model/creature.scm"
+		"../model/item.scm"
+		"../model/world.scm"
 		"../packet/game/client/action.scm"
 	)
 	(provide pick-up)

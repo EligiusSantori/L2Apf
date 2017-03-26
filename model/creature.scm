@@ -3,11 +3,11 @@
 		(rename-in racket/contract (any all/c))
 		srfi/1
 		"../library/structure.scm"
-		"main.scm"
+		"../_logic.scm"
 		"object.scm"
 	)
 	(provide (contract-out
-		(creature? (box? . -> . boolean?))
+		(creature? (any/c . -> . boolean?))
 		(create-creature (list? . -> . list?))
 		(update-creature (list? list? . -> . list?))
 		(update-creature! (box? list? . -> . void?))
@@ -15,7 +15,7 @@
 	))
 
 	(define (creature? object)
-		(if (member 'creature (@: object 'type)) #t #f)
+		(if (and object (member 'creature (@: object 'type))) #t #f)
 	)
 
 	(define (create-creature struct) ; TODO make-creature

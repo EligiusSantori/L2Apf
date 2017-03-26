@@ -7,19 +7,21 @@
 		"library/structure.scm"
 		"library/geometry.scm"
 		"system/contract.scm"
-		"logic/object.scm"
-		"logic/creature.scm"
-		"logic/npc.scm"
-		"logic/character.scm"
-		"logic/antagonist.scm"
-		"logic/protagonist.scm"
-		"logic/skill.scm"
-		"logic/world.scm"
+		"model/object.scm"
+		"model/creature.scm"
+		"model/npc.scm"
+		"model/character.scm"
+		"model/antagonist.scm"
+		"model/protagonist.scm"
+		"model/skill.scm"
+		"model/world.scm"
 		"api/connect.scm"
 		"api/login.scm"
 		"api/select_server.scm"
 		"api/select_character.scm"
 		"api/use_skill.scm"
+		"api/use_item.scm"
+		"api/auto_shot.scm"
 		"api/gesture.scm"
 		"api/move_to.scm"
 		"api/move_on.scm"
@@ -33,13 +35,21 @@
 		"api/run.scm"
 		"api/sit.scm"
 		"api/logout.scm"
+		"api/target_sync.scm"
+		"api/cancel_sync.scm"
+		"behavior/travelling.scm"
+		"behavior/following.scm"
 	)
 )
 
 (define skill-id/stun-attack 100)
+(define skill-id/hammer-crush 260)
 (define skill-id/wild-sweep 245)
+(define skill-id/whirlwind 36)
 (define skill-id/spoil 254)
 (define skill-id/sweep 42)
+(define skill-id/fake-death 60)
+
 (define states (list
 	'state/fighting
 	'state/escaping
@@ -62,7 +72,7 @@
 )
 (define (hp-critical? me)
 	(let ((hp (@: me 'hp)) (max-hp (@: me 'max-hp)))
-		(<= (/ hp max-hp) 1/10)
+		(<= (/ hp max-hp) 1/20)
 	)
 )
 (define (mp-economy? me)
@@ -89,19 +99,26 @@
 					(define state 'state/nothing)
 					
 					(define (stun-attack-pointful?)
-						(and ; TODO mp cost
+						(and
 							(@: me 'target-id)
 							(equal? state 'state/fighting)
 							(or (not (mp-economy? me)) (hp-danger? me))
-							(skill-ready? (skill-ref world skill-id/stun-attack))
+							(skill-ready? (or
+								(skill-ref world skill-id/hammer-crush)
+								(skill-ref world skill-id/stun-attack)
+							))
 						)
 					)
 					(define (wild-sweep-pointful?)
-						(and ; TODO mp cost
+						(and
+							#f ; TODO temporary disable
 							(@: me 'target-id)
 							(equal? state 'state/fighting)
 							(or (not (mp-economy? me)) (hp-danger? me))
-							(skill-ready? (skill-ref world skill-id/wild-sweep))
+							(skill-ready? (or
+								(skill-ref world skill-id/whirlwind)
+								(skill-ref world skill-id/wild-sweep)
+							))
 						)
 					)
 					(define (spoil-pointful?)
@@ -125,20 +142,25 @@
 							)
 						)
 					)
-				
-					(define target/sync (make-contract target (lambda (event)
+					(define (fake-death-pointful?)
 						(and
-							(equal? (first event) 'change-target)
-							(equal? (second event) (@: me 'object-id))
+							(hp-critical? me)
+							(skill-ready? (skill-ref world skill-id/fake-death))
 						)
-					)))
+					)
 					
-					(define cancel/sync (make-contract cancel (lambda (event)
-						(and
-							(equal? (first event) 'change-target)
-							(equal? (second event) (@: me 'object-id))
+					(define (use-stun-attack)
+						(if (skill-ref world skill-id/hammer-crush)
+							(use-skill connection skill-id/hammer-crush)
+							(use-skill connection skill-id/stun-attack)
 						)
-					)))
+					)
+					(define (use-wild-sweep)
+						(if (skill-ref world skill-id/whirlwind)
+							(use-skill connection skill-id/whirlwind)
+							(use-skill connection skill-id/wild-sweep)
+						)
+					)
 					
 					(define (assist master-id)
 						(let ((whose (object-ref world master-id)))
@@ -156,13 +178,13 @@
 										)
 										(cond
 											((artisan? me) (if (stun-attack-pointful?)
-												(use-skill connection skill-id/stun-attack)
+												(use-stun-attack)
 												(attack connection)
 											))
 											((scavenger? me) (cond
 												((sweep-pointful?) (use-skill connection skill-id/sweep)) ; If dead and spoiled use sweep
 												((spoil-pointful?) (use-skill connection skill-id/spoil)) ; Start attack with spoil
-												((wild-sweep-pointful?) (use-skill connection skill-id/wild-sweep)) ; Else attack with skill
+												((wild-sweep-pointful?) (use-wild-sweep)) ; Else attack with skill
 												(else (attack connection)) ; Else attack with hand
 											))
 											(else (attack connection))
@@ -172,21 +194,7 @@
 							)
 						)
 					)
-					
-					(define (follow master-id)
-						(let ((master (object-ref world master-id)))
-							(if master
-								(begin
-									(set! state 'state/following)
-									(target connection master-id)
-									(when (@: me 'sitting?) (sit connection #f) (sleep 1/3))
-									(move-to connection (or (@: master 'destination) (@: master 'position)))
-								)
-								(say connection "I don't see you")
-							)
-						)
-					)
-					
+
 					(define (return master-id)
 						(set! state 'state/nothing)
 						(when (@: me 'target-id) (cancel connection))
@@ -196,7 +204,8 @@
 						)
 					)
 					
-					(define traveller (make-traveller connection))
+					(define follow (make-follower connection))
+					(define travel (make-traveller connection))
 					
 					(define (relax)
 						(let ((sitting? (@: me 'sitting?)) (hp (@: me 'hp)) (max-hp (@: me 'max-hp)) (mp (@: me 'mp)) (max-mp (@: me 'max-mp)))
@@ -213,12 +222,10 @@
 					
 					;(define (follow))
 					
-					;(define (travel))
-					
 					(define (escape)
 						(set! state 'state/escaping)
 						(say connection "Help me")
-						;(follow ...)
+						;(follow party leader ...)
 					)
 					
 					(let loop ()
@@ -228,26 +235,36 @@
 								
 								; standard events
 								((change-moving) (let-values (((object-id position destination) (apply values (cdr event))))
-									(when (and (equal? state 'state/following) (equal? object-id (@: me 'target-id))) ; follow if master
-										(move-to connection (or destination position))
-									)
-									; todo check is finished
-									(when (and (equal? state 'state/traveling) (equal? object-id (@: me 'object-id))) ; travel next if it is me
-										(when (zero? (traveller 'next))
+									(when (and (equal? state 'state/following) (equal? object-id (@: me 'target-id))) ; Follow if master
+										(unless (follow)
 											(set! state 'state/nothing)
+										)
+									)
+									(when (and (equal? state 'state/traveling) (equal? object-id (@: me 'object-id))) ; Travel next if it is me
+										(when (and (not destination) (zero? (travel 'next)))
+											(set! state 'state/nothing)
+											(logout connection)
 										)
 									)
 								))
 								((skill-reused) (let-values (((object-id skill-id level) (apply values (cdr event))))
 									(when (= object-id (@: me 'object-id)) (cond
-										((and (= skill-id skill-id/stun-attack) (stun-attack-pointful?))
-											(use-skill connection skill-id/stun-attack)
+										((and (or (= skill-id skill-id/stun-attack) (= skill-id skill-id/hammer-crush)) (stun-attack-pointful?))
+											(use-stun-attack)
 										)
-										((or (= skill-id skill-id/spoil) (= skill-id skill-id/wild-sweep)) (cond
+										((or (= skill-id skill-id/spoil) (= skill-id skill-id/wild-sweep) (= skill-id skill-id/whirlwind)) (cond
 											((spoil-pointful?) (use-skill connection skill-id/spoil))
-											((wild-sweep-pointful?) (use-skill connection skill-id/wild-sweep))
+											((wild-sweep-pointful?) (use-wild-sweep))
 										))
+										((= skill-id skill-id/sweep)
+											(relax)
+										)
 									))
+								))
+								((creature-update) (let ((object-id (apply values (cdr event))))
+									(when (and (equal? object-id (@: me 'target-id)) (fake-death-pointful?))
+										(use-skill connection skill-id/fake-death)
+									)
 								))
 								; TODO skill failed => attack
 								((die) (let-values (((object-id return) (apply values (cdr event))))
@@ -264,20 +281,27 @@
 								((ask) (let-values (((question data) (apply values (cdr event))))
 									(reply connection question (equal? question 'ask/join-party))
 								))
-								((message) (let-values (((object-id channel author text) (apply values (cdr event))))
+								((message) (let-values (((author-id channel author text) (apply values (cdr event))))
 									(let ((command (parse-command text)))
+										(define (get-targets command)
+											(apply parse-targets (cons connection (cons (object-ref world author-id) command)))
+										)
 										(if command
 											(case (car command)
 												(("hello") (gesture connection 'gesture/hello))
 												(("bye") (logout connection))
-												;(("travel") ...)
-												(("assist") (assist object-id))
-												(("follow") (follow object-id))
-												(("return") (return object-id))
+												(("assist") (assist author-id))
+												(("power") (auto-shot connection (not (string=? (try-second command "") "off")) 'soulshot 'd))
 												(("relax") (relax))
+												(("follow")
+													(if (follow (try-first (get-targets (cdr command))))
+														(set! state 'state/following)
+														(say connection "I don't see you")
+													)
+												)
 												(("travel") (if (null? (cdr command))
-													(say connection (format "~a points left" (traveller 'left)) author)
-													(let ((count (traveller (cond
+													(say connection (format "~a points left" (travel 'left)) author)
+													(let ((count (travel (cond
 															((= (length command) 4) (apply point/3d (map string->number (cdr command))))
 															((= (length command) 2) (second command))
 														))))
@@ -287,14 +311,15 @@
 														)
 													)
 												))
+												(("return") (return author-id))
 												(("who") (cond
 													((artisan? me) (say connection "I'm an artisan"))
-													((scavenger? me) (say connection "I'm an scavenger"))
-													(else (say connection "I'm an dwarf"))
+													((scavenger? me) (say connection "I'm a scavenger"))
+													(else (say connection "I'm a dwarf"))
 												))
 												(else (say connection "I don't understand"))
 											)
-											(displayln (format-chat-message object-id channel author text))
+											(displayln (format-chat-message author-id channel author text))
 										)
 									)
 								))

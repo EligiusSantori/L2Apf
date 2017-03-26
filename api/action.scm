@@ -2,8 +2,8 @@
 	(require
 		"../library/structure.scm"
 		"../library/network.scm"
-		"../logic/creature.scm"
-		"../logic/world.scm"
+		"../model/creature.scm"
+		"../model/world.scm"
 		"../packet/game/client/action.scm"
 	)
 	(provide action)

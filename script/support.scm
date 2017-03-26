@@ -7,19 +7,21 @@
 		"library/structure.scm"
 		"library/geometry.scm"
 		"system/contract.scm"
-		"logic/object.scm"
-		"logic/creature.scm"
-		"logic/npc.scm"
-		"logic/character.scm"
-		"logic/antagonist.scm"
-		"logic/protagonist.scm"
-		"logic/skill.scm"
-		"logic/world.scm"
+		"model/object.scm"
+		"model/creature.scm"
+		"model/npc.scm"
+		"model/character.scm"
+		"model/antagonist.scm"
+		"model/protagonist.scm"
+		"model/skill.scm"
+		"model/world.scm"
 		"api/connect.scm"
 		"api/login.scm"
 		"api/select_server.scm"
 		"api/select_character.scm"
 		"api/use_skill.scm"
+		"api/use_item.scm"
+		"api/auto_shot.scm"
 		"api/gesture.scm"
 		"api/move_to.scm"
 		"api/move_on.scm"
@@ -33,13 +35,19 @@
 		"api/run.scm"
 		"api/sit.scm"
 		"api/logout.scm"
+		"api/target_sync.scm"
+		"api/cancel_sync.scm"
+		"behavior/travelling.scm"
+		"behavior/following.scm"
 	)
 )
 
 (define skill-id/vampiric-rage 1268)
 (define skill-id/focus 1077)
+(define skill-id/death-whisper 1242)
 (define skill-id/might 1068)
 (define skill-id/shield 1040)
+(define skill-id/guidance 1240)
 (define skill-id/empower 1059)
 (define skill-id/concentration 1078)
 (define skill-id/wind-walk 1204)
@@ -52,19 +60,15 @@
 
 (define states (list
 	'state/buffing
-	;'state/healing
-	;'state/recharging
-	;'state/caring
-	;'state/partying
 	'state/following
 	'state/traveling
+	'state/supporting
 	;'state/escaping
 	'state/resting
 	'state/nothing
 ))
 
 (define (is-fighter? creature)
-	(displayln (@: creature 'class-id))
 	(member (@: creature 'class-id) (list 
 		0 1 2 88 3 89 4 5 90 6 91 7 8 93 9 92 ; Human
 		18 19 20 99 21 100 22 23 101 24 102 ; Dark Elf
@@ -75,7 +79,6 @@
 )
 
 (define (is-mage? creature)
-	(displayln (@: creature 'class-id))
 	(member (@: creature 'class-id) (list 
 		10 11 12 94 13 95 14 96 15 16 97 17 98 ; Human
 		25 26 27 103 28 104 29 30 105 ; Dark Elf
@@ -88,7 +91,9 @@
 	(cond
 		((is-fighter? creature) (list ; TODO extend
 				skill-id/vampiric-rage
+				skill-id/death-whisper
 				skill-id/focus
+				skill-id/guidance
 				skill-id/might
 				skill-id/shield
 				skill-id/mental-shield
@@ -139,30 +144,20 @@
 					(define buff-queue (list))
 					;(define response-to)
 					
-					(define target/sync (make-contract target (lambda (event)
-						(and
-							(equal? (first event) 'change-target)
-							(equal? (second event) (@: me 'object-id))
-						)
-					)))
-					
-					(define cancel/sync (make-contract cancel (lambda (event)
-						(and
-							(equal? (first event) 'change-target)
-							(equal? (second event) (@: me 'object-id))
-						)
-					)))
-					
 					(define (buff-iterate)
 						(if (not (null? buff-queue))
 							(let ((queue buff-queue))
 								(set! buff-queue (cdr queue))
-								(use-skill connection (car queue))
+								(if (skill-ref world (car queue))
+									(use-skill connection (car queue))
+									(buff-iterate) ; Skip to next
+								)
 							)
 							(set! state 'state/nothing)
 						)
 					)
 					
+					; TODO (list (cons target skill ...) ...)
 					(define (buff master-id)
 						(let ((master (object-ref world master-id)))
 							(if master
@@ -174,25 +169,7 @@
 										(buff-iterate)
 									)
 								)
-								(say connection "I don't see you")
-							)
-						)
-					)
-					
-					;(define (follow-iterate)
-					;
-					;)
-					
-					(define (follow master-id)
-						(let ((master (object-ref world master-id)))
-							(if master
-								(begin
-									(set! state 'state/following)
-									(target connection master-id)
-									(when (@: me 'sitting?) (sit connection #f) (sleep 1/3))
-									(move-to connection (or (@: master 'destination) (@: master 'position)))
-								)
-								(say connection "I don't see you")
+								(say connection "I don't see a target")
 							)
 						)
 					)
@@ -206,7 +183,8 @@
 						)
 					)
 					
-					(define traveller (make-traveller connection))
+					(define follow (make-follower connection))
+					(define travel (make-traveller connection))
 					
 					(define (relax)
 						(let ((sitting? (@: me 'sitting?)) (hp (@: me 'hp)) (max-hp (@: me 'max-hp)) (mp (@: me 'mp)) (max-mp (@: me 'max-mp)))
@@ -233,16 +211,34 @@
 										(buff-iterate)
 									)
 								))
+								((skill-reused) (let-values (((object-id skill-id level) (apply values (cdr event))))
+									(when (= object-id (@: me 'object-id)) (cond
+										((and (equal? state 'state/supporting) (= skill-id skill-id/recharge))
+											(use-skill connection skill-id/recharge)
+										)
+									))
+								))
 								((change-moving) (let-values (((object-id position destination) (apply values (cdr event))))
-									(when (and (equal? state 'state/following) (equal? object-id (@: me 'target-id))) ; follow if master
-										(move-to connection (or destination position))
+									(when (and (equal? state 'state/following) (equal? object-id (@: me 'target-id))) ; Follow if master
+										(unless (follow)
+											(set! state 'state/nothing)
+										)
 									)
-									(when (and (equal? state 'state/traveling) (equal? object-id (@: me 'object-id))) ; travel next if it is me
-										(when (zero? (traveller 'next))
-											(logout connection) ;(set! state 'state/nothing)
+									(when (and (equal? state 'state/traveling) (equal? object-id (@: me 'object-id))) ; Travel next if it is me
+										(when (and (not destination) (zero? (travel 'next)))
+											(set! state 'state/nothing)
+											(logout connection)
 										)
 									)
 								))
+								#|((creature-update) (let* ((object-id (second event)) (creature (object-ref world object-id)))
+									(when (and creature (equal? state 'state/supporting) (equal? object-id (@: me 'target-id)))
+										(displayln "\n\n\n\n\n\n\n\n\n\nhere")
+										(when (and (is-mage? creature) (<= (/ (@: creature 'mp) (@: creature 'max-mp)) 4/5))
+											(use-skill connection skill-id/recharge)
+										)
+									)
+								))|#
 								#|((die) (let-values (((object-id return) (apply values (cdr event))))
 									(when (equal? object-id (@: me 'object-id))
 										(say connection "I have died" response-to)
@@ -251,24 +247,39 @@
 								((ask) (let-values (((question data) (apply values (cdr event))))
 									(reply connection question (equal? question 'ask/join-party))
 								))
-								((message) (let-values (((object-id channel author text) (apply values (cdr event))))
+								((message) (let-values (((author-id channel author text) (apply values (cdr event))))
 									(let ((command (parse-command text)))
+										(define (get-targets command)
+											(apply parse-targets (cons connection (cons (object-ref world author-id) command)))
+										)
 										(if command
 											(case (car command)
 												(("hello") (gesture connection 'gesture/hello))
 												(("bye") (logout connection))
-												(("buff") (buff (case (if (not (null? (cdr command))) (second command) #f)
-													(("self") (@: me 'object-id))
-													; TODO my
-													; TODO party (list (cons target-id skill-id) ...)
-													(else object-id) ; me
-												)))
+												(("buff") (buff (try-first (get-targets (cdr command)))))
+												(("power") (auto-shot connection (not (string=? (try-second command "") "off")) 'blessed-spiritshot 'd))
+												; TODO support
+												(("support")
+													(target/sync connection author-id)
+													(set! state 'state/supporting)
+													(use-skill connection skill-id/recharge)
+												)
+												(("resurrect")
+													(target/sync connection (try-first (get-targets (cdr command))))
+													(use-skill connection skill-id/resurrection)
+												)
 												(("relax") (relax))
-												(("travel") (if (null? (cdr command))
-													(say connection (format "~a points left" (traveller 'left)) author)
-													(let ((count (traveller (cond
-															((= (length command) 4) (apply point/3d (map string->number (cdr command))))
-															((= (length command) 2) (second command))
+												(("follow")
+													(if (follow (try-first (get-targets (cdr command))))
+														(set! state 'state/following)
+														(say connection "I don't see a target")
+													)
+												)
+												(("travel") (if (null? (cdr command)) ; TODO feedback if died and when finished
+													(say connection (format "~a points left" (travel 'left)) author)
+													(let ((count (travel (cond
+															((= (length command) 4) (apply point/3d (map string->number (cdr command)))) ; To location
+															((= (length command) 2) (second command)) ; To known place ; TODO use DB
 														))))
 														(when (> count 0)
 															(set! state 'state/traveling)
@@ -276,17 +287,15 @@
 														)
 													)
 												))
-												; TODO (("travel") point / route [loop?] [speed_ratio] ) ; TODO feedback if died, feedback & logout when finished
-												; TODO use
-												; TODO say
-												; TODO skill
-												; TODO (("return")) ; TODO town, clanhall, ...
-												; TODO route test / route finish
-												(("follow") (follow object-id)) ; TODO normal (by timer), fast (to destination), accurately (full path)
-												(("return") (return object-id))
+												; TODO use item-name
+												; TODO say {info}
+												; TODO skill skill-id
+												; TODO reborn: town, clanhall, ...
+												; TODO route: record/finish
+												(("return") (return author-id))
 												(else (say connection "I don't understand"))
 											)
-											(displayln (format-chat-message object-id channel author text))
+											(displayln (format-chat-message author-id channel author text))
 										)
 									)
 								))

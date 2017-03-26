@@ -10,7 +10,6 @@
 		(string->bytes/utf-16ge (string? . -> . bytes?))
 		(hash-filter (hash? procedure? . -> . list?))
 		(hash-find (hash? procedure? . -> . any/c))
-		(alist-ref (any/c list? . -> . any/c))
 	))
 
 	(define (convert data from to)
@@ -21,12 +20,6 @@
 					(if (equal? r 'complete) u #f)
 				)
 			)
-		)
-	)
-	
-	(define (alist-ref k l)
-		(let ((p (assoc k l)))
-			(if p (cdr p) p)
 		)
 	)
 	

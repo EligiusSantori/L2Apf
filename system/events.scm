@@ -8,7 +8,7 @@
 		"make_event.scm"
 		"handlers.scm"
 		"timers.scm"
-		"../logic/world.scm"
+		"../model/world.scm"
 	)
 
 	(provide (contract-out
@@ -65,18 +65,29 @@
 			)
 			(listen-event! connection (gensym)
 				(lambda (e) (and
-					(equal? (first e) 'skill-started)
+					(equal? (car e) 'skill-started)
 					(= (second e) (@: connection 'world 'me 'object-id))
 				))
 				(lambda (e)
 					(let-values (((name object-id skill-id level) (apply values e)))
 						(let ((skill (skill-ref (@: connection 'world) skill-id)))
-							(let ((last-usage (@: skill 'last-usage)) (reuse-delay (@: skill 'reuse-delay)))
-								(when (and reuse-delay (> reuse-delay 0))
-									(set-alarm! connection 'skill-reused (+ last-usage reuse-delay) object-id skill-id level)
+							(when skill
+								(let ((last-usage (@: skill 'last-usage)) (reuse-delay (@: skill 'reuse-delay)))
+									(when (and reuse-delay (> reuse-delay 0))
+										(set-alarm! connection 'skill-reused (+ last-usage reuse-delay) object-id skill-id level)
+									)
 								)
 							)
 						)
+					)
+					#f
+				)
+			)
+			(listen-event! connection (gensym) ; fix position refreshing event on attack
+				(lambda (e) (equal? (car e) 'attack))
+				(lambda (e)
+					(let* ((object-id (second e)) (creature (object-ref world object-id)))
+						(when creature (apply trigger-event (list connection 'change-moving object-id (@: creature 'position) #f)))
 					)
 					#f
 				)

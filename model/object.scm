@@ -2,9 +2,9 @@
 	(require
 		(rename-in racket/contract (any all/c))
 		srfi/1
-		"../library/ral.scm"
+		"../library/extension.scm"
 		"../library/structure.scm"
-		"main.scm"
+		"../_logic.scm"
 	)
 	(provide (contract-out
 		(object? (any/c . -> . boolean?))
@@ -31,7 +31,7 @@
 	)
 	
 	(define (update-object object struct)
-		(let ((object-id (alist-ref 'object-id struct)))
+		(let ((object-id (alist-ref struct 'object-id)))
 			(if object-id (alist-cons 'object-id object-id object) object)
 		)
 	)

@@ -3,17 +3,17 @@
 		(rename-in racket/contract (any all/c))
 		srfi/1
 		"../library/structure.scm"
-		"main.scm"
+		"../_logic.scm"
 		"character.scm"
 	)
 	(provide (contract-out
-		(protagonist? (box? . -> . boolean?))
+		(protagonist? (any/c . -> . boolean?))
 		(create-protagonist (list? . -> . box?))
 		(update-protagonist! (box? list? . -> . void?))
 	))
 
 	(define (protagonist? object)
-		(if (member 'protagonist (@: object 'type)) #t #f)
+		(if (and object (member 'protagonist (@: object 'type))) #t #f)
 	)
 	
 	(define (create-protagonist struct)

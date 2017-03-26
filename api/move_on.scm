@@ -4,7 +4,7 @@
 		"../library/geometry.scm"
 		"../library/structure.scm"
 		"../library/network.scm"
-		"../logic/creature.scm"
+		"../model/creature.scm"
 		"../packet/game/client/move_to_point.scm"
 	)
 	(provide move-on)

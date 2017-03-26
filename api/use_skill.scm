@@ -3,8 +3,8 @@
 		srfi/1
 		"../library/structure.scm"
 		"../library/network.scm"
-		"../logic/skill.scm"
-		"../logic/world.scm"
+		"../model/skill.scm"
+		"../model/world.scm"
 		"../packet/game/client/request_skill_use.scm"
 	)
 	(provide use-skill)

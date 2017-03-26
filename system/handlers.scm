@@ -4,20 +4,21 @@
 		racket/dict
 		racket/function
 		"../library/structure.scm"
-		"../logic/main.scm"
-		"../logic/world.scm"
-		"../logic/object.scm"
-		"../logic/creature.scm"
-		"../logic/npc.scm"
-		"../logic/character.scm"
-		"../logic/antagonist.scm"
-		"../logic/protagonist.scm"
-		;"../logic/quest.scm"
-		"../logic/skill.scm"
-		;"../logic/item.scm"
+		"../_logic.scm"
+		"../model/world.scm"
+		"../model/object.scm"
+		"../model/creature.scm"
+		"../model/npc.scm"
+		"../model/character.scm"
+		"../model/antagonist.scm"
+		"../model/protagonist.scm"
+		;"../model/quest.scm"
+		"../model/skill.scm"
+		;"../model/item.scm"
 		"../packet/game/server/chat_message.scm"
 		"../packet/game/server/system_message.scm"
 		"../packet/game/server/social_action.scm"
+		"../packet/game/server/attack.scm"
 		"../packet/game/server/die.scm"
 		"../packet/game/server/revive.scm"
 		"../packet/game/server/object_deleted.scm"
@@ -25,6 +26,7 @@
 		"../packet/game/server/char_info.scm"
 		"../packet/game/server/npc_info.scm"
 		"../packet/game/server/move_to_point.scm"
+		"../packet/game/server/move_to_pawn.scm"
 		"../packet/game/server/stop_moving.scm"
 		"../packet/game/server/status_update.scm"
 		"../packet/game/server/target_selected.scm"
@@ -73,6 +75,23 @@
 			(update-protagonist! me packet)
 			(register-object! world me)
 			(values (@: me 'object-id))
+		)
+	)
+	
+	(define (packet-handler/attack world packet)
+		(let* ((object-id (@: packet 'object-id)) (creature (object-ref world object-id)) (hits (@: packet 'hits)))
+			(when creature
+				(update-creature! creature (list
+					(cons 'target-id (@: (car hits) 'target-id))
+					(cons 'position (@: packet 'position))
+					(cons 'destination (@: packet 'position))
+					(cons 'moving? #f)
+				))
+				; TODO
+					; ? substract damage from hp
+					; ? refresh in-combat for self and all targets if not miss
+			)
+			(values object-id hits)
 		)
 	)
 
@@ -240,6 +259,25 @@
 		)
 	)
 	
+	(define (packet-handler/move-to-pawn world packet) ; Происходит, когда игрок бежит не к точке, а к монстру или NPC
+		(let* ((object-id (@: packet 'object-id)) (target-id (@: packet 'target-id)) (position (@: packet 'position)))
+			(let* ((creature (object-ref world object-id)) (target (object-ref world target-id)))
+				(if (and creature target)
+					(let* ((destination (@: target 'position)) (moving? (not (equal? position destination))))
+						(define struct (list
+							(cons 'position position)
+							(cons 'destination destination)
+							(cons 'moving? moving?)
+						))
+						(update-creature! creature (if moving? (alist-cons 'angle (points-angle position destination) struct) struct))
+						(values object-id position (if moving? destination #f))
+					)
+					(values object-id position #f) ; TODO omit event
+				)
+			)
+		)
+	)
+	
 	(define (packet-handler/skill-started world packet)
 		(let* ((object-id (@: packet 'object-id)) (skill-id (@: packet 'skill-id)) (level (@: packet 'level)) (creature (object-ref world object-id)))
 			(when creature
@@ -314,7 +352,7 @@
 		(list #x01 'change-moving game-server-packet/move-to-point packet-handler/move-to-point)
 		(list #x03 'creature-create game-server-packet/char-info packet-handler/char-info)
 		(list #x04 'creature-update game-server-packet/user-info packet-handler/user-info)
-		;(list #x05 ' game-server-packet/attack packet-handler/attack) Attack
+		(list #x05 'attack game-server-packet/attack packet-handler/attack)
 		(list #x06 'die game-server-packet/die packet-handler/die)
 		(list #x07 'revive game-server-packet/revive packet-handler/revive)
 		; #x0a AttackCanceld
@@ -332,8 +370,8 @@
 		; #x25 ActionFailed
 		(list #x29 'change-target game-server-packet/target-selected packet-handler/target-selected)
 		(list #x2a 'change-target game-server-packet/target-unselected packet-handler/target-unselected)
-		; #x2b ?
-		; #x2c ?
+		; #x2b ? AutoAttackStart
+		; #x2c ? AutoAttackStop
 		(list #x2d 'gesture game-server-packet/social-action packet-handler/social-action)
 		(list #x2e 'creature-update game-server-packet/change-move-type packet-handler/change-move-type)
 		(list #x2f 'creature-update game-server-packet/change-wait-type packet-handler/change-wait-type)
@@ -350,7 +388,7 @@
 		; #x4e ?
 		; #x52 ?
 		(list #x58 'skill-list game-server-packet/skill-list packet-handler/skill-list)
-		; #x60 MoveToPawn
+		(list #x60 'change-moving game-server-packet/move-to-pawn packet-handler/move-to-pawn)
 		(list #x64 'system-message game-server-packet/system-message packet-handler/system-message)
 		; #x65 StartPledgeWar
 		; #x6d SetupGauge
