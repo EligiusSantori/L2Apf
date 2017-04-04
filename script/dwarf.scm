@@ -52,11 +52,11 @@
 
 (define states (list
 	'state/fighting
-	'state/escaping
-	'state/resting
-	'state/nothing
+	;'state/escaping
 	'state/following
 	'state/traveling
+	'state/resting
+	'state/nothing
 ))
 
 (define (artisan? me)

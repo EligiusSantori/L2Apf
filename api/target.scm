@@ -8,14 +8,11 @@
 	)
 	(provide target)
 	
-	(define (target connection object-id . tail)
-		(define shift? (if (null? tail) #f (car tail)))
-
-		(let* ((world (@: connection 'world))
-					(object (object-ref world object-id))
-						(origin (@: object 'position))) ; TODO what is origin really means?
-			(when (and (creature? object) origin)
-				(send connection (game-client-packet/action object-id origin shift?))
+	(define (target connection object-id [shift? #f])
+		; TODO check if me.target.id != target-id
+		(let* ((world (@: connection 'world)) (object (object-ref world object-id)))
+			(when (creature? object) ; TODO what is origin really means?
+				(send connection (game-client-packet/action object-id (@: object 'position) shift?))
 			)
 		)
 	)

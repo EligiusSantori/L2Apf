@@ -21,16 +21,18 @@
 			(cons "town/elf" (point/3d 46903 51417 -2972))
 			(cons "town/dark-elf" (point/3d 9681 15594 -4569))
 			
-			(cons "town/floran" (point/3d 17611 170025 -3505))
 			(cons "town/gludin" (point/3d -80845 149778 -3038))
 			(cons "town/gludio" (point/3d -12578 122820 -3119))
 			(cons "town/dion" (point/3d 18767 145077 -3121))
+			(cons "town/floran" (point/3d 17611 170025 -3505))
 			(cons "town/giran" (point/3d 83371 147962 -3399))
-			(cons "town/oren" (point/3d 80787 54589 -1519))
 			(cons "town/hunter" (point/3d 116798 77017 -2709))
+			(cons "town/oren" (point/3d 82764 53575 -1496))
 			
 			(cons "tomb/sacrifice" (point/3d -41629 209358 -5086))
 			(cons "tomb/worshipers" (point/3d 110769 174014 -5439))
+			(cons "tomb/heretics" (point/3d 43265 143935 -5379))
+			(cons "tomb/pilgrims" (point/3d 45278 123624 -5411))
 			; tomb/down
 			; tomb/dusk
 			; tomb/ascetics
@@ -44,7 +46,6 @@
 			; tomb/witch
 			; tomb/apostate
 			; tomb/disciples
-			; tomb/pilgrims
 			
 			(cons "orc-barracks" (point/3d -85933 105987 -3536))
 			(cons "execution-grounds" (point/3d 44528 148489 -3702))

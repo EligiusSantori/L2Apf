@@ -43,25 +43,16 @@
 	)
 )
 
-(define skill-id/vampiric-rage 1268)
-(define skill-id/focus 1077)
-(define skill-id/death-whisper 1242)
-(define skill-id/might 1068)
-(define skill-id/shield 1040)
-(define skill-id/guidance 1240)
-(define skill-id/empower 1059)
-(define skill-id/concentration 1078)
-(define skill-id/wind-walk 1204)
-(define skill-id/mental-shield 1035)
-(define skill-id/heal 1011)
-(define skill-id/battle-heal 1015)
-(define skill-id/recharge 1013)
-(define skill-id/cure-poision 1012)
-(define skill-id/resurrection 1016)
+(define skill-id/sleep 1069)
+(define skill-id/slow 1160)
+(define skill-id/shadow-flare 1267)
+(define skill-id/hurricane 1239)
+(define skill-id/surrender-to-wind 1074)
+(define skill-id/corpse-life-drain 1151)
 
 (define states (list
-	'state/supporting
-	'state/buffing
+	'state/assisting
+	'state/slaughtering
 	'state/following
 	'state/traveling
 	;'state/escaping
@@ -69,25 +60,20 @@
 	'state/nothing
 ))
 
-(define (is-fighter? creature)
-	(member (@: creature 'class-id) (list 
-		0 1 2 88 3 89 4 5 90 6 91 7 8 93 9 92 ; Human
-		18 19 20 99 21 100 22 23 101 24 102 ; Dark Elf
-		31 32 33 106 34 107 35 36 108 37 109 ; Elf
-		44 45 46 113 47 48 114 ; Orc
-		53 54 55 117 56 57 118 ; Dwarf
-	))
+(define (get-attack-skill me)
+	skill-id/hurricane ; TODO shadow-flare by cond
+	
+	#|(cond
+		((member (@: me 'class-id) (list 56 57 118))
+			skill-id/hurricance
+		)
+	)|#
 )
-
-(define (is-mage? creature)
-	(member (@: creature 'class-id) (list 
-		10 11 12 94 13 95 14 96 15 16 97 17 98 ; Human
-		25 26 27 103 28 104 29 30 105 ; Dark Elf
-		38 39 40 110 41 111 42 43 112 ; Elf
-		49 50 51 115 52 116  ; Orc
-	))
+(define (mp-critical? me)
+	(let ((mp (@: me 'mp)) (max-mp (@: me 'max-mp)))
+		(<= (/ mp max-mp) 1/10)
+	)
 )
-
 #|(define (hp-danger? me)
 	(let ((hp (@: me 'hp)) (max-hp (@: me 'max-hp)))
 		(<= (/ hp max-hp) 1/3)
@@ -112,34 +98,55 @@
 	(let ((connection (connect host port)))
 		(let ((world (first (login connection account password))))
 			(let ((me (@: (select-server connection world) name)))
-				(let ((events (select-character connection me)))			
-					(define state 'state/nothing)
-					;(define response-to)
+				(let ((events (select-character connection me)))	
+					(define state 'state/nothing) ; TODO complex component including stack feature
+					(define response-to #f)
 					
-					(define (get-buff-list object-id)
-						(let ((creature (object-ref world object-id)))
-							(if creature
-								(cond
-									((is-fighter? creature) (list ; TODO extend
-											skill-id/vampiric-rage
-											skill-id/death-whisper
-											skill-id/focus
-											skill-id/guidance
-											skill-id/might
-											skill-id/shield
-											skill-id/mental-shield
-											skill-id/wind-walk
-									))
-									((is-mage? creature) (list ; TODO extend
-											skill-id/empower
-											skill-id/concentration
-											skill-id/shield
-											skill-id/mental-shield
-											skill-id/wind-walk
-									))
-									(else (list))
+					(define (state-fighting?)
+						(member state (list 'state/assisting 'state/slaughtering))
+					)
+					(define (attack-skill-pointful?)
+						(and
+							(@: me 'target-id)
+							; TODO target is alive and hp > damage
+							(state-fighting?)
+							(not (mp-critical? me))
+							(skill-ready? (skill-ref world skill-id/hurricane))
+						)
+					)
+					(define (target-alive-other? subject)
+						(and
+							(creature? subject)
+							(let* ((target-id (@: subject 'target-id)) (target (object-ref world target-id)))
+								(and
+									(creature? target)
+									(not (object=? subject target))
+									(not (@: target 'alike-dead?))
 								)
-								(list)
+							)
+						)
+					)
+
+					(define follow (make-follower connection))
+					(define travel (make-traveller connection))
+					
+					(define (assist master-id)
+						(let ((whose (object-ref world master-id)))
+							(if (target-alive-other? whose)
+								(begin
+									(set! state 'state/assisting)
+									(set! response-to master-id)
+									
+									(let ((target-id (@: whose 'target-id)))
+										(when (not (equal? target-id (@: me 'target-id)))
+											(target connection target-id)
+										)
+									)
+									(when (@: me 'sitting?)
+										(sit connection #f)
+									)
+								)
+								(say connection "Invalid target")
 							)
 						)
 					)
@@ -152,10 +159,6 @@
 							(when to (move-to connection (@: to 'position)))
 						)
 					)
-					
-					(define follow (make-follower connection))
-					(define travel (make-traveller connection))
-					(define buff (make-buffer connection))
 					
 					(define (relax)
 						(let ((sitting? (@: me 'sitting?)) (hp (@: me 'hp)) (max-hp (@: me 'max-hp)) (mp (@: me 'mp)) (max-mp (@: me 'max-mp)))
@@ -178,18 +181,32 @@
 								
 								; standard events
 								((skill-launched) (let-values (((object-id skill-id level) (apply values (cdr event))))
-									(when (and (equal? state 'state/buffing) (equal? object-id (@: me 'object-id))) ; Process next buff
-										(unless (buff) (set! state 'state/nothing))
+									(when (equal? object-id (@: me 'object-id))
+										(if (and (equal? state 'state/slaughtering) (attack-skill-pointful?))
+											(use-skill connection (get-attack-skill me)) ; If time to nuke then do it
+											(let ((master (object-ref world response-to))) ; Else stay near master
+												(when (and (state-fighting?) (creature? master))
+													(move-to connection (or (@: master 'destination) (@: master 'position)))
+												)
+											)
+										)
 									)
 								))
 								((skill-reused) (let-values (((object-id skill-id level) (apply values (cdr event))))
-									(when (= object-id (@: me 'object-id)) (cond
-										((and (equal? state 'state/supporting) (= skill-id skill-id/recharge))
-											(use-skill connection skill-id/recharge)
-										)
-									))
+									(when (and (equal? object-id (@: me 'object-id)) (equal? state 'state/slaughtering) (attack-skill-pointful?))
+										(use-skill connection (get-attack-skill me))
+									)
+								))
+								((die) (let-values (((object-id return) (apply values (cdr event))))
+									(when (and (state-fighting?) (equal? object-id (@: me 'target-id)))
+										(relax)
+									)
+									; TODO corpse-life-drain if health low
 								))
 								((change-moving) (let-values (((object-id position destination) (apply values (cdr event))))
+									(when (and (state-fighting?) (equal? object-id response-to)) ; Stay near master
+										(move-to connection (or destination position)) ; TODO gap 100
+									)
 									(when (and (equal? state 'state/following) (equal? object-id (@: me 'target-id))) ; Follow if master
 										(unless (follow) (set! state 'state/nothing))
 									)
@@ -200,19 +217,6 @@
 										)
 									)
 								))
-								#|((creature-update) (let* ((object-id (second event)) (creature (object-ref world object-id)))
-									(when (and creature (equal? state 'state/supporting) (equal? object-id (@: me 'target-id)))
-										(displayln "\n\n\n\n\n\n\n\n\n\nhere")
-										(when (and (is-mage? creature) (<= (/ (@: creature 'mp) (@: creature 'max-mp)) 4/5))
-											(use-skill connection skill-id/recharge)
-										)
-									)
-								))|#
-								#|((die) (let-values (((object-id return) (apply values (cdr event))))
-									(when (equal? object-id (@: me 'object-id))
-										(say connection "I have died" response-to)
-									)
-								))|#
 								((ask) (let-values (((question data) (apply values (cdr event))))
 									(reply connection question (equal? question 'ask/join-party))
 								))
@@ -225,24 +229,23 @@
 											(case (car command)
 												(("hello") (gesture connection 'gesture/hello))
 												(("bye") (logout connection))
-												(("buff") (let ((targets (get-targets (cdr command))))
-													(when (and targets (not (null? targets)))
-														(if (buff (map (lambda (object-id) (cons object-id (get-buff-list object-id))) targets))
-															(set! state 'state/buffing)
-															(say connection "Nothing to buff")
+												(("assist") (assist author-id))
+												(("slaught")
+													(if (target-alive-other? me)
+														(begin
+															(set! state 'state/slaughtering)
+															(use-skill connection skill-id/surrender-to-wind)
 														)
+														(say connection "Invalid target")
 													)
-												))
+												)
+												(("strike")
+													(if (target-alive-other? me)
+														(use-skill connection (get-attack-skill me))
+														(say connection "Invalid target")
+													)
+												)
 												(("power") (auto-shot connection (not (string=? (try-second command "") "off")) 'blessed-spiritshot 'd))
-												(("support") ; TODO
-													(target/sync connection author-id)
-													(set! state 'state/supporting)
-													(use-skill connection skill-id/recharge)
-												)
-												(("resurrect")
-													(target/sync connection (try-first (get-targets (cdr command))))
-													(use-skill connection skill-id/resurrection)
-												)
 												(("relax") (relax))
 												(("follow")
 													(if (follow (try-first (get-targets (cdr command))))
@@ -262,11 +265,6 @@
 														)
 													)
 												))
-												; TODO use item-name
-												; TODO say {info}
-												; TODO skill skill-id
-												; TODO reborn: town, clanhall, ...
-												; TODO route: record/finish
 												(("return") (return author-id))
 												(else (say connection "I don't understand"))
 											)
