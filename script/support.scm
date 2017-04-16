@@ -69,49 +69,43 @@
 	'state/nothing
 ))
 
-(define (is-fighter? creature)
-	(member (@: creature 'class-id) (list 
-		0 1 2 88 3 89 4 5 90 6 91 7 8 93 9 92 ; Human
-		18 19 20 99 21 100 22 23 101 24 102 ; Dark Elf
-		31 32 33 106 34 107 35 36 108 37 109 ; Elf
-		44 45 46 113 47 48 114 ; Orc
-		53 54 55 117 56 57 118 ; Dwarf
-	))
-)
-
-(define (is-mage? creature)
-	(member (@: creature 'class-id) (list 
-		10 11 12 94 13 95 14 96 15 16 97 17 98 ; Human
-		25 26 27 103 28 104 29 30 105 ; Dark Elf
-		38 39 40 110 41 111 42 43 112 ; Elf
-		49 50 51 115 52 116  ; Orc
-	))
-)
-
-#|(define (hp-danger? me)
-	(let ((hp (@: me 'hp)) (max-hp (@: me 'max-hp)))
-		(<= (/ hp max-hp) 1/3)
+(define (hp-danger? creature)
+	(let ((hp (@: creature 'hp)) (max-hp (@: creature 'max-hp)))
+		(displayln (list "hp-danger? " hp max-hp))
+		(and hp max-hp
+			(<= (/ hp max-hp) 1/3)
+		)
 	)
 )
-(define (hp-critical? me)
-	(let ((hp (@: me 'hp)) (max-hp (@: me 'max-hp)))
-		(<= (/ hp max-hp) 1/10)
+(define (hp-almost-full? creature)
+	(let ((hp (@: creature 'hp)) (max-hp (@: creature 'max-hp)))
+		(displayln (list "hp-almost-full? " hp max-hp))
+		(and hp max-hp
+			(>= (/ hp max-hp) 4/5)
+		)
 	)
 )
-(define (mp-economy? me)
-	(let ((mp (@: me 'mp)) (max-mp (@: me 'max-mp)))
-		(<= (/ mp max-mp) (cond
-			((artisan? me) 1/3)
-			((scavenger? me) 2/3)
-			(else 1)
-		))
+(define (hp-critical? creature)
+	(let ((hp (@: creature 'hp)) (max-hp (@: creature 'max-hp)))
+		(displayln (list "hp-critical? " hp max-hp creature))
+		(and hp max-hp
+			(<= (/ hp max-hp) 1/10)
+		)
 	)
-)|#
+)
+(define (mp-almost-full? creature)
+	(let ((mp (@: creature 'mp)) (max-mp (@: creature 'max-mp)))
+		(displayln (list "mp-almost-full? " mp max-mp))
+		(and mp max-mp
+			(>= (/ mp max-mp) 4/5)
+		)
+	)
+)
 
 (let-values (((account password host port name) (parse-protocol (current-command-line-arguments))))
 	(let ((connection (connect host port)))
-		(let ((world (first (login connection account password))))
-			(let ((me (@: (select-server connection world) name)))
+		(let ((world (findf (lambda (server) (@: server 'state)) (login connection account password))))
+			(let ((me (cdr (assoc name (select-server connection world) string-ci=?))))
 				(let ((events (select-character connection me)))			
 					(define state 'state/nothing)
 					;(define response-to)
@@ -120,22 +114,22 @@
 						(let ((creature (object-ref world object-id)))
 							(if creature
 								(cond
-									((is-fighter? creature) (list ; TODO extend
+									((fighter? creature) (list ; TODO extend
+											skill-id/wind-walk
 											skill-id/vampiric-rage
 											skill-id/death-whisper
 											skill-id/focus
 											skill-id/guidance
 											skill-id/might
 											skill-id/shield
-											skill-id/mental-shield
-											skill-id/wind-walk
+											; skill-id/mental-shield ; buggy, temporary disabled
 									))
-									((is-mage? creature) (list ; TODO extend
+									((mystic? creature) (list ; TODO extend
+											skill-id/wind-walk
 											skill-id/empower
 											skill-id/concentration
 											skill-id/shield
-											skill-id/mental-shield
-											skill-id/wind-walk
+											; skill-id/mental-shield ; buggy, temporary disabled
 									))
 									(else (list))
 								)
@@ -171,6 +165,24 @@
 						)
 					)
 					
+					(define (support-iterate)
+						(let ((creature (object-ref world (@: me 'target-id))))
+							(when creature
+								(cond
+									((and (hp-danger? creature) (skill-ready? (skill-ref world skill-id/battle-heal)))
+										(use-skill connection skill-id/battle-heal)
+									)
+									((and (not (hp-almost-full? creature)) (skill-ready? (skill-ref world skill-id/heal)))
+										(use-skill connection skill-id/heal)
+									)
+									((and (not (mp-almost-full? creature)) (skill-ready? (skill-ref world skill-id/recharge)))
+										(use-skill connection skill-id/recharge)
+									)
+								)
+							)
+						)
+					)
+					
 					(let loop ()
 						(let ((event (sync events)))
 							(case (if event (car event) #f)
@@ -178,14 +190,19 @@
 								
 								; standard events
 								((skill-launched) (let-values (((object-id skill-id level) (apply values (cdr event))))
-									(when (and (equal? state 'state/buffing) (equal? object-id (@: me 'object-id))) ; Process next buff
-										(unless (buff) (set! state 'state/nothing))
+									(when (and (equal? object-id (@: me 'object-id)) (@: me 'target-id)) ; If subject is me and i have target
+										(when (equal? state 'state/buffing) ; Process next buff
+											(unless (buff) (set! state 'state/nothing))
+										)
+										(when (equal? state 'state/supporting)
+											(support-iterate)
+										)
 									)
 								))
 								((skill-reused) (let-values (((object-id skill-id level) (apply values (cdr event))))
 									(when (= object-id (@: me 'object-id)) (cond
-										((and (equal? state 'state/supporting) (= skill-id skill-id/recharge))
-											(use-skill connection skill-id/recharge)
+										((and (equal? state 'state/supporting) (@: me 'target-id))
+											(support-iterate)
 										)
 									))
 								))
@@ -200,14 +217,11 @@
 										)
 									)
 								))
-								#|((creature-update) (let* ((object-id (second event)) (creature (object-ref world object-id)))
+								((creature-update) (let* ((object-id (second event)) (creature (object-ref world object-id)))
 									(when (and creature (equal? state 'state/supporting) (equal? object-id (@: me 'target-id)))
-										(displayln "\n\n\n\n\n\n\n\n\n\nhere")
-										(when (and (is-mage? creature) (<= (/ (@: creature 'mp) (@: creature 'max-mp)) 4/5))
-											(use-skill connection skill-id/recharge)
-										)
+										(support-iterate) ;(displayln "\n\n\n\n\n\n\n\n\n\nhere")
 									)
-								))|#
+								))
 								#|((die) (let-values (((object-id return) (apply values (cdr event))))
 									(when (equal? object-id (@: me 'object-id))
 										(say connection "I have died" response-to)
@@ -226,18 +240,20 @@
 												(("hello") (gesture connection 'gesture/hello))
 												(("bye") (logout connection))
 												(("buff") (let ((targets (get-targets (cdr command))))
-													(when (and targets (not (null? targets)))
+(displayln (cons "targets" targets))
+													(if (and targets (not (null? targets)))
 														(if (buff (map (lambda (object-id) (cons object-id (get-buff-list object-id))) targets))
 															(set! state 'state/buffing)
 															(say connection "Nothing to buff")
 														)
+														(when (equal? state 'state/buffing) (buff))
 													)
 												))
 												(("power") (auto-shot connection (not (string=? (try-second command "") "off")) 'blessed-spiritshot 'd))
-												(("support") ; TODO
+												(("support")
 													(target/sync connection author-id)
 													(set! state 'state/supporting)
-													(use-skill connection skill-id/recharge)
+													(support-iterate)
 												)
 												(("resurrect")
 													(target/sync connection (try-first (get-targets (cdr command))))
@@ -264,7 +280,6 @@
 												))
 												; TODO use item-name
 												; TODO say {info}
-												; TODO skill skill-id
 												; TODO reborn: town, clanhall, ...
 												; TODO route: record/finish
 												(("return") (return author-id))

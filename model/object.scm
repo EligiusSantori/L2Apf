@@ -11,8 +11,6 @@
 		(object=? (object? object? . -> . boolean?))
 		(create-object (list? . -> . list?))
 		(update-object (list? list? . -> . list?))
-		(objects-angle (box? box? . -> . (or/c real? false/c)))
-		(objects-distance (box? box? . -> . integer?))
 	))
 
 	(define (object? object)
@@ -34,13 +32,5 @@
 		(let ((object-id (alist-ref struct 'object-id)))
 			(if object-id (alist-cons 'object-id object-id object) object)
 		)
-	)
-	
-	(define (objects-angle a b)
-		(points-angle (@: a 'position) (@: b 'position))
-	)
-	
-	(define (objects-distance a b)
-		(points-distance (@: a 'position) (@: b 'position))
 	)
 )

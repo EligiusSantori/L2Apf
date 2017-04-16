@@ -41,6 +41,8 @@
 		"../packet/game/server/skill_started.scm"
 		"../packet/game/server/skill_launched.scm"
 		"../packet/game/server/skill_canceled.scm"
+		"../packet/game/server/party_member_update.scm"
+		"../packet/game/server/teleport.scm"
 	)
 	
 	(provide packet-handlers-table)
@@ -79,19 +81,21 @@
 	)
 	
 	(define (packet-handler/attack world packet)
-		(let* ((object-id (@: packet 'object-id)) (creature (object-ref world object-id)) (hits (@: packet 'hits)))
-			(when creature
-				(update-creature! creature (list
-					(cons 'target-id (@: (car hits) 'target-id))
-					(cons 'position (@: packet 'position))
-					(cons 'destination (@: packet 'position))
-					(cons 'moving? #f)
-				))
-				; TODO
-					; ? substract damage from hp
-					; ? refresh in-combat for self and all targets if not miss
+		(let* ((object-id (@: packet 'object-id)) (creature (object-ref world object-id)))
+			(let* ((hits (@: packet 'hits)) (target-id (@: (car hits) 'target-id)))
+				(when creature
+					(update-creature! creature (list
+						(cons 'target-id target-id)
+						(cons 'position (@: packet 'position))
+						(cons 'destination (@: packet 'position))
+						(cons 'moving? #f)
+					))
+					; TODO
+						; ? substract damage from hp
+						; ? refresh in-combat state for self and all targets if not miss
+				)
+				(values object-id target-id hits)
 			)
-			(values object-id hits)
 		)
 	)
 
@@ -336,7 +340,43 @@
 				)
 			)
 			
+			; todo set have effect failed or not
+			
 			(values message-id arguments)
+		)
+	)
+	
+	(define (packet-handler/party-member-update world packet)
+		(let* ((object-id (@: packet 'object-id)) (creature (object-ref world object-id)))
+			(when (character? creature)
+				(update-character! creature packet)
+			)
+			(values object-id)
+		)
+	)
+	
+	(define (packet-handler/teleport world packet)
+		(let* ((object-id (@: packet 'object-id)) (creature (object-ref world object-id)) (position (@: packet 'position)))
+			(when creature
+				(update-creature! creature (list
+					(cons 'position position)
+					(cons 'destination position)
+					(cons 'moving? #f)
+				))
+				
+				(when (equal? object-id (@: world 'me 'object-id))
+					(map
+						(lambda (object)
+							(discard-object! world (@: object 'object-id))
+							; TODO generate object-delete events
+						)
+						(objects world (lambda (object)
+							(not (equal? object-id (@: object 'object-id)))
+						))
+					)
+				)
+			)
+			(values object-id position)
 		)
 	)
 
@@ -368,6 +408,7 @@
 		(list #x16 'creature-create game-server-packet/npc-info packet-handler/npc-info)
 		;(list #x1b ' game-server-packet/item-list packet-handler/item-list)
 		; #x25 ActionFailed
+		(list #x28 'teleport game-server-packet/teleport packet-handler/teleport)
 		(list #x29 'change-target game-server-packet/target-selected packet-handler/target-selected)
 		(list #x2a 'change-target game-server-packet/target-unselected packet-handler/target-unselected)
 		; #x2b ? AutoAttackStart
@@ -386,9 +427,10 @@
 		; #x4c DoorInfo
 		; #x4d DoorStatusUpdate
 		; #x4e ?
-		; #x52 ?
+		(list #x52 'creature-update game-server-packet/party-member-update packet-handler/party-member-update)
 		(list #x58 'skill-list game-server-packet/skill-list packet-handler/skill-list)
 		(list #x60 'change-moving game-server-packet/move-to-pawn packet-handler/move-to-pawn)
+		; #x61 ValidateLocation ; TODO
 		(list #x64 'system-message game-server-packet/system-message packet-handler/system-message)
 		; #x65 StartPledgeWar
 		; #x6d SetupGauge

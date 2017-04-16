@@ -25,13 +25,10 @@
 		)
 	)
 	
-	(define (move-on connection length . tail) ; TODO inverse angle if length is negative
-		(define angle (if (> (list-length tail) 0) (first tail) 0))
-		(define relative? (if (> (list-length tail) 1) (second tail) #t))
-		
+	(define (move-on connection length [_angle #f] [relative? #t]) ; TODO inverse angle if length is negative
 		(let* ((me (@: connection 'world 'me)) (from (@: me 'position)))
-			(let ((angle (if relative? (+ (creature-angle me) angle) angle)))
-				(let ((to (get-destination me angle length)))
+			(let ((_angle (if relative? (+ (get-angle me) _angle) _angle)))
+				(let ((to (get-destination me _angle length)))
 					(send connection (game-client-packet/move-to-point from to))
 				)
 			)

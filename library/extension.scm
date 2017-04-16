@@ -1,12 +1,20 @@
 (module extension racket/base
-	(require srfi/1)
+	(require
+		srfi/1
+		racket/function
+	)
 	(provide
 		bind
 		bind-head
 		bind-tail
 		bind-wrap
+		always?
+		never?
 		any-is?
 		every-is?
+		bubble
+		; min-in
+		; max-in
 		alist-flip
 		alist-ref
 		string-starts?
@@ -40,18 +48,26 @@
 		)
 	)
 	
-	; Хотя бы один элемент списка l равны значению v, используя для сравнения предикат p
-	(define (any-is? v l . t)
-		(define p (if (null? t) equal? (car t)))
+	(define always? (const #t))
+	
+	(define never? (const #f))
+	
+	; Хотя бы один элемент списка l равен значению v, используя для сравнения предикат p
+	(define (any-is? v l [p equal?])
 		(define (is i) (p v i))
 		(apply any is l)
 	)
 	
-	; Все элементы списка l равен значению v, используя для сравнения предикат p
-	(define (every-is? v l . t)
-		(define p (if (null? t) equal? (car t)))
+	; Все элементы списка l равны значению v, используя для сравнения предикат p
+	(define (every-is? v l [p equal?])
 		(define (is i) (p v i))
 		(apply every is l)
+	)
+	
+	(define (bubble c l [d #f])
+		(reduce (lambda (e p)
+			(if (c e p) e p)
+		) d l)
 	)
 	
 	(define (alist-flip l)

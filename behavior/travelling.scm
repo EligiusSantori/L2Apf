@@ -33,14 +33,13 @@
 			(cons "tomb/worshipers" (point/3d 110769 174014 -5439))
 			(cons "tomb/heretics" (point/3d 43265 143935 -5379))
 			(cons "tomb/pilgrims" (point/3d 45278 123624 -5411))
+			(cons "tomb/branded" (point/3d 46411 170304 -4979))
 			; tomb/down
 			; tomb/dusk
 			; tomb/ascetics
 			; tomb/dark-omens
 			; tomb/patriots
-			; tomb/branded
 			; tomb/saints
-			; tomb/worshipers
 			; tomb/martyrs
 			; tomb/forbidden-path
 			; tomb/witch
@@ -92,7 +91,7 @@
 					(let ((start (@: connection 'world 'me 'position)) (finish (determine argument)))
 						(or (and start finish (not (equal? start finish))
 								(begin
-									(set! queue (cdr (split-line-segment/3d start finish ; Make route but skip first point
+									(set! queue (cdr (split-segment/3d start finish ; Make route but skip first point
 										(+ (ceiling (/ (distance/3d start finish) interval)) 1)))) ; Route length
 									(iterate) ; Start travelling and return route length
 								)

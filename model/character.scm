@@ -23,6 +23,8 @@
 				(append (alist-delete 'type creature) (list
 					(cons 'type type)
 					
+					; TODO level (exists in party packet)
+					
 					(cons 'cp (@: struct 'cp))
 					(cons 'max-cp (@: struct 'max-cp))
 					(cons 'karma (@: struct 'karma))

@@ -9,7 +9,7 @@
 	))
 	
 	(define (parse-uri uri)
-		(let ((t (regexp-match #rx"^l2apf://([0-9A-Za-z]+):([0-9A-Za-z]+)@([0-9A-Za-z\\.\\-]+):?([0-9]*)/([0-9A-Za-z]+)[\\?#/]?" uri)))
+		(let ((t (regexp-match #rx"^l2apf://([0-9A-Za-z_]+):([0-9A-Za-z]+)@([0-9A-Za-z\\.\\-]+):?([0-9]*)/([0-9A-Za-z]+)[\\?#/]?" uri)))
 			(if t
 				(list
 					(second t) ; login

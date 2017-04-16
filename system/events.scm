@@ -4,7 +4,9 @@
 		(rename-in racket/contract (any all/c))
 		racket/async-channel
 		"../library/structure.scm"
-		(only-in "../library/network.scm" get-packet-id disconnect)
+		(only-in "../library/network.scm" get-packet-id send disconnect)
+		"../packet/game/client/appearing.scm"
+		"../packet/game/client/validate_position.scm"
 		"make_event.scm"
 		"handlers.scm"
 		"timers.scm"
@@ -12,13 +14,13 @@
 	)
 
 	(provide (contract-out
-		(listen-event! (->* (box? symbol? (or/c procedure? false/c)) #:rest (or/c false/c (listof any/c)) void?))
+		(listen-event! (->* (box? symbol? (or/c procedure? false/c)) (procedure?) void?))
 		(trigger-event (box? symbol? list? . -> . void?))
 		(make-event-channel (box? . -> . evt?))
 	))
 	
-	(define (listen-event! connection name checker . tail)
-		(define handler (if (null? tail) values (car tail)))
+	; Set up or delete a custom event
+	(define (listen-event! connection name checker [handler values])
 		(let ((events (alist-delete name (@: connection 'events))))
 			(set-box-field! connection 'events
 				(if checker (cons (list name checker handler) events) events)
@@ -27,8 +29,8 @@
 		)
 	)
 	
-	(define (set-proxy-event! connection name . tail)
-		(define handler (if (null? tail) values (car tail)))
+	; Set up a fork of some event
+	(define (set-proxy-event! connection name [handler values])
 		(define (checker event) (equal? name (car event)))
 
 		(let ((proxy (gensym)))
@@ -37,7 +39,8 @@
 		)
 	)
 	
-	(define (trigger-event connection name . data)
+	; Trigger an event (enqueue to main channel)
+	(define (trigger-event connection name . data) ; TODO just trigger
 		(let ((channel (@: connection 'custom-channel)))
 			(async-channel-put channel (apply make-event (cons name data)))
 			(void)
@@ -62,6 +65,16 @@
 			(listen-event! connection (gensym) ; disconnect via custom events
 				(lambda (e) (equal? (car e) 'logout))
 				(lambda (e) (begin (disconnect connection) #f))
+			)
+			(listen-event! connection (gensym)
+				(lambda (e) (equal? (car e) 'teleport))
+				(lambda (e)
+					(let* ((me (@: connection 'world 'me)) (position (@: me 'position)) (angle (@: me 'angle)))
+						(send connection (game-client-packet/validate-position position angle))
+						(send connection (game-client-packet/appearing))
+						#f
+					)
+				)
 			)
 			(listen-event! connection (gensym)
 				(lambda (e) (and

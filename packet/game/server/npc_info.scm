@@ -7,6 +7,7 @@
 			(list
 				(cons 'id (read-byte s))
 				(cons 'object-id (read-int32 #f s))
+				(cons 'npc-id (- (read-int32 #f s) 1000000))
 				(cons 'attackable? (not (zero? (read-int32 #f s))))
 				(cons 'position (read-point s))
 				(cons 'angle (heading->angle (read-int32 #f s)))

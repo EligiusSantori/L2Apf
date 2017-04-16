@@ -43,37 +43,3 @@
 		)
 	)
 )
-
-
-		#|
-		writeC(0x05);
-
-		writeD(_attackerId);
-		writeD(hits[0]._targetId);
-		writeD(hits[0]._damage);
-		writeC(hits[0]._flags);
-		writeD(_x);
-		writeD(_y);
-		writeD(_z);
-		writeH(hits.length-1);
-		for (int i=1; i < hits.length; i++)
-		{
-			writeD(hits[i]._targetId);
-			writeD(hits[i]._damage);
-			writeC(hits[i]._flags);
-		}
-		
-		
-            if (_soulshot) _flags |= 0x10 | _grade;
-            if (crit)      _flags |= 0x20;
-            if (shld)      _flags |= 0x40;
-            if (miss)      _flags |= 0x80;
-			
-			
-	public static final int CRYSTAL_NONE = 0x00; // ??
-	public static final int CRYSTAL_D = 0x01; // ??
-	public static final int CRYSTAL_C = 0x02; // ??
-	public static final int CRYSTAL_B = 0x03; // ??
-	public static final int CRYSTAL_A = 0x04; // ??
-	public static final int CRYSTAL_S = 0x05; // ??
-		|#

@@ -7,7 +7,7 @@
 	)
 	(provide target/sync)
 	
-	(define (target/sync connection object-id [shift? #f])
+	(define (target/sync connection object-id [shift? #f]) ; TODO accept object
 		(define handle (make-contract target (lambda (event connection)
 			(equal? (@: connection 'world 'me 'target-id) object-id)
 		)))

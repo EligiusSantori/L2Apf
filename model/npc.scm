@@ -23,6 +23,7 @@
 				(box (append (alist-delete 'type creature) (list
 					(cons 'type type)
 					
+					(cons 'npc-id (@: struct 'npc-id))
 					(cons 'show-name? (@: struct 'show-name?))
 					(cons 'attackable? (@: struct 'attackable?))
 					(cons 'spoiled? (@: struct 'spoiled?))
@@ -36,6 +37,7 @@
 		(set-box! npc
 			(let ((npc (update-creature (unbox npc) struct)))
 				(struct-transfer npc struct
+					'npc-id
 					'show-name?
 					'attackable?
 					'spoiled?

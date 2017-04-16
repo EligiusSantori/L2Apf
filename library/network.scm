@@ -2,15 +2,17 @@
 
 (module network racket/base
 	(require
-		racket/contract
+		(rename-in racket/contract (any all/c))
 		racket/async-channel
 		"structure.scm"
 	)
 	(provide (contract-out
 	;	(smart-receive receive (box? . -> . bytes?))
 	;	(smart-send send (box? bytes? . -> . void?))
+		(connection? (any/c . -> . boolean?))
 		(disconnect (box? . -> . void?))
 		(get-packet-id (bytes? . -> . byte?))
+		;(print-dump (string? bytes? . -> . void?))
 	))
 	(provide
 		(rename-out (smart-receive receive))
@@ -95,5 +97,9 @@
 	
 	(define (get-packet-id buffer)
 		(bytes-ref buffer 0)
+	)
+	
+	(define (connection? connection)
+		(box? connection) ; TODO
 	)
 )

@@ -3,6 +3,7 @@
 		(rename-in racket/contract (any all/c))
 		srfi/1
 		"../library/structure.scm"
+		"../library/geometry.scm"
 		"../_logic.scm"
 		"object.scm"
 	)
@@ -11,7 +12,13 @@
 		(create-creature (list? . -> . list?))
 		(update-creature (list? list? . -> . list?))
 		(update-creature! (box? list? . -> . void?))
-		(creature-angle (box? . -> . real?))
+		(get-angle (creature? . -> . rational?))
+		(get-position (creature? . -> . point/3d?))
+		(moving? (creature? . -> . boolean?))
+		(casting? (creature? . -> . boolean?))
+		(alive? (creature? . -> . boolean?))
+		(creatures-angle (creature? creature? . -> . (or/c rational? false/c)))
+		(creatures-distance (creature? creature? . -> . integer?))
 	))
 
 	(define (creature? object)
@@ -78,7 +85,7 @@
 				'moving?
 				'sitting?
 				'running?
-				'casting?
+				'casting? ; TODO skill-id, last-skill-id
 				'in-combat?
 				'alike-dead?
 				'angle
@@ -105,10 +112,44 @@
 		(set-box! creature (update-creature (unbox creature) struct))
 	)
 	
-	(define (creature-angle creature)
+	(define (casting? creature)
+		; TODO (if casting-skill-id #t #f)
+		(@: creature 'casting?)
+	)
+	
+	(define (moving? creature)
+		(let ((destination (@: creature 'destination)))
+			(and
+				destination
+				(not (equal? (@: creature 'position) destination))
+				(not (casting? creature))
+				; TODO not immobilized effect
+			)
+		)
+	)
+	
+	(define (alive? creature)
+		(not (@: creature 'alike-dead?))
+	)
+	
+	(define (get-angle creature)
 		; TODO if creature? and moving? then f(position, destination)
 		; TODO else if creature? and casting? then f(position, target.position)
 		; TODO else angle
+		; TODO convert to math angle automaticaly?
 		(@: creature 'angle)
+	)
+	
+	(define (get-position creature)
+		; TODO calculate based on last-position, last-move and speed
+		(@: creature 'position)
+	)
+	
+	(define (creatures-angle a b)
+		(points-angle (get-position a) (get-position b))
+	)
+	
+	(define (creatures-distance a b)
+		(points-distance (get-position a) (get-position b))
 	)
 )

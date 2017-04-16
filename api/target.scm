@@ -8,11 +8,10 @@
 	)
 	(provide target)
 	
-	(define (target connection object-id [shift? #f])
-		; TODO check if me.target.id != target-id
+	(define (target connection object-id [shift? #f] [control? #f])
 		(let* ((world (@: connection 'world)) (object (object-ref world object-id)))
-			(when (creature? object) ; TODO what is origin really means?
-				(send connection (game-client-packet/action object-id (@: object 'position) shift?))
+			(when (and (or control? (not (equal? object-id (@: world 'me 'target-id)))) (creature? object))
+				(send connection (game-client-packet/action object-id (@: object 'position) shift?)) ; TODO what is origin really means?
 			)
 		)
 	)

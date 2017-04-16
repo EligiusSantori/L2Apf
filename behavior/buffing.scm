@@ -1,3 +1,5 @@
+; TODO mental-shield не всегда срабатывает почему-то и проблема на сервере
+
 (module script racket/base
 	(require
 		(relative-in "../.."
@@ -48,13 +50,11 @@
 		(lambda arguments
 			(if (not (null? arguments)) ; New to do
 				(let ((argument (filter-todo (car arguments))))
-					(and (and argument (not (null? argument)))
-						(begin
+					(and argument (not (null? argument)) (begin
 							(set! todo argument)
-							;(displayln todo)
+							(set! queue (list))
 							(iterate)
-						)
-					)
+					))
 				)
 				(iterate) ; Dequeue buff
 			)

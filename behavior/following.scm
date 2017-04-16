@@ -1,7 +1,3 @@
-; follow [me]
-; follow {player}
-
-
 (module script racket/base
 	(require
 		srfi/1
@@ -16,12 +12,17 @@
 	)
 	(provide make-follower)
 
-	(define (make-follower connection)	
+	(define (make-follower connection)
 		(define queue (list))
+		(define gap 30)
+		
+		(define (move-near leader)
+			(move-to connection (or (@: leader 'destination) (@: leader 'position)) gap)
+		)
 		
 		(define (iterate)
 			(let ((leader (object-ref (@: connection 'world) (@: connection 'world 'me 'target-id))))
-				(if leader (begin (move-to connection (or (@: leader 'destination) (@: leader 'position))) #t) #f)
+				(if leader (begin (move-near leader) #t) #f)
 			)
 		)
 		
@@ -32,7 +33,7 @@
 						(begin
 							(target connection (@: leader 'object-id))
 							(when (@: connection 'world 'me 'sitting?) (sit connection #f) (sleep 1/3))
-							(move-to connection (or (@: leader 'destination) (@: leader 'position)))
+							(move-near leader)
 						)
 						#f
 					)

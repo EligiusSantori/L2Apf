@@ -92,8 +92,8 @@
 
 (let-values (((account password host port name) (parse-protocol (current-command-line-arguments))))
 	(let ((connection (connect host port)))
-		(let ((world (first (login connection account password))))
-			(let ((me (@: (select-server connection world) name)))
+		(let ((world (findf (lambda (server) (@: server 'state)) (login connection account password))))
+			(let ((me (cdr (assoc name (select-server connection world) string-ci=?))))
 				(let ((events (select-character connection me)))
 				
 					(define state 'state/nothing)
@@ -111,7 +111,7 @@
 					)
 					(define (wild-sweep-pointful?)
 						(and
-							#f ; TODO temporary disable
+							;#f ; TODO temporary disable
 							(@: me 'target-id)
 							(equal? state 'state/fighting)
 							(or (not (mp-economy? me)) (hp-danger? me))

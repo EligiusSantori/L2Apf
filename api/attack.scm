@@ -8,9 +8,7 @@
 	)
 	(provide attack)
 	
-	(define (attack connection . tail)
-		(define shift? (if (null? tail) #f (car tail)))
-		
+	(define (attack connection [shift? #f])		
 		(let* ((world (@: connection 'world))
 					(object-id (@: world 'me 'target-id))
 						(object (object-ref world object-id))

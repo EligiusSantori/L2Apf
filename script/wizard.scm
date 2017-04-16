@@ -96,9 +96,9 @@
 
 (let-values (((account password host port name) (parse-protocol (current-command-line-arguments))))
 	(let ((connection (connect host port)))
-		(let ((world (first (login connection account password))))
-			(let ((me (@: (select-server connection world) name)))
-				(let ((events (select-character connection me)))	
+		(let ((world (findf (lambda (server) (@: server 'state)) (login connection account password))))
+			(let ((me (cdr (assoc name (select-server connection world) string-ci=?))))
+				(let ((events (select-character connection me)))
 					(define state 'state/nothing) ; TODO complex component including stack feature
 					(define response-to #f)
 					
@@ -190,6 +190,7 @@
 												)
 											)
 										)
+										
 									)
 								))
 								((skill-reused) (let-values (((object-id skill-id level) (apply values (cdr event))))
@@ -243,6 +244,19 @@
 													(if (target-alive-other? me)
 														(use-skill connection (get-attack-skill me))
 														(say connection "Invalid target")
+													)
+												)
+												(("sleep")
+													(let ((target-id (or (try-first (get-targets (cdr command))) (@: me 'target-id))))
+														(if target-id
+															(begin
+																(set! state 'state/assisting)
+																(set! response-to author-id)
+																(target/sync connection target-id)
+																(use-skill connection skill-id/sleep)
+															)
+															(say connection "I don't see a target")
+														)
 													)
 												)
 												(("power") (auto-shot connection (not (string=? (try-second command "") "off")) 'blessed-spiritshot 'd))

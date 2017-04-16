@@ -12,8 +12,7 @@
 		(cons #x1 'mouse)
 	))
 	
-	(define (game-client-packet/move-to-point origin target . tail)
-		(define device (if (null? tail) 'mouse (car tail)))
+	(define (game-client-packet/move-to-point origin target [device 'mouse])
 		(let ((s (open-output-bytes)))
 			(begin
 				(write-byte #x01 s)
