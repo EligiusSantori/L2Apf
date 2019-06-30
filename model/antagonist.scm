@@ -3,7 +3,6 @@
 		(rename-in racket/contract (any all/c))
 		srfi/1
 		"../library/structure.scm"
-		"../_logic.scm"
 		"character.scm"
 	)
 	(provide (contract-out
@@ -25,7 +24,7 @@
 			)
 		)
 	)
-	
+
 	(define (update-antagonist! antagonist struct)
 		(set-box! antagonist
 			(let ((antagonist (update-character (unbox antagonist) struct)))

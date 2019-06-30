@@ -6,26 +6,23 @@
 		"../library/geometry.scm"
 		"../library/network.scm"
 		"../model/creature.scm"
-		"../_logic.scm"
 		"../packet/game/client/move_to_point.scm"
 	)
-	(provide (contract-out 
+	(provide (contract-out
 		(move-behind (->* (connection? creature?) (integer?) boolean?))
 	))
-	
+
 	(define (move-behind connection creature [range 20])
-		(and (> range 0) ; Íåëüçÿ îïðåäåëèòü óãîë ìåæäó îäíîé è òîé æå òî÷êîé
+		(and (> range 0) ; ÐÐµÐ»ÑŒÐ·Ñ Ð¾Ð¿Ñ€ÐµÐ´ÐµÐ»Ð¸Ñ‚ÑŒ ÑƒÐ³Ð¾Ð» Ð¼ÐµÐ¶Ð´Ñƒ Ð¾Ð´Ð½Ð¾Ð¹ Ð¸ Ñ‚Ð¾Ð¹ Ð¶Ðµ Ñ‚Ð¾Ñ‡ÐºÐ¾Ð¹
 			(let ((from (@: connection 'world 'me 'position)) (to (@: creature 'position)))
 				; TODO check if not already behind and in range: calculate angle/2d and distance/3d
-				
-				; Ñíà÷àëà ïðåîáðàçóåì èíâåðòèðîâàííûé óãîë â íîðìàëüíûé, çàòåì äîáàâëÿåì òðè ÷åòâåðòè îêðóæíîñòè è íîðìàëèçóåì äî îäíîãî îáîðîòà
-				(let ((angle (simple-angle (+ (revert-angle (get-angle creature)) (* 3/2 pi)))))
-					(begin
-						(send connection (game-client-packet/move-to-point from
-							(point/2d->point/3d (circle-point (point/3d->point/2d to) range angle) (point/3d-z to))
-						))
-						#t
-					)
+
+				; Ð¡Ð½Ð°Ñ‡Ð°Ð»Ð° Ð¿Ñ€ÐµÐ¾Ð±Ñ€Ð°Ð·ÑƒÐµÐ¼ Ð¸Ð½Ð²ÐµÑ€Ñ‚Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð½Ñ‹Ð¹ ÑƒÐ³Ð¾Ð» Ð² Ð½Ð¾Ñ€Ð¼Ð°Ð»ÑŒÐ½Ñ‹Ð¹, Ð·Ð°Ñ‚ÐµÐ¼ Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÐ¼ Ñ‚Ñ€Ð¸ Ñ‡ÐµÑ‚Ð²ÐµÑ€Ñ‚Ð¸ Ð¾ÐºÑ€ÑƒÐ¶Ð½Ð¾ÑÑ‚Ð¸ Ð¸ Ð½Ð¾Ñ€Ð¼Ð°Ð»Ð¸Ð·ÑƒÐµÐ¼ Ð´Ð¾ Ð¾Ð´Ð½Ð¾Ð³Ð¾ Ð¾Ð±Ð¾Ñ€Ð¾Ñ‚Ð°
+				(let ((angle (+ (get-angle creature) (* 3/2 pi))))
+					(send connection (game-client-packet/move-to-point from
+						(point/2d->point/3d (circle-point (point/3d->point/2d to) range angle) (point/3d-z to))
+					))
+					#t
 				)
 			)
 		)

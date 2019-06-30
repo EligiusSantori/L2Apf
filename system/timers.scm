@@ -13,12 +13,12 @@
 		(set-timeout! (->* (box? symbol? integer?) #:rest (listof any/c) symbol?))
 		(set-interval! (->* (box? symbol? integer?) #:rest (listof any/c) symbol?))
 		(clear-timers! (->* (box?) #:rest (listof symbol?) void?))
-		(time-thread (box? . -> . all/c))
+		(time-thread (async-channel? . -> . all/c))
 	))
-	
+
 	(define timers (make-hash)) ; TODO inner connection
-	
-	(define (set-alarm! connection name alarm . data)	
+
+	(define (set-alarm! connection name alarm . data)
 		(let ((id (gensym)) (thread (@: connection 'time-thread)))
 			(hash-set! timers id (wrap-evt
 				(alarm-evt alarm)
@@ -28,13 +28,13 @@
 			id
 		)
 	)
-	
+
 	(define (set-timeout! connection name timeout . data)
 		(let ((alarm (+ (current-inexact-milliseconds) timeout)))
 			(apply set-alarm! (cons connection (cons name (cons alarm data))))
 		)
 	)
-	
+
 	(define (set-interval! connection name period . data) ; TODO нет возможности обнулить таймер. неточное время (с разрывами)
 		(let ((id (gensym)) (thread (@: connection 'time-thread)))
 			(hash-set! timers id (wrap-evt
@@ -45,14 +45,12 @@
 			id
 		)
 	)
-	
+
 	(define (clear-timers! connection . ids)
 		(map (lambda (id) (hash-remove! timers id)) ids)
 	)
-	
-	(define (time-thread connection)
-		(define channel (@: connection 'time-channel))
-		
+
+	(define (time-thread channel)
 		(let loop ()
 			(let ((event (apply sync (cons (thread-receive-evt) (hash-values timers)))))
 				(when (list? event)

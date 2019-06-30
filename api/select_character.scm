@@ -18,12 +18,12 @@
 		"refresh_skill_list.scm"
 	)
 	(provide select-character)
-	
+
 	(define (select-character connection character)
 		(send connection (game-client-packet/select-character (list
 			(cons 'id (unbox character))
 		)))
-		
+
 		(let loop ()
 			(let ((buffer (receive connection)))
 				(case (get-packet-id buffer)
@@ -42,7 +42,7 @@
 				)
 			)
 		)
-		
+
 		(begin
 			(set-box-field! connection 'input-channel (make-async-channel))
 			(let ((read (thread (bind read-thread connection))))
@@ -52,9 +52,11 @@
 			(let ((send (thread (bind send-thread connection))))
 				(set-box-field! connection 'send-thread send)
 			)
-			(set-box-field! connection 'time-channel (make-async-channel))
-			(let ((time (thread (bind time-thread connection))))
-				(set-box-field! connection 'time-thread time)
+			(let* ((tc (make-async-channel)) (th (thread (bind time-thread tc))))
+				(begin
+					(set-box-field! connection 'time-channel tc)
+					(set-box-field! connection 'time-thread th)
+				)
 			)
 			(let ((events (make-event-channel connection)))
 				(set-box-field! connection 'event-channel events)

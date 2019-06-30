@@ -4,7 +4,6 @@
 		srfi/1
 		"../library/extension.scm"
 		"../library/structure.scm"
-		"../_logic.scm"
 	)
 	(provide (contract-out
 		(object? (any/c . -> . boolean?))
@@ -16,7 +15,7 @@
 	(define (object? object)
 		(if (and (box? object) (member 'object (@: object 'type))) #t #f)
 	)
-	
+
 	(define (object=? a b)
 		(= (@: a 'object-id) (@: b 'object-id))
 	)
@@ -27,7 +26,7 @@
 			(cons 'object-id (@: struct 'object-id))
 		)
 	)
-	
+
 	(define (update-object object struct)
 		(let ((object-id (alist-ref struct 'object-id)))
 			(if object-id (alist-cons 'object-id object-id object) object)

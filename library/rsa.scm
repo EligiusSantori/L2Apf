@@ -54,12 +54,6 @@
 	(define ERR_get_error
 		(get-ffi-obj 'ERR_get_error libcrypto (_fun -> _ulong))
 	)
-	(define ERR_load_crypto_strings
-		(get-ffi-obj 'ERR_load_crypto_strings libcrypto (_fun -> _void))
-	)
-	(define ERR_free_strings
-		(get-ffi-obj 'ERR_free_strings libcrypto (_fun -> _void))
-	)
 	(define ERR_error_string
 		(get-ffi-obj 'ERR_error_string libcrypto (_fun _ulong _pointer -> _bytes))
 	)
@@ -107,7 +101,6 @@
 	)
 	
 	(define (rsa-print-errors)
-		(ERR_load_crypto_strings)
 		(let loop ()
 			(when (> (ERR_peek_error) 0)
 				(display (ERR_error_string (ERR_get_error) #f))
@@ -115,7 +108,6 @@
 				(loop)
 			)
 		)
-		(ERR_free_strings)
 	)
 	
 	(define (rsa-create-key key)

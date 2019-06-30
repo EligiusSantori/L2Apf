@@ -7,16 +7,16 @@
 	(provide (contract-out
 		(parse-uri (string? . -> . (or/c list? false/c)))
 	))
-	
+
 	(define (parse-uri uri)
 		(let ((t (regexp-match #rx"^l2apf://([0-9A-Za-z_]+):([0-9A-Za-z]+)@([0-9A-Za-z\\.\\-]+):?([0-9]*)/([0-9A-Za-z]+)[\\?#/]?" uri)))
 			(if t
 				(list
-					(second t) ; login
-					(third t) ; password
 					(fourth t) ; host
 					(let ((port (fifth t))) ; port
-						(if (string-null? port) 2106 (string->number port))					
+					(second t) ; login
+					(third t) ; password
+						(if (string-null? port) 2106 (string->number port))
 					)
 					(sixth t) ; name
 				)

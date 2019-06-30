@@ -20,11 +20,11 @@
 			) todo))
 		)
 	)
-	
+
 	(define (make-buffer connection)
 		(define todo (list))
 		(define queue (list))
-		
+
 		(define (iterate)
 			(if (or (not (null? todo)) (not (null? queue)))
 				(begin
@@ -46,7 +46,7 @@
 				#f
 			)
 		)
-		
+
 		(lambda arguments
 			(if (not (null? arguments)) ; New to do
 				(let ((argument (filter-todo (car arguments))))

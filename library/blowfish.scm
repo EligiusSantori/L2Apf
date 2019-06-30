@@ -2,7 +2,7 @@
 
 (module blowfish racket/base
 	(require (rename-in racket/contract (-> ->/c)) openssl/libcrypto ffi/unsafe)
-	
+
 	(define BF_BLOCK 8)
 	(define BF_ROUNDS 16)
 	(define BF_LONG _uint32)

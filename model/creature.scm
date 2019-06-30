@@ -4,7 +4,7 @@
 		srfi/1
 		"../library/structure.scm"
 		"../library/geometry.scm"
-		"../_logic.scm"
+		"map.scm"
 		"object.scm"
 	)
 	(provide (contract-out
@@ -30,42 +30,42 @@
 			(let ((type (cons 'creature (@: object 'type))))
 				(append (alist-delete 'type object) (list
 					(cons 'type type)
-					
+
 					(cons 'name (@: struct 'name))
 					(cons 'title (@: struct 'title))
-					
+
 					(cons 'target-id #f)
-					
+
 					(cons 'hp (@: struct 'hp))
 					(cons 'mp (@: struct 'mp))
 					(cons 'max-hp (@: struct 'max-hp))
 					(cons 'max-mp (@: struct 'max-mp))
-					
+
 					(cons 'moving? (@: struct 'moving?))
 					(cons 'sitting? (@: struct 'sitting?))
 					(cons 'running? (@: struct 'running?))
 					(cons 'casting? (@: struct 'casting?))
 					(cons 'in-combat? (@: struct 'in-combat?)) ; TODO fighting?
 					(cons 'alike-dead? (@: struct 'alike-dead?))
-					
+
 					(cons 'angle (@: struct 'angle))
 					(cons 'position (@: struct 'position))
 					(cons 'destination (@: struct 'destination))
 					(cons 'collision-radius (@: struct 'collision-radius))
 					(cons 'collision-height (@: struct 'collision-height))
-					
+
 					(cons 'magical-attack-speed (@: struct 'magical-attack-speed))
 					(cons 'physical-attack-speed (@: struct 'physical-attack-speed))
 					(cons 'move-speed-factor (@: struct 'move-speed-factor))
 					(cons 'attack-speed-factor (@: struct 'attack-speed-factor))
-					
+
 					(cons 'run-speed (@: struct 'run-speed))
 					(cons 'walk-speed (@: struct 'walk-speed))
 					(cons 'swim-run-speed (@: struct 'swim-run-speed))
 					(cons 'swim-walk-speed (@: struct 'swim-walk-speed))
 					(cons 'fly-run-speed (@: struct 'fly-run-speed))
 					(cons 'fly-walk-speed (@: struct 'fly-walk-speed))
-					
+
 					(cons 'clothing (@: struct 'clothing))
 				))
 			)
@@ -107,16 +107,16 @@
 			)
 		)
 	)
-	
+
 	(define (update-creature! creature struct)
 		(set-box! creature (update-creature (unbox creature) struct))
 	)
-	
+
 	(define (casting? creature)
 		; TODO (if casting-skill-id #t #f)
 		(@: creature 'casting?)
 	)
-	
+
 	(define (moving? creature)
 		(let ((destination (@: creature 'destination)))
 			(and
@@ -127,11 +127,11 @@
 			)
 		)
 	)
-	
+
 	(define (alive? creature)
 		(not (@: creature 'alike-dead?))
 	)
-	
+
 	(define (get-angle creature)
 		; TODO if creature? and moving? then f(position, destination)
 		; TODO else if creature? and casting? then f(position, target.position)
@@ -139,16 +139,16 @@
 		; TODO convert to math angle automaticaly?
 		(@: creature 'angle)
 	)
-	
+
 	(define (get-position creature)
 		; TODO calculate based on last-position, last-move and speed
 		(@: creature 'position)
 	)
-	
+
 	(define (creatures-angle a b)
 		(points-angle (get-position a) (get-position b))
 	)
-	
+
 	(define (creatures-distance a b)
 		(points-distance (get-position a) (get-position b))
 	)

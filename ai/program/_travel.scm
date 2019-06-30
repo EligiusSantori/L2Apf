@@ -55,6 +55,7 @@
 			(cons "cruma-tower" (point/3d 17217 114176 -3444))
 			(cons "singing-waterfall" (point/3d -109487 242920 -3524))
 			(cons "altar-of-rites" (point/3d -44235 79075 -3745))
+			(cons "ruins-of-agony" (point/3d -42613 119668 -3531))
 		))
 		
 		(define interval 1000)

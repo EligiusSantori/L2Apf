@@ -3,7 +3,6 @@
 		(rename-in racket/contract (any all/c))
 		srfi/1
 		"../library/structure.scm"
-		"../_logic.scm"
 		"creature.scm"
 	)
 	(provide (contract-out
@@ -16,19 +15,19 @@
 	(define (character? object)
 		(if (and object (member 'character (@: object 'type))) #t #f)
 	)
-	
+
 	(define (create-character struct)
 		(let ((creature (create-creature struct)))
 			(let ((type (cons 'character (@: creature 'type))))
 				(append (alist-delete 'type creature) (list
 					(cons 'type type)
-					
+
 					; TODO level (exists in party packet)
-					
+
 					(cons 'cp (@: struct 'cp))
 					(cons 'max-cp (@: struct 'max-cp))
 					(cons 'karma (@: struct 'karma))
-					
+
 					(cons 'pvp? (@: struct 'pvp?))
 					(cons 'invisible? (@: struct 'invisible?))
 					(cons 'find-party? (@: struct 'find-party?))
@@ -37,14 +36,14 @@
 					(cons 'fishing? (@: struct 'fishing?))
 					(cons 'mount-type (@: struct 'mount-type))
 					(cons 'private-store (@: struct 'private-store))
-					
+
 					(cons 'race (@: struct 'race))
 					(cons 'gender (@: struct 'gender))
 					(cons 'face-type (@: struct 'face-type))
 					(cons 'hair-style (@: struct 'hair-style))
 					(cons 'hair-color (@: struct 'hair-color))
 					(cons 'name-color (@: struct 'name-color))
-					
+
 					(cons 'class-id (@: struct 'class-id))
 					(cons 'clan-id (@: struct 'clan-id))
 					(cons 'ally-id (@: struct 'ally-id))
@@ -56,7 +55,7 @@
 			)
 		)
 	)
-	
+
 	(define (update-character character struct)
 		(let ((character (update-creature character struct)))
 			(struct-transfer character struct
@@ -87,7 +86,7 @@
 			)
 		)
 	)
-	
+
 	(define (update-character! character struct)
 		(set-box! character (update-character (unbox character) struct))
 	)

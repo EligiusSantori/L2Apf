@@ -18,7 +18,7 @@
 		(trigger-event (box? symbol? list? . -> . void?))
 		(make-event-channel (box? . -> . evt?))
 	))
-	
+
 	; Set up or delete a custom event
 	(define (listen-event! connection name checker [handler values])
 		(let ((events (alist-delete name (@: connection 'events))))
@@ -29,16 +29,6 @@
 		)
 	)
 	
-	; Set up a fork of some event
-	(define (set-proxy-event! connection name [handler values])
-		(define (checker event) (equal? name (car event)))
-
-		(let ((proxy (gensym)))
-			(listen-event! connection proxy checker handler)
-			proxy
-		)
-	)
-	
 	; Trigger an event (enqueue to main channel)
 	(define (trigger-event connection name . data) ; TODO just trigger
 		(let ((channel (@: connection 'custom-channel)))
@@ -46,7 +36,7 @@
 			(void)
 		)
 	)
-	
+
 	(define (make-event-channel connection)
 		(let ((world (@: connection 'world)) (custom-channel (make-async-channel)))
 			(define (handle b e)
@@ -58,10 +48,10 @@
 			(define (check e l)
 				(filter (lambda (b) ((second b) e)) l)
 			)
-		
+
 			(set-box-field! connection 'custom-channel custom-channel) ; custom events channel
 			(set-box-field! connection 'events (list)) ; custom events list
-		
+
 			(listen-event! connection (gensym) ; disconnect via custom events
 				(lambda (e) (equal? (car e) 'logout))
 				(lambda (e) (begin (disconnect connection) #f))
@@ -105,7 +95,7 @@
 					#f
 				)
 			)
-		
+
 			(wrap-evt
 				(choice-evt
 					custom-channel

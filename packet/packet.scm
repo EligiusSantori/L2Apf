@@ -1,9 +1,10 @@
 (module packet racket/base
 	(require
+		(only-in rnrs/base-6 mod)
 		racket/contract
 		racket/list
 		racket/math
-		"../library/ral.scm"
+		"../library/extension.scm"
 		"../library/geometry.scm"
 	)
 	(provide (contract-out
@@ -26,7 +27,7 @@
 		(read-utf16 (input-port? . -> . string?))
 		(write-utf16 (string? output-port? . -> . void?))
 	))
-	
+
 	(define (scramble data)
 		(define (step1 i)
 			(when (< i 64)
@@ -69,7 +70,7 @@
 			data
 		)
 	)
-	
+
 	(define (checksum data)
 		(define (r data sum)
 			(if (null? data)
@@ -79,13 +80,13 @@
 		)
 		(list->bytes (r (bytes->list data) (make-list 4 0)))
 	)
-	
+
 	(define (to-multiple num base)
 		(let ((mod (modulo num base)))
 			(if (> mod 0) (- base mod) 0)
 		)
 	)
-	
+
 	(define (read-int size signed? port)
 		(integer-bytes->integer (read-bytes size port) signed?)
 	)
@@ -104,7 +105,7 @@
 	(define (write-int16 n signed? port)
 		(write-int n 2 signed? port)
 	)
-	
+
 	(define (read-float port)
 		(floating-point-bytes->real	(read-bytes 4 port))
 	)
@@ -117,7 +118,7 @@
 	(define (write-double n port)
 		(void (write-bytes (real->floating-point-bytes n 8) port))
 	)
-	
+
 	(define (read-ascii port)
 		(define (r l)
 			(let ((b (read-byte port)))
@@ -137,7 +138,7 @@
 				(if (= b1 b2 0) l (r (cons b2 (cons b1 l))))
 			)
 		)
-		
+
 		(bytes->string/utf-16le (list->bytes (reverse (r (list)))))
 	)
 	(define (write-utf16 s port)
@@ -145,7 +146,7 @@
 		(write-bytes (bytes 0 0) port)
 		(void)
 	)
-	
+
 	(define (read-point port)
 		(point/3d
 			(read-int32 #t port)
@@ -159,18 +160,14 @@
 		(write-int32 (point/3d-z p) #t port)
 		(void)
 	)
-	
-	(define (modulo a b) ; real modulo
-		(- a (* b (truncate (/ a b))))
-	)
-	
-	(define (heading->angle heading)
-		(modulo (degrees->radians (/ heading 182.044444444)) (* 2 pi))
+
+	(define (heading->angle heading) ; Конвертированный угол соответсвует радианной шкале, если смотреть направление по карте
+		(simple-angle (revert-angle (mod (degrees->radians (/ heading 182.044444444)) (* 2 pi))))
 	)
 	(define (angle->heading angle)
-		(exact-round (* (radians->degrees (modulo angle (* 2 pi))) 182.044444444))
+		(exact-round (* (radians->degrees (simple-angle (revert-angle angle))) 182.044444444))
 	)
-	
+
 	(define (longer-then-4? data)
 		(> (bytes-length data) 4)
 	)

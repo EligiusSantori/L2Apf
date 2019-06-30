@@ -1,10 +1,11 @@
+; Intermediate calculations layer between low-level protocol and user API to provide higher-level events and state of game world.
 (module system racket/base
 	(require
 		srfi/1
 		racket/dict
 		racket/function
 		"../library/structure.scm"
-		"../_logic.scm"
+		"../model/map.scm"
 		"../model/world.scm"
 		"../model/object.scm"
 		"../model/creature.scm"
@@ -14,7 +15,7 @@
 		"../model/protagonist.scm"
 		;"../model/quest.scm"
 		"../model/skill.scm"
-		;"../model/item.scm"
+		"../model/item.scm"
 		"../packet/game/server/chat_message.scm"
 		"../packet/game/server/system_message.scm"
 		"../packet/game/server/social_action.scm"
@@ -43,12 +44,11 @@
 		"../packet/game/server/skill_canceled.scm"
 		"../packet/game/server/party_member_update.scm"
 		"../packet/game/server/teleport.scm"
+		"../packet/game/server/spawn_item.scm"
 	)
-	
+
 	(provide packet-handlers-table)
 
-	; handlers
-	
 	(define (packet-handler/move-to-point world packet)
 		(let ((object-id (@: packet 'object-id)) (p (@: packet 'position)) (d (@: packet 'destination)))
 			(let ((moving? (not (equal? p d))) (creature (object-ref world object-id)))
@@ -79,7 +79,7 @@
 			(values (@: me 'object-id))
 		)
 	)
-	
+
 	(define (packet-handler/attack world packet)
 		(let* ((object-id (@: packet 'object-id)) (creature (object-ref world object-id)))
 			(let* ((hits (@: packet 'hits)) (target-id (@: (car hits) 'target-id)))
@@ -146,7 +146,14 @@
 	)
 
 	(define (packet-handler/object-deleted world packet)
-		(let ((object-id (@: packet 'object-id)))
+		(let* ((object-id (@: packet 'object-id)) (object (object-ref world object-id)))
+			(when (creature? object) ; Clear targets for aimed to deleted object
+				(objects world (lambda (subject)
+					(when (and (creature? subject) (equal? object-id (@: subject 'target-id)))
+						(update-creature! subject (list (cons 'target-id #f)))
+					)
+				))
+			)
 			(discard-object! world object-id)
 			(values object-id) ; TODO return object-id but discard after event handle
 		)
@@ -248,21 +255,21 @@
 			(cons 'alliance (@: packet 'name))
 		))
 	)
-	
+
 	(define (packet-handler/skill-list world packet)
 		(define (f i)
 			(let ((skill-id (@: i 'skill-id)) (level (@: i 'level)) (active? (@: i 'active?)))
 				(list skill-id (make-skill skill-id level active?))
 			)
 		)
-	
+
 		(let ((skills (@: world 'skills)) (l (@: packet 'list)))
 			(hash-clear! skills)
 			(apply hash-set*! skills (apply append (map f l)))
 			(values (hash-values skills))
 		)
 	)
-	
+
 	(define (packet-handler/move-to-pawn world packet) ; Происходит, когда игрок бежит не к точке, а к монстру или NPC
 		(let* ((object-id (@: packet 'object-id)) (target-id (@: packet 'target-id)) (position (@: packet 'position)))
 			(let* ((creature (object-ref world object-id)) (target (object-ref world target-id)))
@@ -281,7 +288,7 @@
 			)
 		)
 	)
-	
+
 	(define (packet-handler/skill-started world packet)
 		(let* ((object-id (@: packet 'object-id)) (skill-id (@: packet 'skill-id)) (level (@: packet 'level)) (creature (object-ref world object-id)))
 			(when creature
@@ -291,7 +298,7 @@
 					(cons 'casting? #t)
 				))
 			)
-			
+
 			(let* ((skills (@: world 'skills)) (skill (hash-ref skills skill-id #f)))
 				(when skill
 					(hash-set! skills skill-id (struct-transfer skill
@@ -304,11 +311,11 @@
 					))
 				)
 			)
-			
+
 			(values object-id skill-id level)
 		)
 	)
-	
+
 	(define (packet-handler/skill-launched world packet)
 		(let* ((object-id (@: packet 'object-id)) (skill-id (@: packet 'skill-id)) (level (@: packet 'level)) (creature (object-ref world object-id)))
 			(when creature
@@ -320,17 +327,17 @@
 			(values object-id skill-id level)
 		)
 	)
-	
+
 	(define (packet-handler/skill-canceled world packet)
 		(let* ((object-id (@: packet 'object-id)) (creature (object-ref world object-id)))
 			(when creature (update-creature! creature (list (cons 'casting? #f))))
 			(values object-id)
 		)
 	)
-	
+
 	(define (packet-handler/system-message world packet)
 		(let ((message-id (@: packet 'message-id)) (arguments (@: packet 'arguments)))
-			
+
 			; set spoiled state here bacause no other way
 			(when (or (= message-id 612) (= message-id 357))
 				(let ((target-id (@: world 'me 'target-id)))
@@ -339,13 +346,13 @@
 					))
 				)
 			)
-			
+
 			; todo set have effect failed or not
-			
+
 			(values message-id arguments)
 		)
 	)
-	
+
 	(define (packet-handler/party-member-update world packet)
 		(let* ((object-id (@: packet 'object-id)) (creature (object-ref world object-id)))
 			(when (character? creature)
@@ -354,7 +361,7 @@
 			(values object-id)
 		)
 	)
-	
+
 	(define (packet-handler/teleport world packet)
 		(let* ((object-id (@: packet 'object-id)) (creature (object-ref world object-id)) (position (@: packet 'position)))
 			(when creature
@@ -363,12 +370,14 @@
 					(cons 'destination position)
 					(cons 'moving? #f)
 				))
-				
+
 				(when (equal? object-id (@: world 'me 'object-id))
 					(map
 						(lambda (object)
-							(discard-object! world (@: object 'object-id))
-							; TODO generate object-delete events
+							(let ((object-id (@: object 'object-id)))
+								;(trigger-event connection 'object-delete object-id)
+								(discard-object! world object-id)
+							)
 						)
 						(objects world (lambda (object)
 							(not (equal? object-id (@: object 'object-id)))
@@ -380,14 +389,21 @@
 		)
 	)
 
+	(define (packet-handler/spawn-item world packet)
+		(let ((object-id (@: packet 'object-id)) (item (create-item packet)))
+			(register-object! world item)
+			(values object-id)
+		)
+	)
+
 	; table
-	
+
 	(define (applicate row)
 		(let-values (((id name packet handler) (apply values row)))
 			(list id name (lambda (world buffer) (handler world (packet buffer))))
 		)
 	)
-	
+
 	(define packet-handlers-table (make-hash (map applicate (list ; id, name, handler(world, buffer)
 		(list #x01 'change-moving game-server-packet/move-to-point packet-handler/move-to-point)
 		(list #x03 'creature-create game-server-packet/char-info packet-handler/char-info)
@@ -396,7 +412,7 @@
 		(list #x06 'die game-server-packet/die packet-handler/die)
 		(list #x07 'revive game-server-packet/revive packet-handler/revive)
 		; #x0a AttackCanceld
-		;(list #x0b ' game-server-packet/spawn-item packet-handler/spawn-item) SpawnItem | SpawnItemPoly
+		(list #x0b 'item-create game-server-packet/spawn-item packet-handler/spawn-item)
 		;(list #x0c ' game-server-packet/drop-item packet-handler/drop-item) DropItem
 		;(list #x0d ' game-server-packet/get-item packet-handler/get-item)
 		(list #x0e 'creature-update game-server-packet/status-update packet-handler/status-update)
@@ -459,7 +475,7 @@
 		; #xf5 SSQStatus
 		;(list #xf8 'signs-sky game-server-packet/signs-sky packet-handler/signs-sky) SignsSky
 		;(list #xfe 'Ex* game-server-packet/ packet-handler/)
-		
+
 		;(list # ' game-server-packet/ packet-handler/)
 	))))
 )

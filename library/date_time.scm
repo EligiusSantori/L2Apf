@@ -1,4 +1,4 @@
-(struct time-span (days hours minutes seconds ) #:transparent)
+(struct time-span (days hours minutes seconds) #:transparent)
 
 (define (time-span->milliseconds ts)
 	(* 1000 (+
