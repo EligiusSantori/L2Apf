@@ -1,11 +1,11 @@
-(module api racket/base
+(module logic racket/base
 	(require
 		racket/list
-		"../library/network.scm"
+		"../system/network.scm"
 		"../packet/game/client/request_auto_shot.scm"
 	)
 	(provide auto-shot)
-	
+
 	(define (get-item type grade)
 		(let ((index (index-of (list 'ng 'd 'c 'b 'a 's) grade eq?)))
 			(case type
@@ -16,7 +16,7 @@
 			)
 		)
 	)
-	
+
 	(define (auto-shot connection is? type grade)
 		(let ((item-id (get-item type grade)))
 			(when item-id

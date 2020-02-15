@@ -1,4 +1,4 @@
-(module packet racket/base
+(module system racket/base
 	(require "../../packet.scm")
 	(provide game-server-packet/party-clear-members)
 	

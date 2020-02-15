@@ -1,8 +1,8 @@
-(module event racket/base
+(module logic racket/base
 	(require
 		srfi/1
 		"../library/extension.scm"
-		"../library/structure.scm"
+		"../system/structure.scm"
 		"../logic/object.scm"
 		"../system/events.scm"
 		"../system/timers.scm"

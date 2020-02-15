@@ -1,28 +1,26 @@
-; http://www.openssl.org/docs/crypto/blowfish.html
-
-(module blowfish racket/base
+(module library racket/base ; http://www.openssl.org/docs/crypto/blowfish.html
 	(require (rename-in racket/contract (-> ->/c)) openssl/libcrypto ffi/unsafe)
 
 	(define BF_BLOCK 8)
 	(define BF_ROUNDS 16)
 	(define BF_LONG _uint32)
 	(define BF_LONG-pointer (_cpointer BF_LONG))
-	
+
 	(define-cstruct _BF_KEY (
 		(P (_array BF_LONG (+ BF_ROUNDS 2)))
 		(S (_array BF_LONG (* 4 256)))
 	))
-	
+
 	(define BF_set_key
 		(get-ffi-obj 'BF_set_key libcrypto (_fun _BF_KEY-pointer _int _bytes -> _void))
 	)
-	(define BF_encrypt 
+	(define BF_encrypt
 		(get-ffi-obj 'BF_encrypt libcrypto (_fun BF_LONG-pointer _BF_KEY-pointer -> _void))
 	)
-	(define BF_decrypt 
+	(define BF_decrypt
 		(get-ffi-obj 'BF_decrypt libcrypto (_fun BF_LONG-pointer _BF_KEY-pointer -> _void))
 	)
-	
+
 	(define (blowfish-create-key key)
 		(let ((bf-key (ptr-ref (malloc _BF_KEY) _BF_KEY)) (key (bytes-append key (bytes #x0))))
 			(begin
@@ -31,7 +29,7 @@
 			)
 		)
 	)
-	
+
 	(define (blowfish-process data key fn)
 		(define (r bf-data bf-key i l)
 			(if (< i l)
@@ -52,15 +50,15 @@
 			)
 		)
 	)
-	
+
 	(define (blowfish-encrypt data key)
 		(blowfish-process data key BF_encrypt)
 	)
-	
+
 	(define (blowfish-decrypt data key)
 		(blowfish-process data key BF_decrypt)
 	)
-	
+
 	(define (make-blowfish-crypter key)
 		(define blowfish-key (blowfish-create-key key))
 		(lambda (data encrypt?)
@@ -70,7 +68,7 @@
 			)
 		)
 	)
-	
+
 	(provide (contract-out
 		(make-blowfish-crypter (bytes? . ->/c . procedure?))
 		;(blowfish-create-key (bytes? . ->/c . BF_KEY?))

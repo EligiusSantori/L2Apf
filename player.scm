@@ -1,9 +1,10 @@
 #lang racket
 (require
 	srfi/1
+	racket/logging
 	"bootstrap.scm"
 	"library/extension.scm"
-	; "library/structure.scm"
+	; "system/structure.scm"
 	; "library/geometry.scm"
 	; "model/object.scm"
 	; "model/creature.scm"
@@ -12,39 +13,41 @@
 	; "model/antagonist.scm"
 	; "model/protagonist.scm"
 	; "model/skill.scm"
-	(only-in "ai/program/program.scm" ai-program-make)
-	"ai/program/idle.scm"
-	"ai/program/print.scm"
-	"ai/program/command.scm"
-	; "ai/program/auto_reborn.scm"
-	; "ai/program/pickup.scm"
-	; "ai/program/escape.scm"
-	; "ai/program/travel.scm"
-	; "ai/program/bless.scm"
-	"ai/manager.scm"
+	(only-in "program/program.scm" program-make)
+	"program/brain.scm"
+	"program/idle.scm"
+	"program/print.scm"
+	"program/command.scm"
+	; "program/auto_reborn.scm"
+	; "program/pickup.scm"
+	; "program/escape.scm"
+	; "program/travel.scm"
+	; "program/bless.scm"
 )
 
-(let-values (((connection world me events) (call/wv parse-protocol bootstrap)))
-	(define manager (make-ai-manager ai-program-idle))
-	(ai-manager-load! manager
-		ai-program-print
-		(ai-program-make ai-program-command manager)
-	)
-
-	(let loop ()
-		(let ((event (sync events)))
-			; Triggers space.
-			(case (if event (car event) #f)
-				; Custom events.
-
-				; Standard events.
-				((logout)
-					(exit)
-				)
-			)
-			; Programs space.
-			(ai-manager-run! manager event connection)
+(with-logging-to-port (open-output-file "l2apf.log" #:mode 'text #:exists 'append)
+	(let-values (((connection world me events) (call/wv parse-protocol bootstrap)))
+		(define brain (make-brain program-idle))
+		(brain-load! brain
+			program-print
+			(program-make program-command brain)
 		)
-		(loop)
+
+		(let loop ()
+			(let ((event (sync events)))
+				; Triggers space.
+				(case (car event)
+					; Custom events.
+
+					; Standard events.
+					((logout)
+						(exit)
+					)
+				)
+				; Programs space.
+				(brain-run! brain event connection)
+			)
+			(loop)
+		)
 	)
 )

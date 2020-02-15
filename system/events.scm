@@ -3,14 +3,14 @@
 		srfi/1
 		(rename-in racket/contract (any all/c))
 		racket/async-channel
-		"../library/structure.scm"
-		(only-in "../library/network.scm" get-packet-id send disconnect)
 		"../packet/game/client/appearing.scm"
 		"../packet/game/client/validate_position.scm"
+		"../model/world.scm"
+		"structure.scm"
+		(only-in "network.scm" get-packet-id send disconnect)
 		"make_event.scm"
 		"handlers.scm"
 		"timers.scm"
-		"../model/world.scm"
 	)
 
 	(provide (contract-out
@@ -28,7 +28,7 @@
 			(void)
 		)
 	)
-	
+
 	; Trigger an event (enqueue to main channel)
 	(define (trigger-event connection name . data) ; TODO just trigger
 		(let ((channel (@: connection 'custom-channel)))
@@ -106,6 +106,7 @@
 							(let ((row (hash-ref packet-handlers-table (get-packet-id buffer) #f)))
 								(if row
 									(let ((name (car row)) (data ((compose list (second row)) world buffer)))
+;(printf "PACKET: ~x~n" (get-packet-id buffer))
 										(apply make-event (if data (cons name data) (list name)))
 									)
 									(begin

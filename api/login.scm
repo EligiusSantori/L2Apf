@@ -1,8 +1,8 @@
-(module api racket/base
+(module logic racket/base
 	(require
 		racket/contract
-		"../library/structure.scm"
-		"../library/network.scm"
+		"../system/structure.scm"
+		"../system/network.scm"
 		"../model/world.scm"
 		"../packet/login/client/login_auth.scm"
 		"../packet/login/server/login_fail.scm"
@@ -22,13 +22,13 @@
 				(cons 'session-id (@: connection 'session-id))
 				(cons 'rsa-key (@: connection 'rsa-key))
 			)))
-			
+
 			(let loop ()
 				(let ((buffer (receive connection)))
 					(case (get-packet-id buffer)
 						((#x01) (let ((packet (login-server-packet/login-fail buffer)))
 							(disconnect connection)
-							(error (string-append "Authentication failed: " (symbol->string (@: packet 'reason))))						
+							(raise-user-error "Authentication failed, reason:" (@: packet 'reason))
 						))
 						((#x03) (let ((packet (login-server-packet/login-ok buffer)))
 							(set-box-field! connection 'login-key (@: packet 'login-key))

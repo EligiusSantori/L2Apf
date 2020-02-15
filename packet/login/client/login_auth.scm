@@ -1,4 +1,4 @@
-(module packet racket/base
+(module system racket/base
 	(provide login-client-packet/login-auth)
 	(require "../../../library/rsa.scm")
 	(require "../../packet.scm")
@@ -10,7 +10,7 @@
 				(write-ascii (cdr (assoc 'login struct)) s)
 				(file-position s 112)
 				(write-ascii (cdr (assoc 'password struct)) s)
-				
+
 				(let ((buffer (get-output-bytes s #t)))
 					(write-byte #x00 s)
 					(write-bytes (rsa-encrypt buffer rsa-key) s)

@@ -1,7 +1,7 @@
 (module script racket/base
 	(require
 		(rename-in racket/contract (any all/c))
-		"library/structure.scm"
+		"system/structure.scm"
 		"system/uri_scheme.scm"
 		"model/creature.scm"
 		"api/connect.scm"
@@ -12,8 +12,11 @@
 	(provide (contract-out
 		(fighter? (creature? . -> . boolean?))
 		(mystic? (creature? . -> . boolean?))
-		(bootstrap (procedure? . -> . all/c))
 	))
+	(provide
+		bootstrap
+		parse-protocol
+	)
 
 	(define (fighter? creature)
 		(if (member (@: creature 'class-id) (list
@@ -39,10 +42,10 @@
 			(let ((uri (parse-uri (vector-ref command-line 0))))
 				(if uri
 					(apply values uri)
-					(error "Authentication failed because URI is broken")
+					(raise-user-error "Authentication failed because URI is broken.")
 				)
 			)
-			(error "Authentication failed because URI is missed")
+			(raise-user-error "Authentication failed because URI is missed.")
 		)
 	)
 

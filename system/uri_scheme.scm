@@ -14,10 +14,10 @@
 				(list
 					(fourth t) ; host
 					(let ((port (fifth t))) ; port
-					(second t) ; login
-					(third t) ; password
 						(if (string-null? port) 2106 (string->number port))
 					)
+					(second t) ; login
+					(third t) ; password
 					(sixth t) ; name
 				)
 				#f

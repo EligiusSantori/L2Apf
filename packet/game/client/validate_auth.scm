@@ -1,4 +1,4 @@
-(module packet racket/base
+(module system racket/base
 	(provide game-client-packet/validate-auth)
 	(require srfi/1 "../../packet.scm")
 
@@ -6,7 +6,7 @@
 		(define login (cdr (assoc 'login struct)))
 		(define login-key (bytes->list (cdr (assoc 'login-key struct))))
 		(define game-key (bytes->list (cdr (assoc 'game-key struct))))
-	
+
 		(let ((s (open-output-bytes)))
 			(begin
 				(write-byte #x08 s)

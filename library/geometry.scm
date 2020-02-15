@@ -1,4 +1,4 @@
-(module packet racket/base
+(module library racket/base
 	(require
 		srfi/1
 		(only-in rnrs/base-6 mod)

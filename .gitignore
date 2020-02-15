@@ -1,7 +1,5 @@
 /*.txt
-/*.cmd
-/*.sql
-/.project
-/.settings
+/*.log
 /.archive
 compiled
+

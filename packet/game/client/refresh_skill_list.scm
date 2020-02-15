@@ -1,4 +1,4 @@
-(module packet racket/base
+(module system racket/base
 	(provide game-client-packet/refresh-skill-list)
 	(require "../../packet.scm")
 	

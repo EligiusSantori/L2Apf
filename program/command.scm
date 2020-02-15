@@ -5,18 +5,18 @@
 		racket/undefined
 		"program.scm"
 		"follow.scm"
-		(relative-in "../../.."
+		"brain.scm"
+		(relative-in "../.."
 			"library/extension.scm"
-			"library/structure.scm"
+			"system/structure.scm"
 			"model/world.scm"
 			"api/say.scm"
 			"api/gesture.scm"
 			"api/logout.scm"
-			"ai/manager.scm"
 		)
 	)
 	(provide
-		ai-program-command ; Execute commands from game chat
+		program-command ; Execute commands from game chat
 	)
 
 	(define (parse-command text [opener "/"])
@@ -63,30 +63,33 @@
 	; TODO parse(command) e.g. (parse "follow [me]|my|<name>") ; string -> verb, [noun], [noun]
 	; TODO get-targets(command) ; string -> list of object-id
 
-	(define ai-program-command (struct-copy ai-program ai-program-base
-		[id 'command]
-		[iterator (lambda (event connection config state) (let-values (((manager prefix) (list->values config)))
-			(when (and event (eq? (car event) 'message))
-				(let-values (((author-id channel author text) (apply values (cdr event))))
-					(let ((command (parse-command text prefix))) (when command
-						(case (car command)
-							(("follow") (ai-manager-do! manager (ai-program-make ai-program-follow author-id 'repeat)))
-							(("relax") (ai-manager-clear! manager #t))
-							(("hello") (gesture connection 'gesture/hello))
-							(("bye")
-								(ai-manager-clear! manager #t) ; Call foreground program destructor before exit.
-								(logout connection)
-							)
-							(else (say connection "I don't understand"))
+	(define (command event connection config state) (let-values (((brain prefix) (list->values config)))
+		(when (and event (eq? (car event) 'message))
+			(let-values (((author-id channel author text) (apply values (cdr event))))
+				(let ((command (parse-command text prefix))) (when command
+					(case (car command)
+						(("follow") (brain-do! brain (program-make program-follow author-id 'repeat)))
+						(("relax") (brain-clear! brain #t))
+						(("hello") (gesture connection 'gesture/hello))
+						(("bye")
+							(brain-clear! brain #t) ; Call foreground program destructor before exit.
+							(logout connection)
 						)
-					))
-				)
+						(else (say connection "I don't understand"))
+					)
+				))
 			)
-			(void)
-		))]
-		[config (list
+		)
+		(void)
+	))
+
+	(define-program program-command
+		(list
 			undefined ; program manager (required)
 			"/" ; command prefix
-		)]
-	))
+		)
+		undefined
+		undefined
+		command
+	)
 )

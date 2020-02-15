@@ -4,7 +4,6 @@
 		srfi/1
 		racket/dict
 		racket/function
-		"../library/structure.scm"
 		"../model/map.scm"
 		"../model/world.scm"
 		"../model/object.scm"
@@ -45,6 +44,7 @@
 		"../packet/game/server/party_member_update.scm"
 		"../packet/game/server/teleport.scm"
 		"../packet/game/server/spawn_item.scm"
+		"structure.scm"
 	)
 
 	(provide packet-handlers-table)
@@ -52,14 +52,14 @@
 	(define (packet-handler/move-to-point world packet)
 		(let ((object-id (@: packet 'object-id)) (p (@: packet 'position)) (d (@: packet 'destination)))
 			(let ((moving? (not (equal? p d))) (creature (object-ref world object-id)))
-				(define struct (list
+				(when creature (update-creature! creature (list
 					(cons 'position p)
-					(cons 'destination d)
-					(cons 'moving? moving?)
-				))
-				(when creature
-					(update-creature! creature (if moving? (alist-cons 'angle (points-angle p d) struct) struct))
-				)
+					(cons 'destination (if moving? d #f))
+					(if moving?
+						(cons 'angle (points-angle p d))
+						#f
+					)
+				)))
 				(values object-id p (if moving? d #f))
 			)
 		)
@@ -87,8 +87,7 @@
 					(update-creature! creature (list
 						(cons 'target-id target-id)
 						(cons 'position (@: packet 'position))
-						(cons 'destination (@: packet 'position))
-						(cons 'moving? #f)
+						(cons 'destination #f)
 					))
 					; TODO
 						; ? substract damage from hp
@@ -101,7 +100,7 @@
 
 	(define (packet-handler/die world packet)
 		(let* ((object-id (@: packet 'object-id)) (creature (object-ref world object-id)) (spoiled? (@: packet 'spoiled?)))
-			(let ((data (list (cons 'moving? #f) (cons 'alike-dead? #t))))
+			(let ((data (list (cons 'destination #f) (cons 'alike-dead? #t))))
 				(cond
 					((and (protagonist? creature) (<= 0 (@: creature 'hp)))
 						(update-protagonist! creature (alist-cons 'died? #t data))
@@ -167,25 +166,31 @@
 	)
 
 	(define (packet-handler/target-selected world packet)
-		(let* ((object-id (@: packet 'object-id)) (target-id (@: packet 'target-id)) (creature (object-ref world object-id)))
-			(when creature
-				(update-creature! creature (list
+		(let* ((object-id (@: packet 'object-id)) (target-id (@: packet 'target-id)) (position (@: packet 'position)))
+			(let ((creature (object-ref world object-id)))
+				(when creature (update-creature! creature (list
 					(cons 'target-id target-id)
-					(cons 'position (@: packet 'position))
-				))
+					(cons 'position position)
+					(if (equal? position (@: creature 'destination))
+						(cons 'destination #f)
+						#f
+					)
+				)))
+				(values object-id target-id)
 			)
-			(values object-id target-id)
 		)
 	)
 
 	(define (packet-handler/target-unselected world packet)
 		(let* ((object-id (@: packet 'object-id)) (creature (object-ref world object-id)))
-			(when creature
-				(update-creature! creature (list
-					(cons 'target-id #f)
-					(cons 'position (@: packet 'position))
-				))
-			)
+			(when creature (update-creature! creature (list
+				(cons 'target-id #f)
+				(cons 'position (@: packet 'position))
+				(if (equal? (@: packet 'position) (@: creature 'destination))
+					(cons 'destination #f)
+					#f
+				)
+			)))
 			(values object-id #f)
 		)
 	)
@@ -222,15 +227,12 @@
 	)
 
 	(define (packet-handler/stop-moving world packet)
-		(let* ((object-id (@: packet 'object-id)) (p (@: packet 'position)) (a (@: packet 'angle)) (creature (object-ref world object-id)))
-			(when creature
-				(update-creature! creature (list
-					(cons 'angle a)
-					(cons 'position p)
-					(cons 'destination p)
-					(cons 'moving? #f)
-				))
-			)
+		(let* ((object-id (@: packet 'object-id)) (p (@: packet 'position)) (a (@: packet 'angle)))
+			(let ((creature (object-ref world object-id))) (when creature (update-creature! creature (list
+				(cons 'angle a)
+				(cons 'position p)
+				(cons 'destination #f)
+			))))
 			(values object-id p #f)
 		)
 	)
@@ -271,33 +273,42 @@
 	)
 
 	(define (packet-handler/move-to-pawn world packet) ; Происходит, когда игрок бежит не к точке, а к монстру или NPC
-		(let* ((object-id (@: packet 'object-id)) (target-id (@: packet 'target-id)) (position (@: packet 'position)))
-			(let* ((creature (object-ref world object-id)) (target (object-ref world target-id)))
+		(let* ((id (@: packet 'object-id)) (target-id (@: packet 'target-id)) (position (@: packet 'position)))
+			(let* ((creature (object-ref world id)) (target (object-ref world target-id)))
 				(if (and creature target)
 					(let* ((destination (@: target 'position)) (moving? (not (equal? position destination))))
-						(define struct (list
+						(update-creature! creature (list
 							(cons 'position position)
-							(cons 'destination destination)
-							(cons 'moving? moving?)
+							(cons 'destination (moving? destination #f))
+							(if moving?
+								(cons 'angle (points-angle position destination))
+								#f
+							)
 						))
-						(update-creature! creature (if moving? (alist-cons 'angle (points-angle position destination) struct) struct))
-						(values object-id position (if moving? destination #f))
+						(values id position (if moving? destination #f))
 					)
-					(values object-id position #f) ; TODO omit event
+					(begin
+						(log-warning "World objects ~e is missed, causer {packet:move-to-pawn}."
+							(map object-id (filter identity creature target))
+						)
+						(values id position #f) ; TODO omit event and log warning
+					)
 				)
 			)
 		)
 	)
 
 	(define (packet-handler/skill-started world packet)
-		(let* ((object-id (@: packet 'object-id)) (skill-id (@: packet 'skill-id)) (level (@: packet 'level)) (creature (object-ref world object-id)))
-			(when creature
-				(update-creature! creature (list
-					(cons 'target-id (@: packet 'target-id))
-					(cons 'position (@: packet 'position))
-					(cons 'casting? #t)
-				))
-			)
+		(let ((object-id (@: packet 'object-id)) (skill-id (@: packet 'skill-id)) (level (@: packet 'level)))
+			(let ((creature (object-ref world object-id))) (when creature (update-creature! creature (list
+				(cons 'target-id (@: packet 'target-id))
+				(cons 'position (@: packet 'position))
+				(if (equal? (@: packet 'position) (@: creature 'destination))
+					(cons 'destination #f)
+					#f
+				)
+				(cons 'casting? #t)
+			))))
 
 			(let* ((skills (@: world 'skills)) (skill (hash-ref skills skill-id #f)))
 				(when skill
@@ -362,17 +373,17 @@
 		)
 	)
 
+	; TODO Don't remove all objects, only those who too far or too long without updates and not in party?
 	(define (packet-handler/teleport world packet)
-		(let* ((object-id (@: packet 'object-id)) (creature (object-ref world object-id)) (position (@: packet 'position)))
-			(when creature
+		(let ((object-id (@: packet 'object-id)) (position (@: packet 'position)))
+			(let ((creature (object-ref world object-id))) (when creature
 				(update-creature! creature (list
 					(cons 'position position)
-					(cons 'destination position)
-					(cons 'moving? #f)
+					(cons 'destination #f)
 				))
 
 				(when (equal? object-id (@: world 'me 'object-id))
-					(map
+					(map ; Remove all known objects except myself.
 						(lambda (object)
 							(let ((object-id (@: object 'object-id)))
 								;(trigger-event connection 'object-delete object-id)
@@ -384,7 +395,8 @@
 						))
 					)
 				)
-			)
+			))
+
 			(values object-id position)
 		)
 	)

@@ -1,4 +1,4 @@
-(module packet racket/base
+(module system racket/base
 	(require
 		(only-in rnrs/base-6 mod)
 		racket/contract
@@ -81,11 +81,11 @@
 		(list->bytes (r (bytes->list data) (make-list 4 0)))
 	)
 
-	(define (to-multiple num base)
-		(let ((mod (modulo num base)))
-			(if (> mod 0) (- base mod) 0)
-		)
-	)
+	; (define (to-multiple num base)
+	; 	(let ((mod (modulo num base)))
+	; 		(if (> mod 0) (- base mod) 0)
+	; 	)
+	; )
 
 	(define (read-int size signed? port)
 		(integer-bytes->integer (read-bytes size port) signed?)

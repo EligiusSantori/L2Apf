@@ -1,11 +1,11 @@
-(module api racket/base
+(module logic racket/base
 	(require
 		srfi/1
-		"../library/network.scm"
+		"../system/network.scm"
 		"../packet/game/client/say.scm"
 	)
 	(provide say)
-	
+
 	(define (parse-args tail)
 		(if (null? tail)
 			(values 'chat-channel/all "")
@@ -16,7 +16,7 @@
 			)
 		)
 	)
-	
+
 	(define (say connection message . tail)
 		(let-values (((channel target) (parse-args tail)))
 			(send connection (game-client-packet/say message channel target))

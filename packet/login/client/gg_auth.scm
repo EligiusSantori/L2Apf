@@ -1,4 +1,4 @@
-(module packet racket/base
+(module system racket/base
 	(provide login-client-packet/gg-auth)
 	(require "../../packet.scm")
 

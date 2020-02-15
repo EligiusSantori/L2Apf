@@ -1,14 +1,14 @@
-(module api racket/base
+(module logic racket/base
 	(require
-		"../library/structure.scm"
-		"../library/network.scm"
+		"../system/structure.scm"
+		"../system/network.scm"
 		"../model/creature.scm"
 		"../model/world.scm"
 		"../packet/game/client/attack_request.scm"
 	)
 	(provide attack)
-	
-	(define (attack connection [shift? #f])		
+
+	(define (attack connection [shift? #f])
 		(let* ((world (@: connection 'world))
 					(object-id (@: world 'me 'target-id))
 						(object (object-ref world object-id))

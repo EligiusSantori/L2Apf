@@ -1,10 +1,10 @@
-(module api racket/base
+(module logic racket/base
 	(require
 		racket/contract
 		racket/async-channel
 		"../library/extension.scm"
-		"../library/structure.scm"
-		"../library/network.scm"
+		"../system/structure.scm"
+		"../system/network.scm"
 		"../packet/game/client/select_character.scm"
 		"../packet/game/server/player_character.scm"
 		"../packet/game/client/enter_world.scm"

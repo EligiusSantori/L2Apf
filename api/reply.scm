@@ -1,13 +1,13 @@
-(module api racket/base
+(module logic racket/base
 	(require
-		"../library/network.scm"
+		"../system/network.scm"
 		"../packet/game/client/reply_join_alliance.scm"
 		"../packet/game/client/reply_join_clan.scm"
 		"../packet/game/client/reply_join_party.scm"
 		"../packet/game/client/reply_be_friends.scm"
 	)
 	(provide reply)
-	
+
 	(define (reply connection question accept?)
 		(send connection (case question
 			((ask/join-alliance) (game-client-packet/reply-join-alliance accept?))

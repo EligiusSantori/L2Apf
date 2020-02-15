@@ -1,14 +1,14 @@
-(module structure racket/base
+(module system racket/base
 	(require
 		(rename-in racket/contract (any all/c))
 		srfi/1
 		racket/dict
-		"extension.scm"
+		"../library/extension.scm"
 	)
 	(provide (contract-out
 		(ref (->* ((or/c dict? box?)) #:rest (listof any/c) any/c))
 		(@: (->* ((or/c dict? box?)) #:rest (listof any/c) any/c)) ; TODO deprecated
-		(struct-transfer (->* (dict? dict?) #:rest (listof symbol?) dict?)) ; TODO deprecated
+		(struct-transfer (->* (dict? list?) #:rest (listof symbol?) dict?)) ; TODO deprecated
 		(set-box-field! (box? symbol? any/c . -> . void?))
 	))
 

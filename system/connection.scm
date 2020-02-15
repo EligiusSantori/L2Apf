@@ -1,2 +1,3 @@
-;make-connection
-;connection?
+; struct connection
+; make-connection
+; connection?

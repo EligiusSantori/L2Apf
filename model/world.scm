@@ -5,8 +5,8 @@
 		racket/math
 		(rename-in racket/contract (any all/c))
 		"../library/extension.scm"
-		"../library/structure.scm"
 		"../library/geometry.scm"
+		"../system/structure.scm"
 		"skill.scm"
 		"object.scm"
 		"creature.scm"

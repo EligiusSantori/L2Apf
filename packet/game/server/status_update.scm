@@ -1,4 +1,4 @@
-(module packet racket/base
+(module system racket/base
 	(require srfi/1 "../../packet.scm")
 	(provide game-server-packet/status-update)
 	

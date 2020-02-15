@@ -2,8 +2,8 @@
 	(require
 		(rename-in racket/contract (any all/c))
 		srfi/1
-		"../library/structure.scm"
 		"../library/geometry.scm"
+		"../system/structure.scm"
 		"map.scm"
 		"object.scm"
 	)
@@ -41,7 +41,6 @@
 					(cons 'max-hp (@: struct 'max-hp))
 					(cons 'max-mp (@: struct 'max-mp))
 
-					(cons 'moving? (@: struct 'moving?))
 					(cons 'sitting? (@: struct 'sitting?))
 					(cons 'running? (@: struct 'running?))
 					(cons 'casting? (@: struct 'casting?))
@@ -82,7 +81,6 @@
 				'mp
 				'max-hp
 				'max-mp
-				'moving?
 				'sitting?
 				'running?
 				'casting? ; TODO skill-id, last-skill-id

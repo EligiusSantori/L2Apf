@@ -1,4 +1,4 @@
-(module packet racket/base
+(module system racket/base
 	(require "../../../library/extension.scm" "../../packet.scm" "../channel.scm")
 	(provide game-client-packet/say)
 	

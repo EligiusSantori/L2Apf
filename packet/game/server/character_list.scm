@@ -1,4 +1,4 @@
-(module packet racket/base
+(module system racket/base
 	(provide game-server-packet/character-list)
 	(require "../../packet.scm")
 	

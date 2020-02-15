@@ -2,7 +2,7 @@
 	(require
 		(rename-in racket/contract (any all/c))
 		srfi/1
-		"../library/structure.scm"
+		"../system/structure.scm"
 		"object.scm"
 	)
 

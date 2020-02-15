@@ -5,7 +5,7 @@
 		racket/function
 		racket/async-channel
 		(rename-in racket/contract (any all/c))
-		"../library/structure.scm"
+		"structure.scm"
 		"make_event.scm"
 	)
 	(provide (contract-out

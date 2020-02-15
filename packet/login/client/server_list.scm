@@ -1,4 +1,4 @@
-(module packet racket/base
+(module system racket/base
 	(provide login-client-packet/server-list)
 	(require "../../packet.scm")
 

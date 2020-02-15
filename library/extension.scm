@@ -1,5 +1,4 @@
-; Language extensions and implementaton abstraction layer.
-(module extension racket/base
+(module library racket/base ; Language extensions and implementaton abstraction layer.
 	(require
 		srfi/1
 		racket/function
@@ -25,6 +24,7 @@
 		alist-merge
 		string-starts?
 		string-ends?
+		length>
 		try-first
 		try-second
 		try-third
@@ -99,13 +99,11 @@
 	(define (alist-flip lst)
 		(map (compose xcons car+cdr) lst)
 	)
-
 	(define (alist-ref lst key [default #f] [eqp equal?])
-		(let ((p (assoc key lst eqp)))
-			(if p (cdr p) default)
+		(let ((r (memf (lambda (p) (and (pair? p) (eqp key (car p)))) lst)))
+			(if r (cdr (car r)) default)
 		)
 	)
-
 	(define (alist-only lst keys [eqp equal?])
 		(filter (lambda (p)
 			(and
@@ -114,7 +112,6 @@
 			)
 		) lst)
 	)
-
 	(define (alist-merge to from)
 		(fold (lambda (p r) ; Just add elements missing in <from> from <to>
 			(if (not (assoc (car p) r))
@@ -141,14 +138,21 @@
 		)
 	)
 
+	(define (length> lst n)
+		(cond
+			((null? lst) #f)
+			((= n 0) #t)
+			(else (length> (cdr lst) (- n 1)))
+		)
+	)
 	(define (try-first lst [default #f])
-		(if (not (null? lst)) (car lst) default)
+		(if (length> lst 0) (car lst) default)
 	)
 	(define (try-second lst [default #f])
-		(if (> (length lst) 1) (second lst) default)
+		(if (length> lst 1) (second lst) default)
 	)
 	(define (try-third lst [default #f])
-		(if (> (length lst) 2) (third lst) default)
+		(if (length> lst 2) (third lst) default)
 	)
 
 	(define call/wv call-with-values)

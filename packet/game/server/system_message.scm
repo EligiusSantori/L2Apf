@@ -1,4 +1,4 @@
-(module packet racket/base
+(module system racket/base
 	(provide game-server-packet/system-message)
 	(require "../../packet.scm" "../argument.scm")
 	

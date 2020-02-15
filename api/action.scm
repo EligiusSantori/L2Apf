@@ -1,13 +1,13 @@
-(module api racket/base
+(module logic racket/base
 	(require
-		"../library/structure.scm"
-		"../library/network.scm"
+		"../system/structure.scm"
+		"../system/network.scm"
 		"../model/creature.scm"
 		"../model/world.scm"
 		"../packet/game/client/action.scm"
 	)
 	(provide action)
-	
+
 	(define (action connection . tail)
 		(define shift? (if (null? tail) #f (car tail)))
 

@@ -1,10 +1,10 @@
-(module api racket/base
+(module logic racket/base
 	(require
 		racket/contract
 		racket/tcp
-		"../library/crypter.scm"
-		"../library/structure.scm"
-		"../library/network.scm"
+		"../system/structure.scm"
+		"../system/crypter.scm"
+		"../system/network.scm"
 		"../packet/login/client/select_server.scm"
 		"../packet/login/server/play_fail.scm"
 		"../packet/login/server/play_ok.scm"
@@ -21,18 +21,18 @@
 			(define input-port (@: connection 'input-port))
 			(define output-port (@: connection 'output-port))
 			(define crypter (@: connection 'crypter))
-			
+
 			(send connection (login-client-packet/select-server (list
 				(cons 'server-id (@: server 'id))
 				(cons 'login-key (@: connection 'login-key))
 			)))
-			
+
 			(let loop ()
 				(let ((buffer (receive connection)))
 					(case (get-packet-id buffer)
 						((#x06) (let ((packet (login-server-packet/play-fail buffer)))
 							(disconnect connection)
-							(error (string-append "Connection failed: " (symbol->string (@: packet 'reason))))					
+							(raise-user-error "Connection failed, reason:" (@: packet 'reason))
 						))
 						((#x07) (let ((packet (login-server-packet/play-ok buffer)))
 							(begin
@@ -48,18 +48,18 @@
 				)
 			)
 		)
-		
+
 		(if (@: connection 'game-key) ; game-server interaction
 			(let ((host (@: server 'address)) (port (@: server 'port)))
 				(let-values (((input-port output-port) (tcp-connect host port)))
-					
+
 					(set-box-field! connection 'input-port input-port)
 					(set-box-field! connection 'output-port output-port)
-				
+
 					(send connection (game-client-packet/protocol-version (list
 						(cons 'protocol (@: connection 'protocol))
 					)))
-				
+
 					(let loop ()
 						(let ((buffer (receive connection)))
 							(case (get-packet-id buffer)
@@ -79,12 +79,12 @@
 								))
 								((#x13) (let ((packet (game-server-packet/character-list buffer)))
 									(define (transform i) (cons (cdr (assoc 'name i)) (box (cdr (assoc 'id i)))))
-									
+
 									(set-box-field! connection 'account #f)
 									(set-box-field! connection 'protocol #f)
 									(set-box-field! connection 'login-key #f)
 									(set-box-field! connection 'game-key #f)
-									
+
 									(map transform (@: packet 'list))
 								))
 								(else #f)

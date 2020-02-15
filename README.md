@@ -3,7 +3,9 @@ Lineage 2 C4 Artificial Player / Framework (alpha).
 
 
 ## Requirements
-* Racket language (version 6 or newer).
+* Racket language (version 6 or newer), packages:
+	* srfi-lite-lib
+	* r6rs-lib
 * L2J Chronicle 4 server (660 protocol version).
 
 ## Examples
@@ -19,7 +21,7 @@ Run entire realm of players:
 (require
 	; srfi/1
 	"bootstrap.scm"
-	; "library/structure.scm"
+	; "system/structure.scm"
 	; "model/object.scm"
 	; "api/say.scm"
 )

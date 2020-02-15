@@ -1,9 +1,9 @@
-(module api racket/base
+(module logic racket/base
 	(require
 		(rename-in racket/contract (any all/c))
-		"../library/structure.scm"
 		"../library/geometry.scm"
-		"../library/network.scm"
+		"../system/structure.scm"
+		"../system/network.scm"
 		"../packet/game/client/move_to_point.scm"
 		"../model/map.scm"
 		"../model/creature.scm"

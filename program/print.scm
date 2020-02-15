@@ -2,10 +2,11 @@
 	(require
 		srfi/1
 		racket/string
+		racket/undefined
 		"program.scm"
 	)
 	(provide
-		ai-program-print ; Redirect game chat to console
+		program-print ; Redirect game chat to console
 	)
 
 	(define (format-chat-message object-id channel author text)
@@ -14,15 +15,14 @@
 		)
 	)
 
-	(define ai-program-print (struct-copy ai-program ai-program-base
-		[id 'print]
-		[iterator (lambda (event connection config state)
+	(define-program program-print undefined undefined undefined
+		(lambda (event connection . args)
 			(when (and event (eq? (car event) 'message))
 				(let-values (((author-id channel author text) (apply values (cdr event))))
 					(displayln (format-chat-message author-id channel author text))
 				)
 			)
 			(void)
-		)]
-	))
+		)
+	)
 )

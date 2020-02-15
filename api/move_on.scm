@@ -1,16 +1,16 @@
-(module api racket/base
+(module logic racket/base
 	(require
 		srfi/1
 		"../library/geometry.scm"
-		"../library/structure.scm"
-		"../library/network.scm"
+		"../system/structure.scm"
+		"../system/network.scm"
 		"../model/creature.scm"
 		"../packet/game/client/move_to_point.scm"
 	)
 	(provide move-on)
-	
+
 	(define list-length length)
-	
+
 	(define (get-destination me angle length)
 		(let ((from (@: me 'position)))
 			(let ((center (point/2d (point/3d-x from) (- (point/3d-y from)))))
@@ -24,7 +24,7 @@
 			)
 		)
 	)
-	
+
 	(define (move-on connection length [_angle #f] [relative? #t]) ; TODO inverse angle if length is negative
 		(let* ((me (@: connection 'world 'me)) (from (@: me 'position)))
 			(let ((_angle (if relative? (+ (get-angle me) _angle) _angle)))

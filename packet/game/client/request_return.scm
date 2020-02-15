@@ -1,4 +1,4 @@
-(module packet racket/base
+(module system racket/base
 	(require
 		srfi/1
 		"../../../library/extension.scm"

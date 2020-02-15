@@ -1,13 +1,13 @@
-(module api racket/base
+(module logic racket/base
 	(require
-		"../library/structure.scm"
-		"../library/network.scm"
+		"../system/structure.scm"
+		"../system/network.scm"
 		"../model/creature.scm"
 		"../model/world.scm"
 		"../packet/game/client/action.scm"
 	)
 	(provide target)
-	
+
 	(define (target connection object-id [shift? #f] [control? #f])
 		(let* ((world (@: connection 'world)) (object (object-ref world object-id)))
 			(when (and (or control? (not (equal? object-id (@: world 'me 'target-id)))) (creature? object))

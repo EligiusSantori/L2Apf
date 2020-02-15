@@ -1,4 +1,4 @@
-(module packet racket/base
+(module system racket/base
 	(provide game-client-packet/refresh-manor-list)
 	(require "../../packet.scm")
 	

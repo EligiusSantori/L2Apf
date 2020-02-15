@@ -1,4 +1,4 @@
-(module packet racket/base
+(module system racket/base
 	(require "../../packet.scm" "../party_loot.scm")
 	(provide game-server-packet/ask-join-party)
 	

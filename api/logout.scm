@@ -1,12 +1,12 @@
-(module api racket/base
+(module logic racket/base
 	(require
 		racket/contract
-		"../library/network.scm"
+		"../system/network.scm"
 		"../packet/game/client/logout.scm"
 	)
 	(provide logout)
-	
-	(define (logout connection) ; Не может быть синхронным, т.к. можно пропустить некоторые пакеты и получить отказ
+
+	(define (logout connection) ; РќРµ РјРѕР¶РµС‚ Р±С‹С‚СЊ СЃРёРЅС…СЂРѕРЅРЅС‹Рј, С‚.Рє. РјРѕР¶РЅРѕ РїСЂРѕРїСѓСЃС‚РёС‚СЊ РЅРµРєРѕС‚РѕСЂС‹Рµ РїР°РєРµС‚С‹ Рё РїРѕР»СѓС‡РёС‚СЊ РѕС‚РєР°Р·
 		(send connection (game-client-packet/logout))
 	)
 )
