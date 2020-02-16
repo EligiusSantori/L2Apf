@@ -6,7 +6,7 @@
 		(let ((s (open-output-bytes)))
 			(begin
 				(write-byte #x02 s)
-				(write-bytes (cdr (assoc 'login-key struct)) s)
+				(write-bytes (or (cdr (assoc 'login-key struct)) (make-bytes 8)) s)
 				(write-byte (cdr (assoc 'server-id struct)) s)
 				(write-bytes (make-bytes 6) s)
 				(write-bytes (checksum (get-output-bytes s)) s)

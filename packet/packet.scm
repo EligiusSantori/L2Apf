@@ -26,6 +26,7 @@
 		(write-ascii (string? output-port? . -> . void?))
 		(read-utf16 (input-port? . -> . string?))
 		(write-utf16 (string? output-port? . -> . void?))
+		(get-packet-id (bytes? . -> . byte?))
 	))
 
 	(define (scramble data)
@@ -173,5 +174,9 @@
 	)
 	(define (multiple-of-4? data)
 		(= (modulo (bytes-length data) 4) 0)
+	)
+
+	(define (get-packet-id buffer)
+		(bytes-ref buffer 0)
 	)
 )

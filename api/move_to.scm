@@ -3,6 +3,7 @@
 		(rename-in racket/contract (any all/c))
 		"../library/geometry.scm"
 		"../system/structure.scm"
+		"../system/connection.scm"
 		"../system/network.scm"
 		"../packet/game/client/move_to_point.scm"
 		"../model/map.scm"

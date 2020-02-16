@@ -1,9 +1,10 @@
-(module system racket/base ; TODO Merge with network.scm?
+(module system racket/base
 	(require
 		srfi/1
-		(except-in racket/contract any)
+		(rename-in racket/contract (any all/c))
 	)
 	(provide (contract-out
+		(crypter? (any/c . -> . boolean?))
 		(make-crypter ((and/c bytes? length-is-8?) . -> . procedure?))
 	))
 
@@ -57,6 +58,10 @@
 				)
 			)
 		)
+	)
+
+	(define (crypter? cr)
+		(procedure? cr)
 	)
 
 	(define (length-is-8? data)

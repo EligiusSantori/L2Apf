@@ -4,9 +4,11 @@
 		racket/set
 		racket/math
 		(rename-in racket/contract (any all/c))
-		"../library/extension.scm"
-		"../library/geometry.scm"
-		"../system/structure.scm"
+		(relative-in "../."
+			"library/extension.scm"
+			"library/geometry.scm"
+			"system/structure.scm"
+		)
 		"skill.scm"
 		"object.scm"
 		"creature.scm"
@@ -14,78 +16,94 @@
 		"character.scm"
 		"item.scm"
 	)
-	(provide (contract-out
-		(world? (any/c . -> . boolean?))
-		(make-world ((listof pair?) . -> . world?))
-		(register-object! (world? object? . -> . void?))
-		(discard-object! (world? integer? . -> . void?))
-		(objects (->* (world?) (procedure?) list?))
-		(object-ref (world? (or/c integer? false/c) . -> . (or/c box? false/c)))
-		(skill-ref (world? (or/c integer? false/c) . -> . (or/c skill? false/c)))
-		(find-character-by-name (world? string? . -> . (or/c character? false/c)))
-		(get-target (world? creature? . -> . (or/c creature? false/c)))
-		(get-level (creature? . -> .  (or/c integer? false/c)))
-		(attackable? (any/c . -> . boolean?))
-		(aimed-to? (creature? creature? . -> . boolean?))
-		(behind? (->* (creature? creature?) (rational?) boolean?))
-	))
-
-	(define (world? a)
-		(hash? a) ; TODO
+	(provide
+		(struct-out world)
+		(contract-out
+			(make-world ((listof pair?) . -> . world?))
+			(register-object! (world? object? . -> . void?))
+			(discard-object! (world? integer? . -> . void?))
+			(objects (->* (world?) (procedure?) list?))
+			(object-ref (world? (or/c integer? false/c) . -> . (or/c object? false/c)))
+			(skill-ref (world? (or/c integer? false/c) . -> . (or/c skill? false/c)))
+			(find-character-by-name (world? string? . -> . (or/c character? false/c))) ; FIXME rename
+			(get-target (world? creature? . -> . (or/c creature? false/c))) ; FIXME move to creature?
+			(get-level (creature? . -> .  (or/c integer? false/c))) ; FIXME move to creature
+			(attackable? (any/c . -> . boolean?)) ; FIXME move to creature
+			(aimed-to? (creature? creature? . -> . boolean?)) ; FIXME move to creature
+			(behind? (->* (creature? creature?) (rational?) boolean?)) ; FIXME move to map
+		)
 	)
+
+	(struct world (
+		server-id
+		server-host
+		server-port
+		objects
+		me
+		inventory
+		shortcuts
+		skills
+		quests
+		party
+		clans
+		alliances
+	) #:mutable)
 
 	(define (make-world server)
-		(let ((world (make-hash server)))
-			(hash-set! world 'me #f)
-			(hash-set! world 'skills (make-hash))
-			(hash-set! world 'quests (make-hash))
-			(hash-set! world 'party (list))
-			(hash-set! world 'clans (make-hash))
-			(hash-set! world 'alliances (make-hash))
-			;(hash-set! world 'inventory (mutable-set)) ; TODO Как я должен оперировать из кода с таким объектом? Это нарушает абстракцию.
-			world
+		(world
+			(ref server 'id)
+			(ref server 'address)
+			(ref server 'port)
+			(make-hash)
+			#f
+			(mutable-set)
+			(make-vector (* 12 10))
+			(make-hash)
+			(make-hash)
+			(list)
+			(make-hash)
+			(make-hash)
 		)
 	)
 
-	(define (register-object! world object)
-		(let ((object-id (@: object 'object-id)))
-			(hash-set! world object-id object)
+	(define (register-object! wr object)
+		(let ((object-id (ref object 'object-id)))
+			(hash-set! (world-objects wr) object-id object)
 			; TODO set 'characters name object-id
-			; TODO set ski
 			(void)
 		)
 	)
-	(define (discard-object! world object-id)
-		(if (hash-has-key? world object-id)
-			(hash-remove! world object-id)
+	(define (discard-object! wr object-id)
+		(if (hash-has-key? (world-objects wr) object-id)
+			(hash-remove! (world-objects wr) object-id)
 			(void)
 		)
 	)
 
-	(define (objects world [predicate always?])
-		(map cdr (hash-filter world (lambda (k v)
+	(define (objects wr [predicate always?])
+		(map cdr (hash-filter (world-objects wr) (lambda (k v)
 			(and (integer? k) (predicate v))
 		)))
 	)
 
-	(define (object-ref world object-id)
-		(hash-ref world object-id #f)
+	(define (object-ref wr object-id)
+		(hash-ref (world-objects wr) object-id #f)
 	)
 
-	(define (skill-ref world skill-id)
-		(hash-ref (hash-ref world 'skills) skill-id #f)
+	(define (skill-ref wr skill-id)
+		(hash-ref (world-skills world) skill-id #f)
 	)
 
 	;(define (inventory-ref world object-id)
 
 	;)
 
-	(define (find-character-by-name world name)
+	(define (find-character-by-name wr name)
 		(define (test? k v)
 			(and (integer? k) (character? v) (string-ci=? (@: v 'name) name))
 		)
 
-		(let ((found (hash-find world test?)))
+		(let ((found (hash-find (world-objects wr) test?)))
 			(if found (cdr found) #f)
 		)
 	)
@@ -99,7 +117,7 @@
 				(character? creature)
 				(and
 					(npc? creature)
-					(@: creature 'attackable?)
+					(ref creature 'attackable?)
 				)
 			)
 		)
@@ -109,7 +127,7 @@
 		(and
 			(creature? subject)
 			(object? object)
-			(equal? (@: subject 'target-id) (@: object 'object-id))
+			(equal? (ref subject 'target-id) (ref object 'object-id))
 		)
 	)
 
@@ -124,14 +142,14 @@
 		)
 	)
 
-	(define (get-target world creature)
-		(object-ref world (@: creature 'target-id))
+	(define (get-target wr creature)
+		(object-ref world (ref creature 'target-id))
 	)
 
 	(define (get-level creature)
 		(or
 			(and (character? creature)
-				(@: creature 'level)
+				(ref creature 'level)
 			)
 			(and (npc? creature)
 				(let ((match (regexp-match (pregexp "(?i:Lv)\\s*(\\d+)") (or (@: creature 'title) ""))))

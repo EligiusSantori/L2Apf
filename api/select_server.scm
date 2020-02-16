@@ -2,98 +2,84 @@
 	(require
 		racket/contract
 		racket/tcp
-		"../system/structure.scm"
-		"../system/crypter.scm"
-		"../system/network.scm"
-		"../packet/login/client/select_server.scm"
-		"../packet/login/server/play_fail.scm"
-		"../packet/login/server/play_ok.scm"
-		"../packet/game/client/protocol_version.scm"
-		"../packet/game/server/key_packet.scm"
-		"../packet/game/client/validate_auth.scm"
-		"../packet/game/server/character_list.scm"
+		(relative-in "../."
+			"library/extension.scm"
+			"system/structure.scm"
+			"system/crypter.scm"
+			"system/connection.scm"
+			(only-in "packet/packet.scm" get-packet-id)
+			"packet/login/client/select_server.scm"
+			"packet/login/server/play_fail.scm"
+			"packet/login/server/play_ok.scm"
+			"packet/game/client/protocol_version.scm"
+			"packet/game/server/key_packet.scm"
+			"packet/game/client/validate_auth.scm"
+			"packet/game/server/character_list.scm"
+			"model/protagonist.scm"
+			"model/world.scm"
+		)
 	)
-	(provide select-server)
+	(provide (contract-out
+		(select-server (-> connection? world? (listof protagonist?)))
+	))
 
-	(define (select-server connection server)
-		(set-box-field! connection 'world server)
-		(let () ; login-server interaction
-			(define input-port (@: connection 'input-port))
-			(define output-port (@: connection 'output-port))
-			(define crypter (@: connection 'crypter))
-
-			(send connection (login-client-packet/select-server (list
-				(cons 'server-id (@: server 'id))
-				(cons 'login-key (@: connection 'login-key))
+	(define (select-server cn wr)
+		(set-connection-world! cn wr)
+		(let ((login-key (connection-session-key cn)) (host (world-server-host wr)) (port (world-server-port wr)))
+			; Login-server interaction.
+			(send-packet cn (login-client-packet/select-server (list
+				(cons 'server-id (world-server-id wr))
+				(cons 'login-key login-key)
 			)))
-
 			(let loop ()
-				(let ((buffer (receive connection)))
+				(let ((buffer (read-packet cn)))
 					(case (get-packet-id buffer)
 						((#x06) (let ((packet (login-server-packet/play-fail buffer)))
-							(disconnect connection)
-							(raise-user-error "Connection failed, reason:" (@: packet 'reason))
+							(disconnect cn)
+							(raise-user-error "Connection failed, reason:" (ref packet 'reason))
 						))
 						((#x07) (let ((packet (login-server-packet/play-ok buffer)))
-							(begin
-								(set-box-field! connection 'game-key (@: packet 'game-key))
-								(set-box-field! connection 'session-id #f)
-								(set-box-field! connection 'crypter #f)
-								(set-box-field! connection 'rsa-key #f)
-								(disconnect connection)
-							)
+							(set-connection-session-id! cn #f)
+							(set-connection-session-key! cn (ref packet 'game-key))
+							(disconnect cn)
 						))
-						(else #f)
+						(else (raise-user-error "Unexpected login server response, packet:" buffer))
 					)
 				)
 			)
-		)
 
-		(if (@: connection 'game-key) ; game-server interaction
-			(let ((host (@: server 'address)) (port (@: server 'port)))
-				(let-values (((input-port output-port) (tcp-connect host port)))
-
-					(set-box-field! connection 'input-port input-port)
-					(set-box-field! connection 'output-port output-port)
-
-					(send connection (game-client-packet/protocol-version (list
-						(cons 'protocol (@: connection 'protocol))
-					)))
-
-					(let loop ()
-						(let ((buffer (receive connection)))
-							(case (get-packet-id buffer)
-								((#x00) (let ((packet (game-server-packet/key-packet buffer)))
-									(begin
-										(let ((crypter (make-crypter (@: packet 'key))))
-											(set-box-field! connection 'crypter crypter)
-										)
-										
-										(send connection (game-client-packet/validate-auth (list
-											(cons 'login (@: connection 'account))
-											(cons 'login-key (@: connection 'login-key))
-											(cons 'game-key (@: connection 'game-key))
-										)))
-										(loop)
-									)
-								))
-								((#x13) (let ((packet (game-server-packet/character-list buffer)))
-									(define (transform i) (cons (cdr (assoc 'name i)) (box (cdr (assoc 'id i)))))
-
-									(set-box-field! connection 'account #f)
-									(set-box-field! connection 'protocol #f)
-									(set-box-field! connection 'login-key #f)
-									(set-box-field! connection 'game-key #f)
-
-									(map transform (@: packet 'list))
-								))
-								(else #f)
-							)
+			; Game-server interaction.
+			(let-values (((input-port output-port) (tcp-connect host port)))
+				(write-buffer output-port (game-client-packet/protocol-version (list
+					(cons 'protocol (connection-protocol cn))
+				)))
+				(let loop ()
+					(let ((buffer (if (connection-session-id cn) (read-packet cn) (read-buffer input-port))))
+						(case (get-packet-id buffer)
+							((#x00) (let ((packet (game-server-packet/key-packet buffer)))
+								(let ((crypter (make-crypter (ref packet 'key))) (pc (connection-packet-channel cn)))
+									(set-connection-session-id! cn #t)
+									(set-connection-read-thread! cn (thread (bind read-thread input-port crypter pc)))
+									(set-connection-send-thread! cn (thread (bind send-thread output-port crypter)))
+								)
+								(send-packet cn (game-client-packet/validate-auth (list
+									(cons 'login (connection-account cn))
+									(cons 'login-key login-key)
+									(cons 'game-key (connection-session-key cn))
+								)))
+								(loop)
+							))
+							((#x13) (let ((packet (game-server-packet/character-list buffer)))
+								(map (lambda (ch) (create-protagonist (list
+									(cons 'object-id (ref ch 'id))
+									(cons 'name (ref ch 'name))
+								))) (ref packet 'list))
+							))
+							(else (raise-user-error "Unexpected game server response, packet:" buffer))
 						)
 					)
 				)
 			)
-			#f
 		)
 	)
 )

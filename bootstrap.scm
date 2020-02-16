@@ -1,6 +1,9 @@
 (module script racket/base
 	(require
+		srfi/1
 		(rename-in racket/contract (any all/c))
+		racket/string
+		"library/extension.scm"
 		"system/structure.scm"
 		"system/uri_scheme.scm"
 		"model/creature.scm"
@@ -49,10 +52,26 @@
 		)
 	)
 
+	(define (char-name=? name)
+		(lambda (ch) (string-ci=? name (ref ch 'name)))
+	)
+
+	(define (print-handler value port)
+		(if (bytes? value) ; Custom (hex) printer for byte string.
+			(begin
+				(display "[" port)
+				(display (string-join (map byte->hex (bytes->list value)) " ") port)
+				(display "]" port)
+			)
+			(write value port)
+		)
+	)
+
 	(define (bootstrap host port account password name [entry #f])
+		(global-port-print-handler print-handler)
 		(let ((connection (connect host port)))
-			(let ((world (findf (lambda (server) (@: server 'state)) (login connection account password))))
-				(let ((me (cdr (assoc name (select-server connection world) string-ci=?))))
+			(let ((world (first (login connection account password))))
+				(let ((me (findf (char-name=? name) (select-server connection world))))
 					(let ((events (select-character connection me)))
 						(if entry
 							(entry connection world me events)
