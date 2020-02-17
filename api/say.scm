@@ -1,8 +1,8 @@
 (module logic racket/base
 	(require
 		srfi/1
-		"../system/network.scm"
 		"../packet/game/client/say.scm"
+		(only-in "../system/connection.scm" send-packet)
 	)
 	(provide say)
 
@@ -19,7 +19,7 @@
 
 	(define (say connection message . tail)
 		(let-values (((channel target) (parse-args tail)))
-			(send connection (game-client-packet/say message channel target))
+			(send-packet connection (game-client-packet/say message channel target))
 		)
 	)
 )

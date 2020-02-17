@@ -82,15 +82,14 @@
 				)
 			)))
 
-			(wrap-evt
-				(choice-evt ec pc)
-				(lambda (evt)
-					(let ((event (handle-interrupt cn evt ec pc tc)))
-						(apf-debug "Event ~a" event)
-						event
+			(wrap-evt always-evt (lambda args
+				(let loop () ; Handle callbacks for current iteration.
+					(let ((tick (async-channel-try-get tc)))
+						(when tick (tick) (loop))
 					)
 				)
-			)
+				(handle-interrupt cn ec pc tc)
+			))
 		)
 	)
 )

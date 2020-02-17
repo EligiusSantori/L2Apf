@@ -1,8 +1,8 @@
 (module logic racket/base
 	(require
 		racket/list
-		"../system/network.scm"
 		"../packet/game/client/request_auto_shot.scm"
+		(only-in "../system/connection.scm" send-packet)
 	)
 	(provide auto-shot)
 
@@ -20,7 +20,7 @@
 	(define (auto-shot connection is? type grade)
 		(let ((item-id (get-item type grade)))
 			(when item-id
-				(send connection (game-client-packet/request-auto-shot item-id is?))
+				(send-packet connection (game-client-packet/request-auto-shot item-id is?))
 			)
 		)
 	)

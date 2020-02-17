@@ -1,18 +1,18 @@
 (module logic racket/base
 	(require
-		"../system/structure.scm"
-		"../system/network.scm"
+		"../packet/game/client/action.scm"
 		"../model/creature.scm"
 		"../model/item.scm"
 		"../model/world.scm"
-		"../packet/game/client/action.scm"
+		"../system/structure.scm"
+		"../system/connection.scm"
 	)
 	(provide pick-up)
 
-	(define (pick-up connection object-id [shift? #f])
-		(let* ((world (@: connection 'world)) (object (object-ref world object-id)) (origin (@: object 'position))) ; TODO what is origin really means?
+	(define (pick-up cn object-id [shift? #f])
+		(let* ((wr (connection-world cn)) (object (object-ref wr object-id)) (origin (ref object 'position))) ; TODO what is origin really means?
 			(when (and (on-ground? object) origin)
-				(send connection (game-client-packet/action object-id origin shift?))
+				(send-packet cn (game-client-packet/action object-id origin shift?))
 			)
 		)
 	)

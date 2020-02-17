@@ -7,42 +7,43 @@
 		)
 	)
 	(provide
-		; program
+		program
 		define-program
 		program?
 		program-id
 		program-equal?
-		program-make
 		program-load!
 		program-free!
 		program-run!
 	)
 
-	(struct program (
-			id ; Unique progam id
-			iterator ; Procedure that implements the program iteration.
-			constructor ; Procedure that should be executed when the program loading.
-			destructor ; Procedure that should be executed when the program unloading.
-			config
-			[state #:mutable]
-			; compatible : list
-			; incompatible : list
-			; dependencies : list
-		)
-	)
+	(struct base-program (
+		id ; Unique progam id
+		iterator ; Procedure that implements the program iteration.
+		constructor ; Procedure that should be executed when the program loading.
+		destructor ; Procedure that should be executed when the program unloading.
+		config
+		[state #:mutable]
+		; compatible : list
+		; incompatible : list
+		; dependencies : list
+	))
+
+	(define program? base-program?)
+	(define program-id base-program-id)
 
 	(define-syntax-rule (define-program ID CONFIG CONSTRUCTOR DESTRUCTOR ITERATOR)
-		(define ID (program
+		(define ID (base-program
 			'ID
 			ITERATOR
-			(if (eq? CONSTRUCTOR undefined) (lambda args (void)) CONSTRUCTOR)
-			(if (eq? DESTRUCTOR undefined) (lambda args (void)) DESTRUCTOR)
+			(if (eq? CONSTRUCTOR undefined) void CONSTRUCTOR)
+			(if (eq? DESTRUCTOR undefined) void DESTRUCTOR)
 			(if (eq? CONFIG undefined) (list) CONFIG)
 			undefined
 		))
 	)
 
-	(define (program-make base . config) ; Create configured instance of the program.
+	(define (program base . config) ; Create configured instance of the program (instantiate).
 		(define (list-merge to from)
 			(define (equalize a b)
 				(let ((al (length a)) (bl (length b)))
@@ -61,8 +62,8 @@
 			) (values->list (equalize to from)))
 		)
 
-		(let ((source (program-config base)))
-			(struct-copy program base
+		(let ((source (base-program-config base)))
+			(struct-copy base-program base
 				[config (if (and (not (null? config)))
 					(if (alist? config)
 						(alist-merge source config) ; TODO deep recursive merge
@@ -82,19 +83,19 @@
 	)
 
 	(define (program-load! program)
-		(let ((state ((program-constructor program) (program-config program))))
-			(when (state? state) (set-program-state! program state))
+		(let ((state ((base-program-constructor program) (base-program-config program))))
+			(when (state? state) (set-base-program-state! program state))
 			(void)
 		)
 	)
 
 	(define (program-free! program)
-		((program-destructor program) (program-config program) (program-state program))
+		((base-program-destructor program) (base-program-config program) (base-program-state program))
 	)
 
 	(define (program-run! p event connection) ; Iterate program for an event.
-		(let ((state ((program-iterator p) event connection (program-config p) (program-state p))))
-			(when (state? state) (set-program-state! p state))
+		(let ((state ((base-program-iterator p) event connection (base-program-config p) (base-program-state p))))
+			(when (state? state) (set-base-program-state! p state))
 			(not (eof-object? state))
 		)
 	)

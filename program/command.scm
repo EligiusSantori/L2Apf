@@ -8,8 +8,8 @@
 		"brain.scm"
 		(relative-in "../.."
 			"library/extension.scm"
-			"system/structure.scm"
 			"model/world.scm"
+			"system/structure.scm"
 			"api/say.scm"
 			"api/gesture.scm"
 			"api/logout.scm"
@@ -64,11 +64,11 @@
 	; TODO get-targets(command) ; string -> list of object-id
 
 	(define (command event connection config state) (let-values (((brain prefix) (list->values config)))
-		(when (and event (eq? (car event) 'message))
+		(when (eq? (car event) 'message)
 			(let-values (((author-id channel author text) (apply values (cdr event))))
 				(let ((command (parse-command text prefix))) (when command
 					(case (car command)
-						(("follow") (brain-do! brain (program-make program-follow author-id 'repeat)))
+						(("follow") (brain-do! brain (program program-follow author-id 'repeat)))
 						(("relax") (brain-clear! brain #t))
 						(("hello") (gesture connection 'gesture/hello))
 						(("bye")

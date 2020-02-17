@@ -1,12 +1,12 @@
 (module logic racket/base
 	(require
 		racket/contract
-		"../system/network.scm"
 		"../packet/game/client/cancel.scm"
+		(only-in "../system/connection.scm" send-packet)
 	)
 	(provide cancel)
 
 	(define (cancel connection)
-		(send connection (game-client-packet/cancel))
+		(send-packet connection (game-client-packet/cancel))
 	)
 )

@@ -59,64 +59,66 @@
 		)
 	)
 	(provide (contract-out
-		(handle-interrupt (-> connection? any/c async-channel? async-channel? async-channel? event?))
+		(handle-interrupt (-> connection? async-channel? async-channel? async-channel? event?))
 	))
 
 	(define (trigger! ec name . data) (async-channel-put ec (apply make-event (cons name data))) name); async-channel? symbol? any/c ...
 	; (define (trigger-change-moving! cn object-id from to) (trigger! cn 'change-moving object-id from to)) ; connection? point? point?
 	; (define (trigger-creature-create! cn creature) (trigger! cn 'creature-create creature)) ; connection? creature?
 
-	(define (handle-interrupt cn evt ec pc tc)
-		(define wr (connection-world cn))
-		(define (next)
-			(do ((tick (async-channel-try-get tc) (async-channel-try-get tc))) ((not tick)) (tick))
-			(handle-interrupt cn (sync ec pc) ec pc tc)
-		)
-
-		(if (bytes? evt)
-			(let ((row (hash-ref handlers-table (get-packet-id evt) #f))) ; Incoming packet => handle then wait next.
-				(if row
-					((cdr row) wr ((car row) evt) ec)
-					(apf-warn "Unhandled packet ~v" evt)
+	(define (handle-interrupt cn ec pc tc)
+		(let ((wr (connection-world cn)) (evt (sync/enable-break ec pc (connection-read-thread cn))))
+			(cond
+				((bytes? evt)
+					(let ((row (hash-ref handlers-table (get-packet-id evt) #f))) ; Incoming packet => handle then wait next.
+						(if row
+							((cdr row) wr ((car row) evt) ec)
+							(apf-warn "Unhandled packet ~v" evt)
+						)
+						(handle-interrupt cn ec pc tc)
+					)
 				)
-				(next)
-			)
-			(case (event-name evt)  ; Regular event => postprocess then return. ; TODO handle this in input loop
-				((logout) ; Close socket.
-					(disconnect cn)
-					evt
+				((thread? evt) (make-event 'disconnect)) ; Connection closed => return immediately.
+				(else
+					(apf-debug "Event ~a" evt)
+					(case (event-name evt) ; Regular event => postprocess or just return.
+						((logout) ; Close socket.
+							(disconnect cn)
+							evt
+						)
+						((object-delete) (let ((object-id (second evt)))
+							(async-channel-put tc (lambda () ; Actually after event processing.
+								(discard-object! wr object-id)
+							))
+							evt
+						))
+						((teleport) (let* ((me (world-me wr)) (position (ref me 'position)) (angle (ref me 'angle))) ; Request updates. ; TODO handle this in input loop
+							(send-packet cn (game-client-packet/validate-position position angle))
+							(send-packet cn (game-client-packet/appearing))
+							evt
+						))
+						; ((attack) (let* ((object-id (second e)) (creature (object-ref world object-id)) (target (...))) ; Fix position refreshing event on attack.
+						; 	(when creature (trigger-change-moving! cn object-id (ref creature 'position) (ref target 'position)))
+						; ))
+						; (skill-started) ; Custom event on skill reused.
+						; 	(when (= (second e) (ref (world-me wr) 'object-id))
+						; 		(let-values (((name object-id skill-id level) (apply values e)))
+						; 			(let ((skill (skill-ref wr skill-id)))
+						; 				(when skill
+						; 					(let ((last-usage (ref skill 'last-usage)) (reuse-delay (ref skill 'reuse-delay)))
+						; 						(when (and reuse-delay (> reuse-delay 0))
+						; 							(set-alarm! connection 'skill-reused (+ last-usage reuse-delay) object-id skill-id level)
+						; 						)
+						; 					)
+						; 				)
+						; 			)
+						; 		)
+						; 	)
+						; 	evt
+						; )
+						(else evt)
+					)
 				)
-				((object-delete)
-					(async-channel-put tc (lambda ()
-						(discard-object! wr object-id)
-					))
-					evt
-				)
-				((teleport) (let* ((me (world-me wr)) (position (ref me 'position)) (angle (ref me 'angle))) ; Request updates.
-					(send-packet cn (game-client-packet/validate-position position angle))
-					(send-packet cn (game-client-packet/appearing))
-					evt
-				))
-				; ((attack) (let* ((object-id (second e)) (creature (object-ref world object-id)) (target (...))) ; Fix position refreshing event on attack.
-				; 	(when creature (trigger-change-moving! cn object-id (ref creature 'position) (ref target 'position)))
-				; ))
-				; (skill-started) ; Custom event on skill reused.
-				; 	(when (= (second e) (ref (world-me wr) 'object-id))
-				; 		(let-values (((name object-id skill-id level) (apply values e)))
-				; 			(let ((skill (skill-ref wr skill-id)))
-				; 				(when skill
-				; 					(let ((last-usage (ref skill 'last-usage)) (reuse-delay (ref skill 'reuse-delay)))
-				; 						(when (and reuse-delay (> reuse-delay 0))
-				; 							(set-alarm! connection 'skill-reused (+ last-usage reuse-delay) object-id skill-id level)
-				; 						)
-				; 					)
-				; 				)
-				; 			)
-				; 		)
-				; 	)
-				; 	evt
-				; )
-				(else evt)
 			)
 		)
 	)
@@ -528,7 +530,7 @@
 		(cons #x76 (cons game-server-packet/skill-launched packet-handler/skill-launched)) ; skill-launched
 		; #x76 SetToLocation
 		(cons #x7d (cons game-server-packet/ask-be-friends packet-handler/ask-be-friends)) ; ask
-		(cons #x7e (cons (void) packet-handler/logout)) ; logout
+		(cons #x7e (cons void packet-handler/logout)) ; logout
 		;(cons #x7f (cons game-server-packet/ packet-handler/)) ; MagicEffectIcons
 		;(cons #x80 (cons game-server-packet/quest-list packet-handler/quest-list)) ; quest-list
 		; #x81 EnchantResult

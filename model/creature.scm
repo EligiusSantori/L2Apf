@@ -16,7 +16,6 @@
 		(get-position (creature? . -> . point/3d?))
 		(moving? (creature? . -> . boolean?))
 		(casting? (creature? . -> . boolean?))
-		(alive? (creature? . -> . boolean?))
 		(creatures-angle (creature? creature? . -> . (or/c rational? false/c)))
 		(creatures-distance (creature? creature? . -> . integer?))
 	))
@@ -126,9 +125,9 @@
 		)
 	)
 
-	(define (alive? creature)
-		(not (@: creature 'alike-dead?))
-	)
+	; (define (alive? creature)
+	; 	(not (@: creature 'alike-dead?))
+	; )
 
 	(define (get-angle creature)
 		; TODO if creature? and moving? then f(position, destination)

@@ -1,22 +1,22 @@
 (module logic racket/base
 	(require
-		"../system/structure.scm"
-		"../system/network.scm"
+		"../packet/game/client/action.scm"
 		"../model/creature.scm"
 		"../model/world.scm"
-		"../packet/game/client/action.scm"
+		"../system/structure.scm"
+		"../system/connection.scm"
 	)
 	(provide action)
 
-	(define (action connection . tail)
+	(define (action cn . tail)
 		(define shift? (if (null? tail) #f (car tail)))
 
-		(let* ((world (@: connection 'world))
-					(object-id (@: world 'me 'target-id))
+		(let* ((wr (connection-world cn))
+					(object-id (ref (world-me wr) 'target-id))
 						(object (object-ref world object-id))
-							(origin (@: object 'position))) ; TODO what is origin really means?
+							(origin (ref object 'position))) ; TODO what is origin really means?
 			(when (and (creature? object) origin)
-				(send connection (game-client-packet/action object-id origin shift?))
+				(send-packet cn (game-client-packet/action object-id origin shift?))
 			)
 		)
 	)

@@ -11,9 +11,9 @@
 		(event-name (-> event? symbol?))
 		(trigger! (-> connection? event? symbol?))
 		(next-tick! (-> connection? procedure? void?))
-		(alarm! (->* (connection? integer?) #:rest list? symbol?))
-		(timeout! (->* (connection? integer?) #:rest list? symbol?))
-		(interval! (->* (connection? integer?) #:rest list? symbol?))
+		(alarm! (->* (connection? integer?) (#:id symbol?) #:rest list? symbol?))
+		(timeout! (->* (connection? integer?) (#:id symbol?) #:rest list? symbol?))
+		(interval! (->* (connection? integer?) (#:id symbol?) #:rest list? symbol?))
 		(stop! (-> connection? symbol? symbol?))
 	))
 
@@ -36,18 +36,16 @@
 		(async-channel-put (connection-tick-channel cn) tick)
 	)
 
-	(define (alarm! cn time . data)
-		(let ((id (gensym)))
-			(thread-send (connection-timer-thread cn)
-				(cons id (wrap-evt (alarm-evt time) (const (apply make-event id data))))
-			#f)
-			id
-		)
+	(define (alarm! #:id [id (gensym)] cn time . data)
+		(thread-send (connection-timer-thread cn)
+			(cons id (wrap-evt (alarm-evt time) (const (apply make-event id data))))
+		#f)
+		id
 	)
-	(define (timeout! cn timeout . data)
-		(apply alarm! cn (+ timeout (current-inexact-milliseconds)) data)
+	(define (timeout! #:id [id (gensym)] cn timeout . data)
+		(apply alarm! #:id id cn (+ timeout (current-inexact-milliseconds)) data)
 	)
-	(define (interval! cn interval . data)
+	(define (interval! #:id [id (gensym)] cn interval . data)
 		(define (setup start interval counter cn id data)
 			(thread-send (connection-timer-thread cn) (cons id (wrap-evt
 				(alarm-evt (+ start (* counter interval)))
@@ -57,10 +55,8 @@
 				)
 			)) #f)
 		)
-		(let ((id (gensym)))
-			(setup (current-inexact-milliseconds) interval 1 cn id data)
-			id
-		)
+		(setup (current-inexact-milliseconds) interval 1 cn id data)
+		id
 	)
 	(define (stop! cn timer)
 		(thread-send (connection-timer-thread cn) timer)

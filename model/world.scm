@@ -9,12 +9,13 @@
 			"library/geometry.scm"
 			"system/structure.scm"
 		)
-		"skill.scm"
 		"object.scm"
 		"creature.scm"
 		"npc.scm"
 		"character.scm"
+		"protagonist.scm"
 		"item.scm"
+		"skill.scm"
 	)
 	(provide
 		(struct-out world)
@@ -31,6 +32,7 @@
 			(attackable? (any/c . -> . boolean?)) ; FIXME move to creature
 			(aimed-to? (creature? creature? . -> . boolean?)) ; FIXME move to creature
 			(behind? (->* (creature? creature?) (rational?) boolean?)) ; FIXME move to map
+			(alive? (creature? . -> . boolean?)) ; FIXME
 		)
 	)
 
@@ -156,6 +158,13 @@
 					(and match (string->number (last match)))
 				)
 			)
+		)
+	)
+
+	(define (alive? creature)
+		(if (protagonist? creature)
+			(not (ref creature 'died?))
+			(not (ref creature 'alike-dead?))
 		)
 	)
 )

@@ -5,7 +5,7 @@
 		racket/async-channel
 		racket/port
 		(only-in "../packet/packet.scm" get-packet-id)
-		(only-in "../system/crypter.scm" crypter?)
+		(only-in "crypter.scm" crypter?)
 		"debug.scm"
 	)
 	(provide
