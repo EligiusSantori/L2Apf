@@ -1,7 +1,7 @@
 (module system racket/base
 	(require "../../packet.scm")
 	(provide game-server-packet/skill-started)
-	
+
 	(define (game-server-packet/skill-started buffer)
 		(let ((s (open-input-bytes buffer)))
 			(list
@@ -10,7 +10,7 @@
 				(cons 'target-id (read-int32 #f s))
 				(cons 'skill-id (read-int32 #f s))
 				(cons 'level (read-int32 #f s))
-				(cons 'cast-origin (read-int32 #f s))
+				(cons 'cast-origin (read-int32 #f s)) ; TODO clarify
 				(cons 'reuse-delay (read-int32 #f s))
 				(cons 'position
 					(let ((position (read-point s)))

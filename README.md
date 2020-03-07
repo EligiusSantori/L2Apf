@@ -27,13 +27,16 @@ Run entire realm of players:
 ```scheme
 #lang racket
 (require
-	srfi/1
-	racket/logging
 	"library/extension.scm"
 	"system/connection.scm"
 	"system/event.scm"
 	(only-in "program/program.scm" program)
-	"program/brain.scm"
+	(only-in "program/brain.scm"
+		make-brain
+		(brain-run! run!)
+		(brain-load! load!)
+		(brain-stop! stop!)
+	)
 	"program/idle.scm"
 	"program/print.scm"
 	"program/command.scm"
@@ -42,21 +45,20 @@ Run entire realm of players:
 
 (apply bootstrap (lambda (connection world me events)
 	(define br (make-brain program-idle))
-	(brain-load! br
+	(load! br
 		(program program-print)
 		(program program-command br)
 	)
 
 	(do ((event (sync events) (sync events))) ((eq? (car event) 'disconnect))
 		; Triggers space.
-
 		(case (car event)
 			; Custom events.
-
 			; Standard events.
 		)
+
 		; Programs space.
-		(brain-run! br event connection)
+		(run! br event connection)
 	)
 ) (values->list (parse-protocol)))
 ```
@@ -112,4 +114,3 @@ Full syntax:
 ---
 
 For non-commertial use. In case of public use please indicate URL of original repo (https://github.com/EligiusSantori/L2Apf).
-

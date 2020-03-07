@@ -24,7 +24,7 @@
 		alist-merge
 		string-starts?
 		string-ends?
-		length>
+		list-try-ref
 		try-first
 		try-second
 		try-third
@@ -140,21 +140,21 @@
 		)
 	)
 
-	(define (length> lst n)
+	(define (list-try-ref lst n [default #f])
 		(cond
-			((null? lst) #f)
-			((= n 0) #t)
-			(else (length> (cdr lst) (- n 1)))
+			((null? lst) default)
+			((= n 0) (car lst))
+			(else (list-try-ref (cdr lst) (- n 1) default))
 		)
 	)
 	(define (try-first lst [default #f])
-		(if (length> lst 0) (car lst) default)
+		(if (pair? lst) (car lst) default)
 	)
 	(define (try-second lst [default #f])
-		(if (length> lst 1) (second lst) default)
+		(list-try-ref lst 1 default)
 	)
 	(define (try-third lst [default #f])
-		(if (length> lst 2) (third lst) default)
+		(list-try-ref lst 2 default)
 	)
 
 	(define call/wv call-with-values)

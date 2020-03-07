@@ -14,10 +14,12 @@
 	)
 	(provide
 		make-brain
+		brain-active
+		brain-count
 		brain-run!
 		brain-do!
 		brain-load!
-		brain-free!
+		brain-stop!
 		brain-clear!
 	)
 
@@ -32,10 +34,10 @@
 		#:auto-value (list)
 	)
 
-	(define (active brain) ; Get active foreground program (or default).
+	(define (brain-active brain) ; Get active foreground program (or default).
 		(try-first (brain-main brain) (brain-default brain))
 	)
-	(define (count brain) ; Total programs count.
+	(define (brain-count brain) ; Total programs count.
 		(+
 			(length (brain-main brain))
 			(length (brain-done brain))
@@ -91,7 +93,7 @@
 		(set-brain-done! brain (filter keep?+ (brain-done brain)))
 	)
 
-	(define (brain-free! brain . programs) ; Unload amount of programs.
+	(define (brain-stop! brain . programs) ; Unload amount of programs.
 		(define (keep? p) (not (member p programs program-equal?)))
 		(when (not (null? programs))
 			(filter-foreground! brain keep?)
@@ -109,11 +111,11 @@
 		(define (keep? p) (not (program-equal? p program)))
 		(filter-background! brain keep?) ; Remove existing from background set.
 
-		(program-free! (active brain)) ; Execute current program destructor.
+		(program-free! (brain-active brain)) ; Execute current program destructor.
 		(set-brain-main! brain (cons program
 			(let ((main (brain-main brain)))
 				(filter keep? ; Remove existing from foreground stack.
-					(if (or (null? main) stack?) main (cdr main)) ; Remove current program if not stack?.
+					(if (or (null? main) stack?) main (cdr main)) ; Remove current program if not empty and not stack?.
 				)
 			)
 		))
@@ -123,17 +125,15 @@
 	(define (brain-run! brain event connection) ; Execute iterations of all active programs.
 		(define turns (list)) ; Background programs which changed foreground program.
 		(define (log-turns! program) ; TODO Выбрасывать исключение по ходу. Избавиться от turns.
-			(let ((a (active brain)))
+			(let ((a (brain-active brain)))
 				(let ((r (program-run! program event connection))) ; Executer background program iterator.
-					(when (not (eq? a (active brain))) ; If foreground program was changed during program iteration.
+					(when (not (eq? a (brain-active brain))) ; If foreground program was changed during program iteration.
 						(set! turns (cons program turns))
 					)
 					r
 				)
 			)
 		)
-
-		; TODO triggers
 
 		; Execute background programs.
 		(set-brain-todo! brain (append ; Rewind iterator.
@@ -152,13 +152,13 @@
 		)
 
 		; Execute foreground program.
-		(when (length> turns 1) ; If foreground program was changed twice or more.
+		(when (list-try-ref turns 2) ; If foreground program was changed twice or more.
 			(apply raise-user-error "Foreground program is ambiguous, causers:" (map program-id turns))
 		)
 
-		(let ((a (active brain)))
+		(let ((a (brain-active brain)))
 			(when (not (program-run! a event connection))
-				(brain-free! brain a)
+				(brain-stop! brain a)
 			)
 		)
 	)

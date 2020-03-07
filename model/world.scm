@@ -82,7 +82,7 @@
 		)
 	)
 
-	(define (objects wr [predicate always?])
+	(define (objects wr [predicate always?]) ; TODO optimize.
 		(map cdr (hash-filter (world-objects wr) (lambda (k v)
 			(and (integer? k) (predicate v))
 		)))

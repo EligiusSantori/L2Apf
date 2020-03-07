@@ -42,7 +42,6 @@
 
 					(cons 'sitting? (@: struct 'sitting?))
 					(cons 'running? (@: struct 'running?))
-					(cons 'casting? (@: struct 'casting?))
 					(cons 'in-combat? (@: struct 'in-combat?)) ; TODO fighting?
 					(cons 'alike-dead? (@: struct 'alike-dead?))
 
@@ -52,6 +51,7 @@
 					(cons 'collision-radius (@: struct 'collision-radius))
 					(cons 'collision-height (@: struct 'collision-height))
 
+					(cons 'casting #f)
 					(cons 'magical-attack-speed (@: struct 'magical-attack-speed))
 					(cons 'physical-attack-speed (@: struct 'physical-attack-speed))
 					(cons 'move-speed-factor (@: struct 'move-speed-factor))
@@ -82,7 +82,6 @@
 				'max-mp
 				'sitting?
 				'running?
-				'casting? ; TODO skill-id, last-skill-id
 				'in-combat?
 				'alike-dead?
 				'angle
@@ -90,6 +89,7 @@
 				'destination
 				'collision-radius
 				'collision-height
+				'casting ; TODO last-skill-id
 				'magical-attack-speed
 				'physical-attack-speed
 				'move-speed-factor
@@ -109,20 +109,18 @@
 		(set-box! creature (update-creature (unbox creature) struct))
 	)
 
-	(define (casting? creature)
-		; TODO (if casting-skill-id #t #f)
-		(@: creature 'casting?)
-	)
-
 	(define (moving? creature)
-		(let ((destination (@: creature 'destination)))
-			(and
+		(let ((destination (ref creature 'destination)))
+			(if (and
 				destination
-				(not (equal? (@: creature 'position) destination))
 				(not (casting? creature))
 				; TODO not immobilized effect
-			)
+			) #t #f)
 		)
+	)
+
+	(define (casting? creature)
+		(if (ref creature 'casting) #t #f)
 	)
 
 	; (define (alive? creature)

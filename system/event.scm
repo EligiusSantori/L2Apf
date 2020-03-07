@@ -14,7 +14,7 @@
 		(alarm! (->* (connection? integer?) (#:id symbol?) #:rest list? symbol?))
 		(timeout! (->* (connection? integer?) (#:id symbol?) #:rest list? symbol?))
 		(interval! (->* (connection? integer?) (#:id symbol?) #:rest list? symbol?))
-		(stop! (-> connection? symbol? symbol?))
+		(timer-stop! (-> connection? symbol? symbol?))
 	))
 
 	(define (make-event name . data)
@@ -58,7 +58,7 @@
 		(setup (current-inexact-milliseconds) interval 1 cn id data)
 		id
 	)
-	(define (stop! cn timer)
+	(define (timer-stop! cn timer)
 		(thread-send (connection-timer-thread cn) timer)
 		timer
 	)
