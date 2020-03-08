@@ -33,6 +33,13 @@
 			(aimed-to? (creature? creature? . -> . boolean?)) ; FIXME move to creature
 			(behind? (->* (creature? creature?) (rational?) boolean?)) ; FIXME move to map
 			(alive? (creature? . -> . boolean?)) ; FIXME
+
+			(party-add! (world? integer? . -> . void?))
+			(party-kick! (world? integer? . -> . void?))
+			(party-leader! (world? integer? . -> . void?))
+			(party-clear! (world? . -> . void?))
+			(in-party? (world? . -> . boolean?))
+			(party-leader (world? . -> . (or/c integer? false/c)))
 		)
 	)
 
@@ -82,10 +89,14 @@
 		)
 	)
 
-	(define (objects wr [predicate always?]) ; TODO optimize.
-		(map cdr (hash-filter (world-objects wr) (lambda (k v)
-			(and (integer? k) (predicate v))
-		)))
+	(define (objects wr [predicate always?])
+		(define l (list))
+		(hash-for-each (world-objects wr) (lambda (k v)
+			(when (predicate v)
+				(set! l (cons v l))
+			)
+		))
+		l
 	)
 
 	(define (object-ref wr object-id)
@@ -166,5 +177,32 @@
 			(not (ref creature 'died?))
 			(not (ref creature 'alike-dead?))
 		)
+	)
+
+	(define (party-add! wr object-id)
+		(let ((party (world-party wr)))
+			(set-world-party! wr
+				(cons (car party) (cons object-id (cdr party)))
+			)
+		)
+	)
+	(define (party-kick! wr object-id)
+		(set-world-party! wr
+			(remove (lambda (id) (= id object-id)) (world-party wr))
+		)
+	)
+	(define (party-leader! wr object-id)
+		(set-world-party! wr
+			(cons object-id (remove (lambda (id) (= id object-id)) (world-party wr)))
+		)
+	)
+	(define (party-clear! wr)
+		(set-world-party! wr (list))
+	)
+	(define (in-party? wr)
+		(not (null? (world-party wr)))
+	)
+	(define (party-leader wr)
+		(if (in-party? wr) (car (world-party wr)) #f)
 	)
 )

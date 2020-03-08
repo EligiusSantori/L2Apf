@@ -114,15 +114,15 @@
 							))
 							evt
 						))
-						((teleport) (let ((me (world-me wr)))
-							(when (= (second evt) (object-id me))
+						((teleport)
+							(let ((me (world-me wr))) (when (= (second evt) (object-id me))
 								(async-channel-put tc (lambda () ; Discard after event processing.
 									(map ; Remove all known objects except myself & party memebers.
 										(lambda (object) (discard-object! wr (object-id object)))
 										(objects wr (lambda (object)
 											(not (or ; TODO Don't remove nearest objects?
-												(object=? object me)
-												(member object (world-party wr) object=?)
+												(protagonist? object)
+												(member (object-id object) (world-party wr) =)
 											))
 										))
 									)
@@ -132,9 +132,9 @@
 										(send-packet cn (game-client-packet/appearing))
 									)
 								))
-							)
+							))
 							evt
-						))
+						)
 						(else evt)
 					)
 				)
@@ -349,7 +349,7 @@
 				)
 			) (ref packet 'list))))
 
-			(trigger! ec 'skill-list (ref (world-me wr) 'object-id))
+			(trigger! ec 'skill-list (object-id (world-me wr)))
 		)
 	)
 	(define (packet-handler/skill-started cn ec wr packet)
@@ -376,7 +376,7 @@
 				)
 			)
 
-			(when (object=? creature (world-me wr))
+			(when (protagonist? creature)
 				(hash-set! (world-skills wr) (skill-id skill) skill)
 
 				; Fix skill reused event via timer.
@@ -499,7 +499,7 @@
 
 			(trigger! ec 'die
 				(object-id creature)
-				(if (object=? creature (world-me wr))
+				(if (protagonist? creature)
 					(ref packet 'return)
 					#f
 				)

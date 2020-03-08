@@ -1,14 +1,8 @@
 (module ai racket/base
 	(require
 		srfi/1
-		(only-in "program.scm"
-			program-id
-			program-equal?
-			program-load!
-			program-free!
-			program-run!
-		)
-		(relative-in "../.."
+		"program.scm"
+		(relative-in "../."
 			"library/extension.scm"
 		)
 	)
@@ -24,6 +18,7 @@
 	)
 
 	(struct brain (
+			connection
 			default ; Defaunt program.
 			[main #:auto #:mutable] ; Foreground programs stack.
 			[todo #:auto #:mutable] ; Background programs set, part 1.
@@ -61,23 +56,25 @@
 	)
 
 	(define (brain-load! brain . programs) ; Load background programs.
+		(define cn (brain-connection brain))
 		(set-brain-todo! brain
 			(append (brain-todo brain) (filter (lambda (p)
 				(and (not (exists? brain p)) ; Don't replace existsing (use free before).
-					(begin (program-load! p) p) ; Execute loading program constructor.
+					(begin (program-load! cn p) p) ; Execute loading program constructor.
 				)
 			) programs))
 		)
 	)
 
 	(define (filter-foreground! brain keep?)
+		(define cn (brain-connection brain))
 		(let ((main (brain-main brain))) (when (not (null? main))
 			(let ((s (filter keep? (cdr main))))
 				(set-brain-main! brain
 					(if (not (keep? (car main))) ; If active program should be unloaded.
 						(begin
-							(program-free! (car main)) ; Execute current program destructor.
-							(program-load! (try-first s (brain-default brain))) ; Execute unstacking program constructor.
+							(program-free! cn (car main)) ; Execute current program destructor.
+							(program-load! cn (try-first s (brain-default brain))) ; Execute unstacking program constructor.
 							s
 						)
 						(cons (car main) s) ; Else just prepend to filtered stack.
@@ -88,9 +85,10 @@
 	)
 
 	(define (filter-background! brain keep?)
-		(define (keep?+ p) (or (keep? p) (begin (program-free! p) #f)))
-		(set-brain-todo! brain (filter keep?+ (brain-todo brain)))
-		(set-brain-done! brain (filter keep?+ (brain-done brain)))
+		(define cn (brain-connection brain))
+		(define (keep-or-destruct p) (or (keep? p) (begin (program-free! cn p) #f)))
+		(set-brain-todo! brain (filter keep-or-destruct (brain-todo brain)))
+		(set-brain-done! brain (filter keep-or-destruct (brain-done brain)))
 	)
 
 	(define (brain-stop! brain . programs) ; Unload amount of programs.
@@ -108,25 +106,30 @@
 	)
 
 	(define (brain-do! brain program [stack? #f]) ; Load a foreground program. If stack? the current program will be stacked.
+		(define cn (brain-connection brain))
 		(define (keep? p) (not (program-equal? p program)))
+
 		(filter-background! brain keep?) ; Remove existing from background set.
 
-		(program-free! (brain-active brain)) ; Execute current program destructor.
+		(program-free! cn (brain-active brain)) ; Execute current program destructor.
 		(set-brain-main! brain (cons program
 			(let ((main (brain-main brain)))
-				(filter keep? ; Remove existing from foreground stack.
-					(if (or (null? main) stack?) main (cdr main)) ; Remove current program if not empty and not stack?.
+				(cond
+					((null? main) (list))
+					(stack? (filter keep? main)) ; Remove same programs from foreground stack.
+					(else (filter keep? (cdr main))) ; Remove also current program if not stack?.
 				)
 			)
 		))
-		(program-load! program) ; Execute loading program constructor.
+		(program-load! cn program) ; Execute loading program constructor.
 	)
 
-	(define (brain-run! brain event connection) ; Execute iterations of all active programs.
+	(define (brain-run! brain event) ; Execute iterations of all active programs.
+		(define cn (brain-connection brain))
 		(define turns (list)) ; Background programs which changed foreground program.
 		(define (log-turns! program) ; TODO Выбрасывать исключение по ходу. Избавиться от turns.
 			(let ((a (brain-active brain)))
-				(let ((r (program-run! program event connection))) ; Executer background program iterator.
+				(let ((r (program-run! cn program event))) ; Execute background program iterator.
 					(when (not (eq? a (brain-active brain))) ; If foreground program was changed during program iteration.
 						(set! turns (cons program turns))
 					)
@@ -146,7 +149,7 @@
 				(set-brain-todo! brain (cdr todo))
 				(if (log-turns! p) ; If program has not finished.
 					(set-brain-done! brain (cons p (brain-done brain))) ; Keep in queue.
-					(program-free! p) ; Unload & drop program from queue.
+					(program-free! cn p) ; Unload & drop program from queue.
 				)
 			)
 		)
@@ -156,9 +159,9 @@
 			(apply raise-user-error "Foreground program is ambiguous, causers:" (map program-id turns))
 		)
 
-		(let ((a (brain-active brain)))
-			(when (not (program-run! a event connection))
-				(brain-stop! brain a)
+		(let ((p (brain-active brain)))
+			(when (not (program-run! cn p event))
+				(brain-stop! brain p)
 			)
 		)
 	)

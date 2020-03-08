@@ -9,11 +9,13 @@
 		"system/connection.scm"
 		"system/event.scm"
 		"model/creature.scm"
+		"model/world.scm"
 		"api/connect.scm"
 		"api/login.scm"
 		"api/select_server.scm"
 		"api/select_character.scm"
 		"api/logout.scm"
+		"program/program.scm"
 	)
 	(provide (contract-out
 		(fighter? (creature? . -> . boolean?))
@@ -61,13 +63,30 @@
 	)
 
 	(define (print-handler value port)
-		(if (bytes? value) ; Custom (hex) printer for byte string.
-			(begin
+		(cond
+			((bytes? value) ; Custom (hex) printer for byte string.
 				(display "[" port)
 				(display (string-join (map byte->hex (bytes->list value)) " ") port)
 				(display "]" port)
 			)
-			(write value port)
+			((connection? value)
+				(display "#<connection:" port)
+				(display (connection-account value) port)
+				(display ">" port)
+			)
+			((world? value)
+				(display "#<world(" port)
+				(display (hash-count (world-objects value)) port)
+				(display "):" port)
+				(display (ref (world-me value) 'name) port)
+				(display ">" port)
+			)
+			((program? value)
+				(display "#<program:" port)
+				(display (program-id value) port)
+				(display ">" port)
+			)
+			(else (write value port))
 		)
 	)
 

@@ -82,19 +82,19 @@
 		))
 	)
 
-	(define (program-load! program)
-		(let ((state ((base-program-constructor program) (base-program-config program))))
+	(define (program-load! cn program)
+		(let ((state ((base-program-constructor program) cn (base-program-config program))))
 			(when (state? state) (set-base-program-state! program state))
 			(void)
 		)
 	)
 
-	(define (program-free! program)
-		((base-program-destructor program) (base-program-config program) (base-program-state program))
+	(define (program-free! cn program)
+		((base-program-destructor program) cn (base-program-config program) (base-program-state program))
 	)
 
-	(define (program-run! p event connection) ; Iterate program for an event.
-		(let ((state ((base-program-iterator p) event connection (base-program-config p) (base-program-state p))))
+	(define (program-run! cn p event) ; Iterate program for an event.
+		(let ((state ((base-program-iterator p) cn event (base-program-config p) (base-program-state p))))
 			(when (state? state) (set-base-program-state! p state))
 			(not (eof-object? state))
 		)

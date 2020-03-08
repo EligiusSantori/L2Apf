@@ -30,6 +30,8 @@ Run entire realm of players:
 	"library/extension.scm"
 	"system/connection.scm"
 	"system/event.scm"
+	"system/structure.scm"
+	"model/creature.scm"
 	(only-in "program/program.scm" program)
 	(only-in "program/brain.scm"
 		make-brain
@@ -39,12 +41,13 @@ Run entire realm of players:
 	)
 	"program/idle.scm"
 	"program/print.scm"
+	"program/radar.scm"
 	"program/command.scm"
 	"bootstrap.scm"
 )
 
-(apply bootstrap (lambda (connection world me events)
-	(define br (make-brain program-idle))
+(apply bootstrap (lambda (cn wr me events)
+	(define br (make-brain cn program-idle))
 	(load! br
 		(program program-print)
 		(program program-command br)
@@ -53,12 +56,12 @@ Run entire realm of players:
 	(do ((event (sync events) (sync events))) ((eq? (car event) 'disconnect))
 		; Triggers space.
 		(case (car event)
-			; Custom events.
 			; Standard events.
+			; Custom events.
 		)
 
 		; Programs space.
-		(run! br event connection)
+		(run! br event)
 	)
 ) (values->list (parse-protocol)))
 ```
