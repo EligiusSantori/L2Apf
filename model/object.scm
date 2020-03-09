@@ -1,7 +1,7 @@
 (module logic racket/base
 	(require
-		(rename-in racket/contract (any all/c))
 		srfi/1
+		(rename-in racket/contract (any all/c))
 		"../library/extension.scm"
 		"../system/structure.scm"
 	)
@@ -9,12 +9,12 @@
 		(object? (any/c . -> . boolean?))
 		(object-id (object? . -> . (or/c integer? #f)))
 		(object=? (object? object? . -> . boolean?))
-		(create-object (list? . -> . list?))
+		(make-object (list? . -> . list?))
 		(update-object (list? list? . -> . list?))
 	))
 
 	(define (object? object)
-		(if (and (box? object) (member 'object (@: object 'type))) #t #f)
+		(if (and (box? object) (member 'object (ref object 'type))) #t #f)
 	)
 
 	(define (object-id object)
@@ -25,27 +25,31 @@
 		(= (object-id a) (object-id b))
 	)
 
-	(define (create-object struct)
-		(list
-			(cons 'type (list 'object))
-			(cons 'object-id (@: struct 'object-id))
+	(define (make-object struct)
+		(let ((object-id (ref struct 'object-id)))
+			(if (integer? object-id)
+				(list
+					(cons 'type (list 'object))
+					(cons 'object-id object-id)
+				)
+				(list (cons 'type (list 'object))) ; (error "Invalid id passed to object." object-id)
+			)
 		)
 	)
 
-	(define (update-object object struct)
-		(let ((object-id (alist-ref struct 'object-id #f eq?)))
-			; (let ((id (alist-ref object 'object-id #f eq?)))
-			; 	(when (and id object-id (or (not (integer? object-id)) (not (= id object-id))))
-			; 		(error "Invalid id passed to object." id object-id)
-			; 	)
-			; )
-
-			(if object-id
-				(cons (cons 'object-id object-id) (remove (lambda (p)
-					(eq? (car p) 'object-id)
-				) object))
-				object
-			)
+	(define (update-object object data) ; TODO optimize by recursion.
+		(let ((nid (assoc 'object-id data eq?)))
+			(when nid (let ((object-id (cdr nid)) (oid (assoc 'object-id object eq?)))
+				(cond
+					((and (not oid) (integer? object-id))
+						(cons (cons 'object-id object-id) object)
+					)
+					((or (not (integer? object-id)) (not (= (cdr oid) object-id)))
+						(error "Invalid id passed to object." (cdr oid) object-id)
+					)
+				)
+			))
+			object
 		)
 	)
 )

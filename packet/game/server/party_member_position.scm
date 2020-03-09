@@ -1,7 +1,8 @@
+; l2j/gameserver/serverpackets/PartyMemberPosition.java
 (module system racket/base
 	(require "../../packet.scm")
 	(provide game-server-packet/party-member-position)
-	
+
 	(define (read-member s)
 		(list
 			(cons 'object-id (read-int32 #f s))
@@ -9,7 +10,7 @@
 
 		)
 	)
-	
+
 	(define (read-members s c n l)
 		(if (< n c)
 			(let ((i (read-member s)))
@@ -18,7 +19,7 @@
 			l
 		)
 	)
-	
+
 	(define (game-server-packet/party-member-position buffer)
 		(let ((s (open-input-bytes buffer)))
 			(list

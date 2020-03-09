@@ -1,37 +1,32 @@
 (module logic racket/base
 	(require
-		(rename-in racket/contract (any all/c))
 		srfi/1
+		(rename-in racket/contract (any all/c))
 		"../system/structure.scm"
 		"character.scm"
 	)
 	(provide (contract-out
-		(antagonist? (any/c . -> . boolean?))
-		(create-antagonist (list? . -> . box?))
-		(update-antagonist! (box? list? . -> . void?))
+		(antagonist? (-> any/c boolean?))
+		(make-antagonist (-> list? box?))
+		(update-antagonist! (-> box? list? list?))
 	))
 
 	(define (antagonist? object)
-		(if (and object (member 'antagonist (@: object 'type))) #t #f)
+		(if (and object (member 'antagonist (ref object 'type))) #t #f)
 	)
 
-	(define (create-antagonist struct)
-		(let ((character (create-character struct)))
-			(let ((type (cons 'antagonist (@: character 'type))))
-				(box (append (alist-delete 'type character) (list
-					(cons 'type type)
-				)))
+	(define (make-antagonist data)
+		(let ((character (make-character data)))
+			(let ((type (cons 'antagonist (ref character 'type))))
+				(box (cons (cons 'type type) (alist-delete 'type character)))
 			)
 		)
 	)
 
-	(define (update-antagonist! antagonist struct)
-		(set-box! antagonist
-			(let ((antagonist (update-character (unbox antagonist) struct)))
-				(struct-transfer antagonist struct
-					; ...
-				)
-			)
+	(define (update-antagonist! object data)
+		(let-values (((updated changes) (update-character (unbox object) data)))
+			(set-box! object updated)
+			changes
 		)
 	)
 )

@@ -28,14 +28,14 @@
 
 	(define (select-character cn me)
 		(send-packet cn (game-client-packet/select-character (list
-			(cons 'id (ref me 'object-id))
+			(cons 'id (ref me 'character-id))
 		)))
 
 		(let loop ()
 			(let ((buffer (read-packet cn)))
 				(case (get-packet-id buffer)
 					((#x15) (let ((packet (game-server-packet/player-character buffer)))
-						(update-protagonist! me (ref packet 'me))
+						(update-protagonist! me packet)
 						(set-world-me! (connection-world cn) me)
 
 						(refresh-manor-list cn)

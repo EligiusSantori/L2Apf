@@ -1,48 +1,52 @@
 (module logic racket/base
 	(require
-		(rename-in racket/contract (any all/c))
 		srfi/1
+		(only-in racket/function negate)
+		(rename-in racket/contract (any all/c))
 		"../system/structure.scm"
-		"object.scm"
 		"creature.scm"
 	)
 	(provide (contract-out
-		(npc? ((or/c box? false/c) . -> . boolean?))
-		(create-npc (list? . -> . box?))
-		(update-npc! (box? list? . -> . void?))
+		(npc? (-> any/c boolean?))
+		(make-npc (-> list? box?))
+		(update-npc! (-> box? list? list?))
+	))
+
+	(define npc (list
+		(cons 'npc-id (negate =))
+		(cons 'show-name? (negate eq?))
+		(cons 'attackable? (negate eq?))
+		(cons 'spoiled? (negate eq?))
+		(cons 'summoned? (negate eq?))
 	))
 
 	(define (npc? object)
-		(if (and object (member 'npc (@: object 'type))) #t #f)
+		(if (and object (member 'npc (ref object 'type))) #t #f)
 	)
 
-	(define (create-npc struct)
-		(let ((creature (create-creature struct)))
-			(let ((type (cons 'npc (@: creature 'type))))
-				(box (append (alist-delete 'type creature) (list
-					(cons 'type type)
-
-					(cons 'npc-id (@: struct 'npc-id))
-					(cons 'show-name? (@: struct 'show-name?))
-					(cons 'attackable? (@: struct 'attackable?))
-					(cons 'spoiled? (@: struct 'spoiled?))
-					(cons 'summoned? (@: struct 'summoned?))
-				)))
+	(define (make-npc data)
+		(let ((creature (make-creature data)))
+			(let ((type (cons 'npc (ref creature 'type))))
+				(box (fold
+					(lambda (p r) (if (and p (assoc (car p) npc eq?)) (cons p r) r)) ; If field belongs to npc.
+					(cons (cons 'type type) (alist-delete 'type creature))
+					data
+				))
 			)
 		)
 	)
 
-	(define (update-npc! npc struct)
-		(set-box! npc
-			(let ((npc (update-creature (unbox npc) struct)))
-				(struct-transfer npc struct
-					'npc-id
-					'show-name?
-					'attackable?
-					'spoiled?
-					'summoned?
-				)
+	(define (update-npc object data)
+		(let-values (((creature cp) (update-creature object data)))
+			(let-values (((updated cc) (struct-update creature data npc)))
+				(values updated (append cp cc))
 			)
+		)
+	)
+	(define (update-npc! object data)
+		(let-values (((updated changes) (update-npc (unbox object) data)))
+			(set-box! object updated)
+			changes
 		)
 	)
 )

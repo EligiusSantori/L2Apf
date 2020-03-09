@@ -2,6 +2,7 @@
 	(require
 		srfi/1
 		racket/function
+		(only-in racket/list flatten)
 		(for-syntax racket/base)
 		(rename-in racket/contract (any all/c))
 	)
@@ -22,6 +23,7 @@
 		alist-ref
 		alist-only
 		alist-merge
+		alist-equal?
 		string-starts?
 		string-ends?
 		list-try-ref
@@ -121,6 +123,9 @@
 				r
 			)
 		) from to)
+	)
+	(define (alist-equal? a b)
+		(equal? (apply hasheq (flatten a)) (apply hasheq (flatten b)))
 	)
 
 	(define (string-starts? s t)

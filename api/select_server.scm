@@ -70,10 +70,7 @@
 								(loop)
 							))
 							((#x13) (let ((packet (game-server-packet/character-list buffer)))
-								(map (lambda (ch) (create-protagonist (list
-									(cons 'object-id (ref ch 'id))
-									(cons 'name (ref ch 'name))
-								))) (ref packet 'list))
+								(map (lambda (data) (make-protagonist data)) (ref packet 'list))
 							))
 							(else (raise-user-error "Unexpected game server response, packet:" buffer))
 						)

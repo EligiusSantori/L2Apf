@@ -1,93 +1,77 @@
 (module logic racket/base
 	(require
-		(rename-in racket/contract (any all/c))
 		srfi/1
+		(only-in racket/function negate)
+		(rename-in racket/contract (any all/c))
 		"../system/structure.scm"
 		"creature.scm"
 	)
 	(provide (contract-out
-		(character? (any/c . -> . boolean?))
-		(create-character (list? . -> . list?))
-		(update-character (list? list? . -> . list?))
-		(update-character! (box? list? . -> . void?))
+		(character? (-> any/c boolean?))
+		(make-character (-> list? list?))
+		(update-character (-> list? list? (values list? list?)))
+		(update-character! (-> box? list? list?))
+	))
+
+	(define character (list
+		(cons 'level (negate =))
+		(cons 'cp (negate =))
+		(cons 'max-cp (negate =))
+		(cons 'karma (negate =))
+
+		(cons 'race (negate =))
+		(cons 'gender (negate eq?))
+		(cons 'face-type (negate =))
+		(cons 'hair-style (negate =))
+		(cons 'hair-color (negate =))
+		(cons 'name-color (negate =))
+		(cons 'class-id (negate =))
+
+		(cons 'pvp? (negate eq?))
+		(cons 'invisible? (negate eq?))
+		(cons 'find-party? (negate eq?))
+		(cons 'hero-icon? (negate eq?))
+		(cons 'hero-glow? (negate eq?))
+		(cons 'fishing? (negate eq?))
+		(cons 'mount-type (negate eq?))
+		(cons 'private-store (negate eq?))
+
+		(cons 'clan-id (negate =))
+		(cons 'clan-crest-id (negate =))
+		(cons 'ally-id (negate =))
+		(cons 'ally-crest-id (negate =))
+
+		(cons 'cubics (negate =))
+		(cons 'fish (negate =))
 	))
 
 	(define (character? object)
-		(if (and object (member 'character (@: object 'type))) #t #f)
+		(if (and object (member 'character (ref object 'type))) #t #f)
 	)
 
-	(define (create-character struct)
-		(let ((creature (create-creature struct)))
-			(let ((type (cons 'character (@: creature 'type))))
-				(append (alist-delete 'type creature) (list
-					(cons 'type type)
-
-					; TODO level (exists in party packet)
-
-					(cons 'cp (@: struct 'cp))
-					(cons 'max-cp (@: struct 'max-cp))
-					(cons 'karma (@: struct 'karma))
-
-					(cons 'pvp? (@: struct 'pvp?))
-					(cons 'invisible? (@: struct 'invisible?))
-					(cons 'find-party? (@: struct 'find-party?))
-					(cons 'hero-icon? (@: struct 'hero-icon?))
-					(cons 'hero-glow? (@: struct 'hero-glow?))
-					(cons 'fishing? (@: struct 'fishing?))
-					(cons 'mount-type (@: struct 'mount-type))
-					(cons 'private-store (@: struct 'private-store))
-
-					(cons 'race (@: struct 'race))
-					(cons 'gender (@: struct 'gender))
-					(cons 'face-type (@: struct 'face-type))
-					(cons 'hair-style (@: struct 'hair-style))
-					(cons 'hair-color (@: struct 'hair-color))
-					(cons 'name-color (@: struct 'name-color))
-
-					(cons 'class-id (@: struct 'class-id))
-					(cons 'clan-id (@: struct 'clan-id))
-					(cons 'ally-id (@: struct 'ally-id))
-					(cons 'clan-crest-id (@: struct 'clan-crest-id))
-					(cons 'ally-crest-id (@: struct 'ally-crest-id))
-					(cons 'cubics (@: struct 'cubics))
-					(cons 'fish (@: struct 'fish))
-				))
+	(define (make-character data)
+		(let ((creature (make-creature data)))
+			(let ((type (cons 'character (ref creature 'type))))
+				(fold
+					(lambda (p r) (if (and p (assoc (car p) character eq?)) (cons p r) r)) ; If field belongs to character.
+					(cons (cons 'type type) (alist-delete 'type creature))
+					data
+				)
 			)
 		)
 	)
 
-	(define (update-character character struct)
-		(let ((character (update-creature character struct)))
-			(struct-transfer character struct
-				'cp
-				'max-cp
-				'karma
-				'pvp?
-				'invisible?
-				'find-party?
-				'hero-icon?
-				'hero-glow?
-				'fishing?
-				'mount-type
-				'private-store
-				'race
-				'gender
-				'face-type
-				'hair-style
-				'hair-color
-				'name-color
-				'class-id
-				'clan-id
-				'ally-id
-				'clan-crest-id
-				'ally-crest-id
-				'cubics
-				'fish
+	(define (update-character object data)
+		(let-values (((creature cp) (update-creature object data)))
+			(let-values (((updated cc) (struct-update creature data character)))
+				(values updated (append cp cc))
 			)
 		)
 	)
-
-	(define (update-character! character struct)
-		(set-box! character (update-character (unbox character) struct))
+	(define (update-character! object data)
+		(let-values (((updated changes) (update-character (unbox object) data)))
+			(set-box! object updated)
+			changes
+		)
 	)
 )

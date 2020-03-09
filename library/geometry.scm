@@ -14,6 +14,9 @@
 		(struct-out point/3d)
 		point/3d->point/2d
 		point/2d->point/3d
+		point/3d=
+		point/2d=
+		point=
 
 		pi/4 ; 45 deg
 		pi/2 ; 90 deg
@@ -193,6 +196,27 @@
 
 	(define (point/2d->point/3d p [z 0])
 		(point/3d (point/2d-x p) (point/2d-y p) z)
+	)
+
+	(define (point/2d= p1 p2)
+		(and
+			(= (point/2d-x p1) (point/2d-x p2))
+			(= (point/2d-y p1) (point/2d-y p2))
+		)
+	)
+	(define (point/3d= p1 p2)
+		(and
+			(= (point/3d-x p1) (point/3d-x p2))
+			(= (point/3d-y p1) (point/3d-y p2))
+			(= (point/3d-z p1) (point/3d-z p2))
+		)
+	)
+	(define (point= p1 p2)
+		(cond
+			((and (point/2d? p1) (point/2d? p2)) (point/2d= p1 p2))
+			((and (point/3d? p1) (point/3d? p2)) (point/3d= p1 p2))
+			(else #f)
+		)
 	)
 
 	(define (revert-angle a) ; Инвертирует направление шкалы сохраняя точку отсчёта

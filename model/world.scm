@@ -16,12 +16,13 @@
 		"protagonist.scm"
 		"item.scm"
 		"skill.scm"
+		"party.scm"
 	)
 	(provide
 		(struct-out world)
 		(contract-out
 			(make-world ((listof pair?) . -> . world?))
-			(register-object! (world? object? . -> . void?))
+			(register-object! (world? (and/c box? object?) . -> . void?))
 			(discard-object! (world? integer? . -> . void?))
 			(objects (->* (world?) (procedure?) list?))
 			(object-ref (world? (or/c integer? false/c) . -> . (or/c object? false/c)))
@@ -33,13 +34,10 @@
 			(aimed-to? (creature? creature? . -> . boolean?)) ; FIXME move to creature
 			(behind? (->* (creature? creature?) (rational?) boolean?)) ; FIXME move to map
 			(alive? (creature? . -> . boolean?)) ; FIXME
-
 			(party-add! (world? integer? . -> . void?))
 			(party-kick! (world? integer? . -> . void?))
 			(party-leader! (world? integer? . -> . void?))
 			(party-clear! (world? . -> . void?))
-			(in-party? (world? . -> . boolean?))
-			(party-leader (world? . -> . (or/c integer? false/c)))
 		)
 	)
 
@@ -69,7 +67,7 @@
 			(make-vector (* 12 10))
 			(make-hash)
 			(make-hash)
-			(list)
+			#f
 			(make-hash)
 			(make-hash)
 		)
@@ -113,7 +111,7 @@
 
 	(define (find-character-by-name wr name)
 		(define (test? k v)
-			(and (integer? k) (character? v) (string-ci=? (@: v 'name) name))
+			(and (integer? k) (character? v) (string-ci=? (ref v 'name) name))
 		)
 
 		(let ((found (hash-find (world-objects wr) test?)))
@@ -165,7 +163,7 @@
 				(ref creature 'level)
 			)
 			(and (npc? creature)
-				(let ((match (regexp-match (pregexp "(?i:Lv)\\s*(\\d+)") (or (@: creature 'title) ""))))
+				(let ((match (regexp-match (pregexp "(?i:Lv)\\s*(\\d+)") (or (ref creature 'title) ""))))
 					(and match (string->number (last match)))
 				)
 			)
@@ -181,28 +179,31 @@
 
 	(define (party-add! wr object-id)
 		(let ((party (world-party wr)))
-			(set-world-party! wr
-				(cons (car party) (cons object-id (cdr party)))
-			)
+			(set-world-party! wr (make-party
+				(party-loot party)
+				(party-leader party)
+				(cons object-id (cdr (party-members party)))
+			))
 		)
 	)
 	(define (party-kick! wr object-id)
-		(set-world-party! wr
-			(remove (lambda (id) (= id object-id)) (world-party wr))
+		(let ((party (world-party wr)))
+			(set-world-party! wr (apply make-party
+				(party-loot party)
+				(remove (lambda (id) (= id object-id)) (party-members party))
+			))
 		)
 	)
 	(define (party-leader! wr object-id)
-		(set-world-party! wr
-			(cons object-id (remove (lambda (id) (= id object-id)) (world-party wr)))
+		(let ((party (world-party wr)))
+			(set-world-party! wr (make-party
+				(party-loot party)
+				object-id
+				(cdr (party-members party))
+			))
 		)
 	)
 	(define (party-clear! wr)
-		(set-world-party! wr (list))
-	)
-	(define (in-party? wr)
-		(not (null? (world-party wr)))
-	)
-	(define (party-leader wr)
-		(if (in-party? wr) (car (world-party wr)) #f)
+		(set-world-party! wr #f)
 	)
 )

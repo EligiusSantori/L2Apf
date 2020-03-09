@@ -10,6 +10,7 @@
 			"library/extension.scm"
 			"system/structure.scm"
 			"system/connection.scm"
+			"model/party.scm"
 			"model/world.scm"
 			"api/say.scm"
 			"api/gesture.scm"

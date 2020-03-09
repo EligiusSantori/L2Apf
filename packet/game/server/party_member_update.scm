@@ -1,7 +1,8 @@
+; l2j/gameserver/serverpackets/PartySmallWindowUpdate.java
 (module system racket/base
 	(require "../../packet.scm")
 	(provide game-server-packet/party-member-update)
-	
+
 	(define (game-server-packet/party-member-update buffer)
 		(let ((s (open-input-bytes buffer)))
 			(list

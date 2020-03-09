@@ -5,14 +5,14 @@
 		"../system/structure.scm"
 	)
 	(provide (contract-out
-		(skill? (any/c . -> . boolean?))
-		(skill-id (skill? . -> . integer?))
-		(skill-ready? ((or/c any/c false/c) . -> . boolean?))
+		(skill? (-> any/c boolean?))
+		(skill-id (-> skill? integer?))
+		(skill-ready? (-> skill? boolean?))
 		(make-skill (->* (integer? integer?) (boolean? integer? integer?) skill?))
 	))
 
 	(define (skill? skill)
-		(if (and skill (@: skill 'skill-id)) #t #f)
+		(if (and skill (ref skill 'skill-id)) #t #f)
 	)
 
 	(define (skill-id skill)
@@ -20,11 +20,8 @@
 	)
 
 	(define (skill-ready? skill)
-		(if (skill? skill)
-			(let ((last-usage (@: skill 'last-usage)) (reuse-delay (@: skill 'reuse-delay)))
-				(and (@: skill 'active?) (> (current-milliseconds) (+ last-usage reuse-delay)))
-			)
-			#f
+		(let ((last-usage (ref skill 'last-usage)) (reuse-delay (ref skill 'reuse-delay)))
+			(and (ref skill 'active?) (> (current-milliseconds) (+ last-usage reuse-delay)))
 		)
 	)
 
