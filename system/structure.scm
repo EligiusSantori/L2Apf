@@ -1,13 +1,13 @@
 (module system racket/base
 	(require
-		srfi/1
+		(only-in srfi/1 fold car+cdr)
 		(only-in racket/dict dict-ref)
 		(rename-in racket/contract (any all/c))
 		"../library/extension.scm"
 	)
 	(provide (contract-out
 		(ref (->* ((or/c list? box?)) #:rest list? any/c))
-		(struct-update (-> list? list? list? (values list? list?)))
+		(struct-update (->* (list? list? list?) (list? list?) (values list? list? list?)))
 	))
 
 	(define (ref struct . chain) ; Ultimate dictionary path extractor.
@@ -15,12 +15,12 @@
 		(fold f (f (car chain) struct) (cdr chain))
 	)
 
-	(define (struct-extract lst key [rst (list)])
+	(define (struct-extract lst key [rst (list)]) ; O(n)
 		(if (not (null? lst))
 			(let ((p (car lst)))
 				(if p
 					(if (eq? key (car p))
-						(values (cdr p) (append (cdr lst) rst)) ; Pair found.
+						(values (cdr p) (append rst (cdr lst))) ; Pair found.
 						(struct-extract (cdr lst) key (cons p rst)) ; Iterate next.
 					)
 					(struct-extract (cdr lst) key rst) ; Empty pair.
@@ -31,27 +31,36 @@
 	)
 
 	(define (field-update struct field new allow?)
-		(let-values (((old rest) (struct-extract struct field)))
-			(if (and allow? (or (eq? #t allow?) (and (not old) new) (and (not new) old) (allow? old new)))
-				(cons (cons (cons field new) rest) old) ; Return struct & old value.
+		(let-values (((old rest) (struct-extract struct field))) ; O(n)
+			(if (and allow? (or (eq? #t allow?) (and (not old) new) (and (not new) old) (and old new (allow? old new))))
+				(cons rest (cons new old))
 				#f ; Change forbidden or value hasn't changed.
 			)
 		)
 	)
 
-	(define (struct-update struct data fields)
-		(car+cdr (fold (lambda (pair r) (let-values (((field value) (car+cdr pair)))
-			(let ((allow? (alist-ref fields field #f eq?)))
-				(let ((update (field-update (car r) field value allow?)))
-					(if update
-						(if (eq? #t allow?)
-							(cons (car update) (cdr r)) ; Skip change record for service field.
-							(cons (car update) (cons (cons field (cons (cdr update) value)) (cdr r))) ; Return struct & add change to chain.
+	(define (struct-update data fields rest [updated (list)] [changes (list)])
+		(if (not (null? data))
+			(if (car data)
+				(let-values (((field value) (car+cdr (car data))))
+					(let ((allow? (alist-ref fields field #f eq?))) ; O(n/2)
+						(let ((update (field-update rest field value allow?)))
+							(if update
+								(struct-update (cdr data) fields (car update)
+									(cons (cons field (cadr update)) updated)
+									(if (not (eq? #t allow?))
+										(cons (cons field (cdr update)) changes) ; Add change record to chain.
+										changes ; Skip change record for service field.
+									)
+								)
+								(struct-update (cdr data) fields rest updated changes) ; Field not changed.
+							)
 						)
-						r ; Field not changed.
 					)
 				)
+				(struct-update (cdr data) fields rest updated changes) ; Invalid data pair.
 			)
-		)) (cons struct (list)) data))
+			(values rest updated changes) ; End of data.
+		)
 	)
 )

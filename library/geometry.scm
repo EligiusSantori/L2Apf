@@ -31,7 +31,7 @@
 		in-sphere?
 		in-sector?
 		circle-point
-		sphere-point
+		; sphere-point
 		circumference
 		segment-offset/2d
 		segment-offset/3d
@@ -69,19 +69,19 @@
 	; Нахождение точки на окружности
 	(define (circle-point center radius angle)
 		(point/2d
-			(+ (point/2d-x center) (* radius (sin angle)))
-			(+ (point/2d-y center) (* radius (cos angle)))
+			(+ (point/2d-x center) (* radius (cos angle)))
+			(+ (point/2d-y center) (* radius (sin angle)))
 		)
 	)
 
 	; Нахождение точки на сфере
-	(define (sphere-point center radius angle1 angle2)
-		(point/3d
-			(+ (point/3d-x center) (* radius (sin angle1) (cos angle2)))
-			(+ (point/3d-y center) (* radius (sin angle1) (sin angle2)))
-			(+ (point/3d-z center) (* radius (cos angle1)))
-		)
-	)
+	; (define (sphere-point center radius angle1 angle2) ; TODO test
+	; 	(point/3d
+	; 		(+ (point/3d-x center) (* radius (sin angle1) (cos angle2)))
+	; 		(+ (point/3d-y center) (* radius (sin angle1) (sin angle2)))
+	; 		(+ (point/3d-z center) (* radius (cos angle1)))
+	; 	)
+	; )
 
 	(define (angle/2d a b) ; Angle between two points in radians
 		(let* ((p (centrate/2d a b)) (x (point/2d-x p)) (y (point/2d-y p)))

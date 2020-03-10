@@ -156,9 +156,9 @@
 		)
 	)
 	(define (write-point p port)
-		(write-int32 (point/3d-x p) #t port)
-		(write-int32 (point/3d-y p) #t port)
-		(write-int32 (point/3d-z p) #t port)
+		(write-int32 (exact-round (point/3d-x p)) #t port)
+		(write-int32 (exact-round (point/3d-y p)) #t port)
+		(write-int32 (exact-round (point/3d-z p)) #t port)
 		(void)
 	)
 

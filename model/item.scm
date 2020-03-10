@@ -47,11 +47,11 @@
 	)
 
 	(define (update-item object data)
-		(struct-update (update-object object data) data item)
+		(struct-update data item (update-object object data))
 	)
 	(define (update-item! object data)
-		(let-values (((updated changes) (update-item (unbox object) data)))
-			(set-box! object updated)
+		(let-values (((rest updated changes) (update-item (unbox object) data)))
+			(set-box! object (append rest updated))
 			changes
 		)
 	)

@@ -12,15 +12,15 @@
 	(provide (contract-out
 		(creature? (-> any/c boolean?))
 		(make-creature (-> list? list?))
-		(update-creature (-> list? list? (values list? list?)))
+		(update-creature (-> list? list? (values list? list? list?)))
 		(update-creature! (-> box? list? list?))
 
-		(get-angle (creature? . -> . rational?))
-		(get-position (creature? . -> . point/3d?))
-		(moving? (creature? . -> . boolean?))
-		(casting? (creature? . -> . boolean?))
-		(creatures-angle (creature? creature? . -> . (or/c rational? false/c)))
-		(creatures-distance (creature? creature? . -> . integer?))
+		(moving? (-> creature? boolean?))
+		(casting? (-> creature? boolean?))
+		(get-speed (-> creature? integer?))
+		(get-position (-> creature? point/3d?))
+		(creatures-angle (-> creature? creature? (or/c rational? false/c)))
+		(creatures-distance (-> creature? creature? integer?))
 	))
 
 	(define creature (list
@@ -35,7 +35,7 @@
 		(cons 'max-mp (negate =))
 
 		(cons 'sitting? (negate eq?))
-		(cons 'running? (negate eq?))
+		(cons 'walking? (negate eq?))
 		(cons 'in-combat? (negate eq?))
 		(cons 'alike-dead? (negate eq?))
 		(cons 'casting #t)
@@ -97,17 +97,13 @@
 		)
 	)
 	(define (update-creature object data)
-		(struct-update
-			(update-object object data)
-			(let-values (((ld bd) (partition location-field? data)))
-				(append bd (parse-location ld))
-			)
-			creature
+		(let-values (((ld bd) (partition location-field? data)))
+			(struct-update (append bd (parse-location ld)) creature (update-object object data))
 		)
 	)
 	(define (update-creature! object data)
-		(let-values (((updated changes) (update-creature (unbox object) data)))
-			(set-box! object updated)
+		(let-values (((rest updated changes) (update-creature (unbox object) data)))
+			(set-box! object (append rest updated))
 			changes
 		)
 	)
@@ -124,16 +120,24 @@
 		) #t #f)
 	)
 
-	(define (get-angle creature)
-		; TODO if casting? then f(position, target.position) else angle
-		(ref creature 'angle)
+	(define (get-speed creature)
+		(if (moving? creature)
+			(if (ref creature 'walking?)
+				(or (ref creature 'walk-speed) 0)
+				(or (ref creature 'run-speed) 0)
+			)
+			0
+		)
 	)
-
 	(define (get-position creature)
-		; (if (moving? creature)
-			; TODO calculate
-			(ref creature 'position)
-		; )
+		(let ((speed (get-speed creature)) (at (ref creature 'located-at)) (p (ref creature 'position)) (d (ref creature 'destination)))
+			(if (and (> speed 0) p at) ; If moving? and located-at is set.
+				(let ((cd (* (/ (- (current-milliseconds) at) 1000) speed)))
+					(if (< cd (distance/3d p d)) (segment-offset/3d p d cd) d) ; Total or calculated distance.
+				)
+				p
+			)
+		)
 	)
 
 	(define (creatures-angle a b)

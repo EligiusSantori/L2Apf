@@ -30,6 +30,7 @@
 			(find-character-by-name (world? string? . -> . (or/c character? false/c))) ; FIXME rename
 			(get-target (world? creature? . -> . (or/c creature? false/c))) ; FIXME move to creature?
 			(get-level (creature? . -> .  (or/c integer? false/c))) ; FIXME move to creature
+			(get-angle (world? creature? . -> . rational?))
 			(attackable? (any/c . -> . boolean?)) ; FIXME move to creature
 			(aimed-to? (creature? creature? . -> . boolean?)) ; FIXME move to creature
 			(behind? (->* (creature? creature?) (rational?) boolean?)) ; FIXME move to map
@@ -167,6 +168,15 @@
 					(and match (string->number (last match)))
 				)
 			)
+		)
+	)
+
+	(define (get-angle wr creature)
+		(if (casting? creature)
+			(let ((target (get-target wr creature)))
+				(or (and target (creatures-angle creature target)) (ref creature 'angle))
+			)
+			(ref creature 'angle)
 		)
 	)
 

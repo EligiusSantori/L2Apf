@@ -5,15 +5,21 @@
 		racket/undefined
 		"program.scm"
 		"follow_chase.scm"
+		"follow_repeat.scm"
 		"brain.scm"
 		(relative-in "../."
 			"library/extension.scm"
 			"system/structure.scm"
 			"system/connection.scm"
+			"system/event.scm"
+			"model/creature.scm"
 			"model/party.scm"
 			"model/world.scm"
 			"api/say.scm"
 			"api/gesture.scm"
+			"api/move_to.scm"
+			"api/move_on.scm"
+			"api/move_behind.scm"
 			"api/logout.scm"
 		)
 	)
@@ -53,7 +59,7 @@
 	; )
 
 	(define (parse-command wr text channel author-id)
-		(if (or (eq? channel 'chat-channel/tell) (and (eq? channel 'chat-channel/party) (eq? author-id (party-leader wr))))
+		(if (or (eq? channel 'chat-channel/tell) (and (eq? channel 'chat-channel/party) (eq? author-id (party-leader (world-party wr)))))
 			(remove (compose zero? string-length) (string-split (string-downcase text) " "))
 			#f
 		)
@@ -62,18 +68,28 @@
 	(define (command cn event config state)
 		(when (eq? (car event) 'message)
 			(let-values (((author-id channel author text) (apply values (cdr event))) ((brain) (car config)))
-				(let ((command (parse-command (connection-world cn) text channel author-id))) (when command
-					(case (car command)
-						(("follow") (brain-do! brain (program program-follow-chase author-id)))
+				(let* ((wr (connection-world cn)) (command (parse-command wr text channel author-id)))
+					(when command (case (car command)
+						(("chase") (brain-do! brain (program program-follow-chase author-id)))
+						(("repeat") (brain-do! brain (program program-follow-repeat author-id)))
 						(("relax") (brain-clear! brain #t))
+						(("return") (let ((author (object-ref wr author-id)))
+							; (when author (move-to cn (get-position author) (or (ref author 'collision-radius) 10)))
+							(when author (move-behind cn author 50))
+						))
+						(("go") (let* ((on (or (string->number (list-try-ref command 1 "0")) 0)) (es (/ on (ref (world-me wr) 'run-speed))))
+							(when (> on 0)
+								(move-on cn on)
+							)
+						))
 						(("hello") (gesture cn 'gesture/hello))
 						(("bye")
 							(brain-clear! brain #t) ; Call foreground program destructor before exit.
 							(logout cn)
 						)
 						(else (say cn "I don't understand"))
-					)
-				))
+					))
+				)
 			)
 		)
 		(void)

@@ -24,8 +24,8 @@
 	)
 
 	(define (update-antagonist! object data)
-		(let-values (((updated changes) (update-character (unbox object) data)))
-			(set-box! object updated)
+		(let-values (((rest updated changes) (update-character (unbox object) data)))
+			(set-box! object (append rest updated))
 			changes
 		)
 	)

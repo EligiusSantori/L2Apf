@@ -1,7 +1,7 @@
 (module system racket/base
 	(require "../../packet.scm")
 	(provide game-server-packet/npc-info)
-	
+
 	(define (game-server-packet/npc-info buffer)
 		(let ((s (open-input-bytes buffer)))
 			(list
@@ -20,7 +20,7 @@
 				(cons 'walk-speed (read-int32 #f s))
 				(cons 'swim-run-speed (read-int32 #f s))
 				(cons 'swim-walk-speed (read-int32 #f s))
-				(cons 'fly-run-speed (begin 
+				(cons 'fly-run-speed (begin
 					(read-int32 #f s) ; FlRunSpd
 					(read-int32 #f s) ; FlWalkSpd
 					(read-int32 #f s)
@@ -36,7 +36,7 @@
 					(cons 'left-hand (read-int32 #f s))
 				))
 				(cons 'show-name? (not (zero? (read-byte s))))
-				(cons 'running? (not (zero? (read-byte s))))
+				(cons 'walking? (zero? (read-byte s)))
 				(cons 'in-combat? (not (zero? (read-byte s))))
 				(cons 'alike-dead? (not (zero? (read-byte s))))
 				(cons 'summoned? (not (zero? (read-byte s))))

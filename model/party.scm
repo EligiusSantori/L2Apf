@@ -4,10 +4,10 @@
 	)
 	(provide (contract-out
 		(make-party (->* (symbol? integer?) #:rest (listof integer?) list?))
-		(in-party? (list? . -> . boolean?))
-		(party-members (list? . -> . (listof integer?)))
-		(party-leader (list? . -> . (or/c integer? false/c)))
-		(party-loot (list? . -> . symbol?))
+		(in-party? (->* ((or/c list? false/c)) (integer?) boolean?))
+		(party-members (-> list? (listof integer?)))
+		(party-leader (-> list? (or/c integer? false/c)))
+		(party-loot (-> list? symbol?))
 	))
 
 	(define (make-party loot-mode leader-id . object-ids)

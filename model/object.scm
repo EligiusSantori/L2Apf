@@ -37,19 +37,22 @@
 		)
 	)
 
-	(define (update-object object data) ; TODO optimize by recursion.
+	(define (update-object object data)
 		(let ((nid (assoc 'object-id data eq?)))
-			(when nid (let ((object-id (cdr nid)) (oid (assoc 'object-id object eq?)))
-				(cond
-					((and (not oid) (integer? object-id))
-						(cons (cons 'object-id object-id) object)
-					)
-					((or (not (integer? object-id)) (not (= (cdr oid) object-id)))
-						(error "Invalid id passed to object." (cdr oid) object-id)
+			(if nid
+				(let ((object-id (cdr nid)) (oid (assoc 'object-id object eq?)))
+					(cond
+						((and (not oid) (integer? object-id)) ; Set object-id.
+							(cons (cons 'object-id object-id) object)
+						)
+						((or (not (integer? object-id)) (not (= (cdr oid) object-id))) ; Invalid object-id.
+							(error "Invalid id passed to object." (cdr oid) object-id)
+						)
+						(else object) ; Valid object-id.
 					)
 				)
-			))
-			object
+				object ; Nothing to update.
+			)
 		)
 	)
 )

@@ -1,10 +1,10 @@
 (module system racket/base ; Intermediate layer between low-level protocol and user API to provide higher-level events and state of game world.
 	(require
 		srfi/1
-		(rename-in racket/contract (any all/c))
 		racket/function
 		racket/set
 		racket/async-channel
+		(rename-in racket/contract (any all/c))
 		"debug.scm"
 		"structure.scm"
 		"connection.scm"
@@ -21,10 +21,11 @@
 			"user_info.scm"
 			"char_info.scm"
 			"npc_info.scm"
+			"status_update.scm"
 			"move_to_point.scm"
 			"move_to_pawn.scm"
 			"stop_moving.scm"
-			"status_update.scm"
+			"validate_location.scm"
 			"target_selected.scm"
 			"target_unselected.scm"
 			"ask_join_alliance.scm"
@@ -48,7 +49,7 @@
 			"spawn_item.scm"
 		)
 		(relative-in "../packet/game/client/."
-			"validate_position.scm"
+			"validate_location.scm"
 			"appearing.scm"
 		)
 		(relative-in "../model/."
@@ -78,18 +79,18 @@
 			(when creature
 				(let* ((changes (update-creature! creature data)) (changed (apply seteq (map car changes))))
 					(let ((change (assoc 'target-id changes eq?))) (when change
-						(trigger! ec 'change-target (object-id creature) (third change))
+						(trigger! ec 'change-target (object-id creature) (cadr change))
 					))
-					(when (or (set-member? changed 'position) (set-member? changed 'destination))
+					(when (set-member? changed 'destination) ; Only on start or stop moving (skip position validation).
 						(trigger! ec 'change-moving (object-id creature) (ref creature 'position) (ref creature 'destination))
 					)
-					(let ((change (assoc 'running? changes eq?))) (when change
-						(trigger! ec 'change-running (object-id creature) (third change))
+					(let ((change (assoc 'walking? changes eq?))) (when change
+						(trigger! ec 'change-walking (object-id creature) (cadr change))
 					))
 					(let ((change (assoc 'sitting? changes eq?))) (when change
-						(trigger! ec 'change-sitting (object-id creature) (third change))
+						(trigger! ec 'change-sitting (object-id creature) (cadr change))
 					))
-					(when (not (set-empty? (set-subtract changed (seteq 'target-id 'position 'destination 'angle 'running? 'sitting?))))
+					(when (not (set-empty? (set-subtract changed (seteq 'target-id 'position 'destination 'angle 'walking? 'sitting?))))
 						(trigger! ec 'creature-update (object-id creature) changes)
 					)
 				)
@@ -160,7 +161,7 @@
 									)
 
 									(let ((position (ref me 'position)) (angle (ref me 'angle))) ; Request updates.
-										(send-packet cn (game-client-packet/validate-position position angle))
+										(send-packet cn (game-client-packet/validate-location position angle))
 										(send-packet cn (game-client-packet/appearing))
 									)
 								))
@@ -238,6 +239,9 @@
 			)
 		)
 	)
+	(define (packet-handler/validate-location ec wr packet)
+		(handle-creature-update! ec wr packet)
+	)
 	(define (packet-handler/stop-moving ec wr packet)
 		(handle-creature-update! ec wr (list
 			(cons 'object-id (ref packet 'object-id))
@@ -247,7 +251,13 @@
 		))
 	)
 	(define (packet-handler/change-move-type ec wr packet)
-		(handle-creature-update! ec wr packet)
+		(let ((creature (object-ref wr (ref packet 'object-id)))) (when creature
+			(handle-creature-update! ec wr (list
+				(cons 'object-id (object-id creature))
+				(cons 'position (get-position creature))
+				(cons 'walking? (ref packet 'walking?))
+			))
+		))
 	)
 	(define (packet-handler/change-wait-type ec wr packet)
 		(handle-creature-update! ec wr (list
@@ -585,12 +595,12 @@
 		(cons #x52 (cons game-server-packet/party-member-update packet-handler/party-member-update)) ; creature-update
 		(cons #x58 (cons game-server-packet/skill-list packet-handler/skill-list))
 		(cons #x60 (cons game-server-packet/move-to-pawn packet-handler/move-to-pawn)) ; change-moving
-		; #x61 ValidateLocation ; TODO
+		(cons #x61 (cons game-server-packet/validate-location packet-handler/validate-location))
 		(cons #x64 (cons game-server-packet/system-message packet-handler/system-message))
 		; #x65 StartPledgeWar
 		; #x6d SetupGauge
 		; #x6f ChooseInventoryItem
-		(cons #x76 (cons game-server-packet/skill-launched packet-handler/skill-launched)) ; skill-launched
+		(cons #x76 (cons game-server-packet/skill-launched packet-handler/skill-launched)) ; skill-launched ; TODO 8e?
 		; #x76 SetToLocation
 		(cons #x7d (cons game-server-packet/ask-be-friends packet-handler/ask-be-friends)) ; ask
 		(cons #x7e (cons void packet-handler/logout)) ; logout

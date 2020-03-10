@@ -9,7 +9,7 @@
 	(provide (contract-out
 		(character? (-> any/c boolean?))
 		(make-character (-> list? list?))
-		(update-character (-> list? list? (values list? list?)))
+		(update-character (-> list? list? (values list? list? list?)))
 		(update-character! (-> box? list? list?))
 	))
 
@@ -62,15 +62,13 @@
 	)
 
 	(define (update-character object data)
-		(let-values (((creature cp) (update-creature object data)))
-			(let-values (((updated cc) (struct-update creature data character)))
-				(values updated (append cp cc))
-			)
+		(let-values (((rest updated changes) (update-creature object data)))
+			(struct-update data character rest updated changes)
 		)
 	)
 	(define (update-character! object data)
-		(let-values (((updated changes) (update-character (unbox object) data)))
-			(set-box! object updated)
+		(let-values (((rest updated changes) (update-character (unbox object) data)))
+			(set-box! object (append rest updated))
 			changes
 		)
 	)

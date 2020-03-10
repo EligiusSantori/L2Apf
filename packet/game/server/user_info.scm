@@ -1,3 +1,4 @@
+; l2j/gameserver/serverpackets/UserInfo.java
 (module system racket/base
 	(require
 		"../../packet.scm"
@@ -7,7 +8,7 @@
 		"../private_store.scm"
 	)
 	(provide game-server-packet/user-info)
-		
+
 	(define (game-server-packet/user-info buffer)
 		(let ((s (open-input-bytes buffer)))
 			(list
@@ -60,7 +61,7 @@
 				(cons 'walk-speed (read-int32 #f s))
 				(cons 'swim-run-speed (read-int32 #f s))
 				(cons 'swim-walk-speed (read-int32 #f s))
-				(cons 'fly-run-speed (begin 
+				(cons 'fly-run-speed (begin
 					(read-int32 #f s) ; FlRunSpd
 					(read-int32 #f s) ; FlWalkSpd
 					(read-int32 #f s)
