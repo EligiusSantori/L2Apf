@@ -20,7 +20,7 @@
 			(when (and (eq? (car event) 'ask/join-party) (not (in-party? (world-party (connection-world cn)))))
 				(let ((from (ref (cdr event) 'player)))
 					(reply cn (car event)
-						(or (null? names) (member from names string=?))
+						(or (not names) (member from names string-ci=?))
 					)
 				)
 			)

@@ -2,13 +2,14 @@
 	(require
 		srfi/1
 		(rename-in racket/contract (any all/c))
+		"../library/date_time.scm"
 		"../system/structure.scm"
 	)
 	(provide (contract-out
 		(skill? (-> any/c boolean?))
 		(skill-id (-> skill? integer?))
 		(skill-ready? (-> skill? boolean?))
-		(make-skill (->* (integer? integer?) (boolean? integer? integer?) skill?))
+		(make-skill (->* (integer? integer?) (boolean? rational? rational?) skill?))
 	))
 
 	(define (skill? skill)
@@ -21,7 +22,7 @@
 
 	(define (skill-ready? skill)
 		(let ((last-usage (ref skill 'last-usage)) (reuse-delay (ref skill 'reuse-delay)))
-			(and (ref skill 'active?) (> (current-milliseconds) (+ last-usage reuse-delay)))
+			(and (ref skill 'active?) (> (timestamp) (+ last-usage reuse-delay)))
 		)
 	)
 

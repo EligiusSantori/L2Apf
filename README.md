@@ -12,9 +12,9 @@ Program can be finite or not. Can be foreground or background. Only one foregrou
 
 ## Requirements
 * Racket language (version 6 or newer).
-	* Packages: srfi-lite-lib, r6rs-lib.
-* L2J Chronicle 4 server (660 protocol version).
-	* Link: TODO
+	* Packages: srfi-lite-lib, r6rs-lib, yaml.
+* L2J Chronicle 4 [server](https://bitbucket.org/l2jserver/l2j-server-game/src/C4) & [datapack](https://bitbucket.org/l2jserver/l2j-server-datapack/src/C4).
+* Lineage 2 Chronicle 4 installer & [protocol 656 update](https://drive.google.com/open?id=10uYHb6Hg07me7Y88xHDRUs4zI-c-njnE).
 
 ## Examples
 Run script for solo player:  
@@ -71,7 +71,7 @@ Run entire realm of players:
 password: "123456"
 party:
   a: [first, second, third]
-  b: [fourth, fifth ,sixth, seventh, eighth]
+  b: [fourth, fifth, sixth, seventh, eighth]
 
 ```
 

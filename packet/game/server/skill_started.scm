@@ -1,3 +1,4 @@
+; l2j/gameserver/serverpackets/MagicSkillUse.java
 (module system racket/base
 	(require "../../packet.scm")
 	(provide game-server-packet/skill-started)
@@ -11,7 +12,7 @@
 				(cons 'skill-id (read-int32 #f s))
 				(cons 'level (read-int32 #f s))
 				(cons 'cast-origin (read-int32 #f s)) ; TODO clarify
-				(cons 'reuse-delay (read-int32 #f s))
+				(cons 'reuse-delay (/ (read-int32 #f s) 1000))
 				(cons 'position
 					(let ((position (read-point s)))
 						(read-int16 #f s)

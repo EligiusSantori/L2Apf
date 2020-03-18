@@ -1,12 +1,12 @@
 (module system racket/base
 	(require
 		(only-in srfi/1 fold car+cdr)
-		(only-in racket/dict dict-ref)
+		(only-in racket/dict dict? dict-ref)
 		(rename-in racket/contract (any all/c))
 		"../library/extension.scm"
 	)
 	(provide (contract-out
-		(ref (->* ((or/c list? box?)) #:rest list? any/c))
+		(ref (->* ((or/c box? list? dict?)) #:rest list? any/c))
 		(struct-update (->* (list? list? list?) (list? list?) (values list? list? list?)))
 	))
 
@@ -32,6 +32,7 @@
 
 	(define (field-update struct field new allow?)
 		(let-values (((old rest) (struct-extract struct field))) ; O(n)
+			; (printf "{~a: ~a => ~a}~n" field old new)
 			(if (and allow? (or (eq? #t allow?) (and (not old) new) (and (not new) old) (and old new (allow? old new))))
 				(cons rest (cons new old))
 				#f ; Change forbidden or value hasn't changed.

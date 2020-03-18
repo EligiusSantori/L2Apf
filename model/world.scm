@@ -9,6 +9,7 @@
 			"library/geometry.scm"
 			"system/structure.scm"
 		)
+		"map.scm"
 		"object.scm"
 		"creature.scm"
 		"npc.scm"
@@ -21,10 +22,12 @@
 	(provide
 		(struct-out world)
 		(contract-out
-			(make-world ((listof pair?) . -> . world?))
-			(register-object! (world? (and/c box? object?) . -> . void?))
-			(discard-object! (world? integer? . -> . void?))
+			(make-world (-> (listof pair?) world?))
+			(register-object! (-> world? (and/c box? object?) void?))
+			(discard-object! (-> world? integer? void?))
 			(objects (->* (world?) (procedure?) list?))
+			(nearest (-> world? point/3d? integer? list?))
+			(towards (-> world? point/3d? integer? list?))
 			(object-ref (world? (or/c integer? false/c) . -> . (or/c object? false/c)))
 			(skill-ref (world? (or/c integer? false/c) . -> . (or/c skill? false/c)))
 			(find-character-by-name (world? string? . -> . (or/c character? false/c))) ; FIXME rename
@@ -64,7 +67,7 @@
 			(ref server 'port)
 			(make-hash)
 			#f
-			(mutable-set)
+			(make-hash)
 			(make-vector (* 12 10))
 			(make-hash)
 			(make-hash)
@@ -97,15 +100,27 @@
 		))
 		l
 	)
+	(define (nearest wr position radius)
+		(objects wr (lambda (object)
+			(let ((p (cond ((creature? object) (get-position object)) ((item? object) (ref object 'position)) (else #f))))
+				(and p (<= (points-distance p position) radius))
+			)
+		))
+	)
+	(define (towards wr destination radius)
+		(objects wr (lambda (object)
+			(let ((d (if (creature? object) (ref object 'destination) #f)))
+				(and d (<= (points-distance d destination) radius))
+			)
+		))
+	)
 
 	(define (object-ref wr object-id)
 		(hash-ref (world-objects wr) object-id #f)
 	)
-
 	(define (skill-ref wr skill-id)
 		(hash-ref (world-skills world) skill-id #f)
 	)
-
 	;(define (inventory-ref world object-id)
 
 	;)

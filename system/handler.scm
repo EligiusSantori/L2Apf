@@ -5,48 +5,53 @@
 		racket/set
 		racket/async-channel
 		(rename-in racket/contract (any all/c))
+		"../library/date_time.scm"
 		"debug.scm"
 		"structure.scm"
 		"connection.scm"
 		"event.scm"
 		(only-in "../packet/packet.scm" get-packet-id)
 		(relative-in "../packet/game/server/."
-			"chat_message.scm"
-			"system_message.scm"
-			"social_action.scm"
-			"attack.scm"
-			"die.scm"
-			"revive.scm"
-			"object_deleted.scm"
 			"user_info.scm"
 			"char_info.scm"
 			"npc_info.scm"
 			"status_update.scm"
+			"object_deleted.scm"
+			"validate_location.scm"
 			"move_to_point.scm"
 			"move_to_pawn.scm"
 			"stop_moving.scm"
-			"validate_location.scm"
+			"change_move_type.scm"
+			"change_wait_type.scm"
 			"target_selected.scm"
 			"target_unselected.scm"
+			"social_action.scm"
+			"attack.scm"
+			"skill_list.scm"
+			"skill_started.scm"
+			"skill_launched.scm"
+			"skill_canceled.scm"
+			"die.scm"
+			"revive.scm"
+			"teleport.scm"
+			"inventory_info.scm"
+			"inventory_update.scm"
+			"spawn_item.scm"
+			"drop_item.scm"
+			"pick_item.scm"
+			"chat_message.scm"
+			"system_message.scm"
 			"ask_join_alliance.scm"
 			"ask_join_clan.scm"
 			"ask_join_party.scm"
 			"ask_be_friends.scm"
 			"reply_join_party.scm"
-			"change_move_type.scm"
-			"change_wait_type.scm"
-			"skill_list.scm"
-			"skill_started.scm"
-			"skill_launched.scm"
-			"skill_canceled.scm"
 			"party_all_members.scm"
 			"party_add_member.scm"
 			"party_member_update.scm"
 			"party_member_position.scm"
 			"party_delete_member.scm"
 			"party_clear_members.scm"
-			"teleport.scm"
-			"spawn_item.scm"
 		)
 		(relative-in "../packet/game/client/."
 			"validate_location.scm"
@@ -205,11 +210,38 @@
 			)
 		)
 	)
+	(define (packet-handler/inventory-info ec wr packet)
+		(let ((inv (world-inventory wr)))
+			(hash-clear! inv)
+			(map (lambda (item)
+				(hash-set! inv (ref item 'object-id) (make-item item))
+			) (ref packet 'items))
+		)
+	)
+	(define (packet-handler/inventory-update ec wr packet)
+		(let ((inv (world-inventory wr)))
+			(map (lambda (item)
+				(if (not (eq? (ref item 'change) 'remove))
+					(hash-set! inv (ref item 'object-id) (make-item item)) ; add/modify
+					(hash-remove! inv (ref item 'object-id)) ; remove
+				)
+			) (ref packet 'items))
+		)
+	)
 	(define (packet-handler/spawn-item ec wr packet)
 		(let ((item (make-item packet)))
 			(register-object! wr item)
-			(trigger! ec 'item-create (object-id item))
+			(trigger! ec 'item-spawn (object-id item) #f)
 		)
+	)
+	(define (packet-handler/drop-item ec wr packet)
+		(let ((item (make-item packet)))
+			(register-object! wr item)
+			(trigger! ec 'item-spawn (object-id item) (ref packet 'subject-id))
+		)
+	)
+	(define (packet-handler/pick-item ec wr packet) ; Происходит перед object-delete.
+		(trigger! ec 'item-pick (ref packet 'object-id) (ref packet 'subject-id) (ref packet 'position))
 	)
 	(define (packet-handler/object-deleted ec wr packet)
 		(let* ((object-id (ref packet 'object-id)) (object (object-ref wr object-id)))
@@ -325,13 +357,11 @@
 					(list skill-id (make-skill skill-id level active?))
 				)
 			) (ref packet 'list))))
-
-			(trigger! ec 'skill-list (object-id (world-me wr)))
 		)
 	)
 	(define (packet-handler/skill-started cn ec wr packet)
 		(define (make-active-skill packet)
-			(make-skill (ref packet 'skill-id) (ref packet 'level) #t (current-milliseconds) (ref packet 'reuse-delay))
+			(make-skill (ref packet 'skill-id) (ref packet 'level) #t (timestamp) (ref packet 'reuse-delay))
 		)
 
 		(let* ((skill (make-active-skill packet)) (creature (handle-creature-update! ec wr (list
@@ -362,12 +392,11 @@
 		(let ((creature (object-ref wr (ref packet 'object-id)))) (when creature
 			(let ((skill (or (ref creature 'casting) (make-skill (ref packet 'skill-id) (ref packet 'level) #t))))
 				(handle-creature-update! ec wr (list
-					(cons 'target-id (ref packet 'target-id))
 					(cons 'casting #f)
-					(cons 'located-at (current-milliseconds))
+					(cons 'located-at (timestamp))
 				) creature)
 
-				(trigger! ec 'skill-launched (object-id creature) skill)
+				(trigger! ec 'skill-launched (object-id creature) skill (remove zero? (ref packet 'targets)))
 			)
 		))
 	)
@@ -376,7 +405,7 @@
 			(let ((skill (ref creature 'casting)))
 				(update-creature! creature (list
 					(cons 'casting #f)
-					(cons 'located-at (current-milliseconds))
+					(cons 'located-at (timestamp))
 				))
 				(trigger! ec 'skill-canceled (object-id creature) skill)
 			)
@@ -551,40 +580,41 @@
 
 	(define handlers-table (make-hash (list
 		(cons #x01 (cons game-server-packet/move-to-point packet-handler/move-to-point)) ; change-moving
-		(cons #x03 (cons game-server-packet/char-info packet-handler/char-info))
-		(cons #x04 (cons game-server-packet/user-info packet-handler/user-info))
+		(cons #x03 (cons game-server-packet/char-info packet-handler/char-info)) ; creature-create
+		(cons #x04 (cons game-server-packet/user-info packet-handler/user-info)) ; creature-create
 		(cons #x05 (cons game-server-packet/attack packet-handler/attack)) ; attack
 		(cons #x06 (cons game-server-packet/die packet-handler/die)) ; die
 		(cons #x07 (cons game-server-packet/revive packet-handler/revive)) ; revive
 		; #x0a AttackCanceld
-		(cons #x0b (cons game-server-packet/spawn-item packet-handler/spawn-item)) ; item-create
-		; (cons #x0c (cons game-server-packet/drop-item packet-handler/drop-item)) ; DropItem
-		; (cons #x0d (cons game-server-packet/get-item packet-handler/get-item))
-		(cons #x0e (cons game-server-packet/status-update packet-handler/status-update))
+		(cons #x0b (cons game-server-packet/spawn-item packet-handler/spawn-item)) ; item-spawn
+		(cons #x0c (cons game-server-packet/drop-item packet-handler/drop-item)) ; item-spawn
+		(cons #x0d (cons game-server-packet/pick-item packet-handler/pick-item)) ; item-pick
+		(cons #x0e (cons game-server-packet/status-update packet-handler/status-update)) ; creature-update
 		; #x10 SellList
-		(cons #x12 (cons game-server-packet/object-deleted packet-handler/object-deleted))
+		(cons #x12 (cons game-server-packet/object-deleted packet-handler/object-deleted)) ; object-delete
 		; #x13 CharSelectInfo
 		; #x15 CharSelected
 		; #x17 CharTemplates
-		(cons #x16 (cons game-server-packet/npc-info packet-handler/npc-info))
-		; (cons #x1b (cons game-server-packet/item-list packet-handler/item-list))
+		(cons #x16 (cons game-server-packet/npc-info packet-handler/npc-info)) ; creature-create
+		(cons #x1b (cons game-server-packet/inventory-info packet-handler/inventory-info))
 		; #x25 ActionFailed
+		(cons #x27 (cons game-server-packet/inventory-update packet-handler/inventory-update))
 		(cons #x28 (cons game-server-packet/teleport packet-handler/teleport)) ; teleport
 		(cons #x29 (cons game-server-packet/target-selected packet-handler/target-selected)) ; change-target
 		(cons #x2a (cons game-server-packet/target-unselected packet-handler/target-unselected)) ; change-target
 		; #x2b ? AutoAttackStart
 		; #x2c ? AutoAttackStop
-		(cons #x2d (cons game-server-packet/social-action packet-handler/social-action))
-		(cons #x2e (cons game-server-packet/change-move-type packet-handler/change-move-type)) ; creature-update
-		(cons #x2f (cons game-server-packet/change-wait-type packet-handler/change-wait-type)) ; creature-update
+		(cons #x2d (cons game-server-packet/social-action packet-handler/social-action)) ; gesture
+		(cons #x2e (cons game-server-packet/change-move-type packet-handler/change-move-type)) ; change-walking
+		(cons #x2f (cons game-server-packet/change-wait-type packet-handler/change-wait-type)) ; change-sitting
 		(cons #x32 (cons game-server-packet/ask-join-clan packet-handler/ask-join-clan)) ; ask
 		(cons #x39 (cons game-server-packet/ask-join-party packet-handler/ask-join-party)) ; ask
 		; (cons #x3a (cons game-server-packet/reply-join-party packet-handler/reply-join-party)) ; reject
-		; (cons #x45 (cons game-server-packet/shortcut-init packet-handler/shortcut-init)) ; shortcut-list
+		; (cons #x45 (cons game-server-packet/shortcut-init packet-handler/shortcut-init))
 		(cons #x47 (cons game-server-packet/stop-moving packet-handler/stop-moving)) ; change-moving
 		; #x48 packet-handler/skill-started (especial handling).
 		(cons #x49 (cons game-server-packet/skill-canceled packet-handler/skill-canceled)) ; skill-canceled
-		(cons #x4a (cons game-server-packet/chat-message packet-handler/chat-message))
+		(cons #x4a (cons game-server-packet/chat-message packet-handler/chat-message)) ; message
 		; #x4b EquipUpdate
 		; #x4c DoorInfo
 		; #x4d DoorStatusUpdate
@@ -596,7 +626,7 @@
 		(cons #x58 (cons game-server-packet/skill-list packet-handler/skill-list))
 		(cons #x60 (cons game-server-packet/move-to-pawn packet-handler/move-to-pawn)) ; change-moving
 		(cons #x61 (cons game-server-packet/validate-location packet-handler/validate-location))
-		(cons #x64 (cons game-server-packet/system-message packet-handler/system-message))
+		(cons #x64 (cons game-server-packet/system-message packet-handler/system-message)) ; system-message
 		; #x65 StartPledgeWar
 		; #x6d SetupGauge
 		; #x6f ChooseInventoryItem

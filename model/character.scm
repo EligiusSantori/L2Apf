@@ -3,6 +3,7 @@
 		srfi/1
 		(only-in racket/function negate)
 		(rename-in racket/contract (any all/c))
+		"../library/geometry.scm"
 		"../system/structure.scm"
 		"creature.scm"
 	)
@@ -41,8 +42,8 @@
 		(cons 'ally-id (negate =))
 		(cons 'ally-crest-id (negate =))
 
-		(cons 'cubics (negate =))
-		(cons 'fish (negate =))
+		(cons 'cubics (negate equal?)) ; TODO use set
+		(cons 'fish (negate point/3d=))
 	))
 
 	(define (character? object)

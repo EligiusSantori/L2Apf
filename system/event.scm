@@ -3,6 +3,7 @@
 		racket/contract
 		racket/function
 		racket/async-channel
+		"../library/date_time.scm"
 		"connection.scm"
 	)
 	(provide (contract-out
@@ -38,24 +39,24 @@
 
 	(define (alarm! #:id [id (gensym)] cn time . data)
 		(thread-send (connection-timer-thread cn)
-			(cons id (wrap-evt (alarm-evt time) (const (apply make-event id data))))
+			(cons id (wrap-evt (alarm-evt (* time 1000)) (const (apply make-event id data))))
 		#f)
 		id
 	)
 	(define (timeout! #:id [id (gensym)] cn timeout . data)
-		(apply alarm! #:id id cn (+ timeout (current-inexact-milliseconds)) data)
+		(apply alarm! #:id id cn (+ timeout (timestamp)) data)
 	)
 	(define (interval! #:id [id (gensym)] cn interval . data)
 		(define (setup start interval counter cn id data)
 			(thread-send (connection-timer-thread cn) (cons id (wrap-evt
-				(alarm-evt (+ start (* counter interval)))
+				(alarm-evt (* (+ start (* counter interval)) 1000))
 				(lambda args
 					(setup start interval (+ 1 counter) cn id data)
 					(apply make-event id data)
 				)
 			)) #f)
 		)
-		(setup (current-inexact-milliseconds) interval 1 cn id data)
+		(setup (timestamp) interval 1 cn id data)
 		id
 	)
 	(define (timer-stop! cn timer)

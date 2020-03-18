@@ -3,6 +3,7 @@
 		srfi/1
 		(only-in racket/function negate)
 		(rename-in racket/contract (any all/c))
+		"../library/geometry.scm"
 		"../system/structure.scm"
 		"object.scm"
 	)
@@ -17,9 +18,14 @@
 
 	(define item (list
 		(cons 'item-id (negate =))
-		(cons 'position (negate equal?))
-		(cons 'stackable? (negate eq?))
+		(cons 'position (negate point/3d=))
+		(cons 'equipped? (negate eq?))
 		(cons 'count (negate =))
+		(cons 'enchant (negate =))
+
+		; (cons 'stackable? (negate eq?))
+		; TODO slot (symbol)
+		; TODO weapon? shield? armor? jewelry? thing? quest?
 	))
 
 	(define (item? object)

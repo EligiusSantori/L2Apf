@@ -4,6 +4,7 @@
 		(only-in racket/function negate)
 		(rename-in racket/contract (any all/c))
 		"../library/extension.scm"
+		"../library/date_time.scm"
 		"../library/geometry.scm"
 		"../system/structure.scm"
 		"map.scm"
@@ -81,7 +82,7 @@
 		(member (car pair) (list 'position 'destination 'angle))
 	)
 	(define (parse-location data)
-		(let ((pf (assoc 'position data eq?)) (df (assoc 'destination data eq?)) (af (assoc 'angle data eq?)) (at (cons 'located-at (current-milliseconds))))
+		(let ((pf (assoc 'position data eq?)) (df (assoc 'destination data eq?)) (af (assoc 'angle data eq?)) (at (cons 'located-at (timestamp))))
 			(cond
 				((and pf df) (let ((df (cons 'destination (and (cdr df) (not (point/3d= (cdr pf) (cdr df))) (cdr df))))) ; Reset destination if equal to position.
 						(if (or af (cdr df)) ; If angle specified or can be calculated.
@@ -132,7 +133,7 @@
 	(define (get-position creature)
 		(let ((speed (get-speed creature)) (at (ref creature 'located-at)) (p (ref creature 'position)) (d (ref creature 'destination)))
 			(if (and (> speed 0) p at) ; If moving? and located-at is set.
-				(let ((cd (* (/ (- (current-milliseconds) at) 1000) speed)))
+				(let ((cd (* (- (timestamp) at) speed)))
 					(if (< cd (distance/3d p d)) (segment-offset/3d p d cd) d) ; Total or calculated distance.
 				)
 				p

@@ -1,3 +1,4 @@
+; l2j/gameserver/network/clientpackets/Action.java
 (module logic racket/base
 	(require
 		"../packet/game/client/action.scm"
@@ -8,15 +9,10 @@
 	)
 	(provide action)
 
-	(define (action cn . tail)
-		(define shift? (if (null? tail) #f (car tail)))
-
-		(let* ((wr (connection-world cn))
-					(object-id (ref (world-me wr) 'target-id))
-						(object (object-ref world object-id))
-							(origin (ref object 'position))) ; TODO what is origin really means?
-			(when (and (creature? object) origin)
-				(send-packet cn (game-client-packet/action object-id origin shift?))
+	(define (action cn [shift? #f])
+		(let* ((target (get-target wr (world-me (connection-world cn)))) (origin (get-position target)))
+			(when (and (creature? target) origin) ; TODO what is origin really means?
+				(send-packet cn (game-client-packet/action (object-id target) origin shift?))
 			)
 		)
 	)
