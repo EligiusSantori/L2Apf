@@ -1,8 +1,9 @@
+; l2j/gameserver/clientpackets/RequestMagicSkillUse.java
 (module system racket/base
 	(require "../../packet.scm")
-	(provide game-client-packet/request-skill-use)
-	
-	(define (game-client-packet/request-skill-use skill-id control? shift?)
+	(provide game-client-packet/use-skill)
+
+	(define (game-client-packet/use-skill skill-id control? shift?)
 		(let ((s (open-output-bytes)))
 			(begin
 				(write-byte #x2f s)

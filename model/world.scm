@@ -28,8 +28,10 @@
 			(objects (->* (world?) (procedure?) list?))
 			(nearest (-> world? point/3d? integer? list?))
 			(towards (-> world? point/3d? integer? list?))
-			(object-ref (world? (or/c integer? false/c) . -> . (or/c object? false/c)))
-			(skill-ref (world? (or/c integer? false/c) . -> . (or/c skill? false/c)))
+			(object-ref (-> world? (or/c integer? false/c) (or/c object? false/c)))
+			(skill-ref (-> world? (or/c integer? false/c) (or/c skill? false/c)))
+			(inv-ref (-> world? (or/c integer? false/c) (or/c item? false/c)))
+			(equipped (-> world? item? (or/c symbol? false/c)))
 			(find-character-by-name (world? string? . -> . (or/c character? false/c))) ; FIXME rename
 			(get-target (world? creature? . -> . (or/c creature? false/c))) ; FIXME move to creature?
 			(get-level (creature? . -> .  (or/c integer? false/c))) ; FIXME move to creature
@@ -121,9 +123,17 @@
 	(define (skill-ref wr skill-id)
 		(hash-ref (world-skills world) skill-id #f)
 	)
-	;(define (inventory-ref world object-id)
+	(define (inv-ref world object-id)
+		(hash-ref (world-inventory world) object-id #f)
+	)
 
-	;)
+	(define (equipped wr item)
+		(let ((object-id (ref item 'object-id)))
+			(fold (lambda (c p)
+				(if (eq? object-id (cdr c)) (car c) p)
+			) #f (ref (world-me wr) 'equipment))
+		)
+	)
 
 	(define (find-character-by-name wr name)
 		(define (test? k v)

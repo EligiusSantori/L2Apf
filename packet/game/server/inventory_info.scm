@@ -12,7 +12,7 @@
 			(cons 'type2 (read-int16 #f s))
 			(cons 'type3 (read-int16 #f s))
 			(cons 'equipped? (not (zero? (read-int16 #f s))))
-			(cons 'slot (read-int32 #f s))
+			(cons 'slot (read-int32 #f s)) ; net.sf.l2j.gameserver.datatables.ItemTable::_slots
 			(cons 'enchant (read-int16 #f s))
 			(cons 'type4 (read-int16 #f s))
 		)

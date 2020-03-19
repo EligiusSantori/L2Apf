@@ -221,9 +221,11 @@
 	(define (packet-handler/inventory-update ec wr packet)
 		(let ((inv (world-inventory wr)))
 			(map (lambda (item)
-				(if (not (eq? (ref item 'change) 'remove))
-					(hash-set! inv (ref item 'object-id) (make-item item)) ; add/modify
-					(hash-remove! inv (ref item 'object-id)) ; remove
+				(case (ref item 'change)
+					((add) (hash-set! inv (ref item 'object-id) (make-item item)))
+					((modify) (hash-set! inv (ref item 'object-id) (make-item item)))
+					((remove) (hash-remove! inv (ref item 'object-id)))
+					(else (void))
 				)
 			) (ref packet 'items))
 		)

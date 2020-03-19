@@ -19,13 +19,9 @@
 	(define item (list
 		(cons 'item-id (negate =))
 		(cons 'position (negate point/3d=))
-		(cons 'equipped? (negate eq?))
 		(cons 'count (negate =))
 		(cons 'enchant (negate =))
-
-		; (cons 'stackable? (negate eq?))
-		; TODO slot (symbol)
-		; TODO weapon? shield? armor? jewelry? thing? quest?
+		; TODO stackable? equipped? grade crystallizable? {weapon? shield? armor? accessory? thing? quest?}
 	))
 
 	(define (item? object)

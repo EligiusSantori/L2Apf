@@ -1,7 +1,6 @@
 ; l2j/gameserver/clientpackets/RequestSocialAction.java
 (module system racket/base
 	(require
-		srfi/1
 		"../../../library/extension.scm"
 		"../../packet.scm"
 		"../gesture.scm"

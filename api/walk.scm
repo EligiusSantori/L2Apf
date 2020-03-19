@@ -1,12 +1,11 @@
 (module logic racket/base
 	(require
-		racket/contract
 		"../packet/game/client/change_move_type.scm"
 		(only-in "../system/connection.scm" send-packet)
 	)
-	(provide run)
+	(provide walk)
 
-	(define (run connection is?)
-		(send-packet connection (game-client-packet/change-move-type is?))
+	(define (walk cn is?)
+		(send-packet cn (game-client-packet/change-move-type (not is?)))
 	)
 )
