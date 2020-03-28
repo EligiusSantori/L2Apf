@@ -23,7 +23,7 @@
 	)
 
 	(define (party-members party)
-		(if party (cdr party) #f)
+		(if party (cdr party) (list))
 	)
 
 	(define (party-leader party)

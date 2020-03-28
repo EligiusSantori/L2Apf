@@ -1,6 +1,7 @@
 (module ai racket/base
 	(require
 		srfi/1
+		racket/math
 		racket/undefined
 		"program.scm"
 		(relative-in "../."
@@ -22,7 +23,7 @@
 			(if leader
 				(move-to cn
 					(or (ref leader 'destination) (get-position leader))
-					(+ margin (or (ref leader 'collision-radius) 0))
+					(exact-round (+ margin (or (ref leader 'collision-radius) 0)))
 				)
 				(apf-warn "Don't see the leader ~v, program: follow-chase." leader-id)
 			)

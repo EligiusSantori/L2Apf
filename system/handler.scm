@@ -166,7 +166,7 @@
 										(objects wr (lambda (object)
 											(not (or ; TODO Don't remove nearest objects?
 												(protagonist? object)
-												(member (object-id object) (world-party wr) =)
+												(member (object-id object) (party-members (world-party wr)) =)
 											))
 										))
 									)
