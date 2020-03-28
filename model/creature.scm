@@ -19,7 +19,7 @@
 		(moving? (-> creature? boolean?))
 		(casting? (-> creature? boolean?))
 		(get-speed (-> creature? integer?))
-		(get-position (-> creature? point/3d?))
+		(get-position (-> creature? (or/c point/3d? false/c)))
 		(creatures-angle (-> creature? creature? (or/c rational? false/c)))
 		(creatures-distance (-> creature? creature? integer?))
 	))

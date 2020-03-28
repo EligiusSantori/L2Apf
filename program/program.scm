@@ -65,7 +65,7 @@
 		(let ((source (base-program-config base)))
 			(struct-copy base-program base
 				[config (if (and (not (null? config)))
-					(if (alist? config)
+					(if (alist? source)
 						(alist-merge source config) ; TODO deep recursive merge
 						(list-merge source config)
 					)

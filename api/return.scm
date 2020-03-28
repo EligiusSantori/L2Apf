@@ -1,4 +1,3 @@
-; l2j/gameserver/clientpackets/RequestRestartPoint.java
 (module logic racket/base
 	(require
 		racket/contract

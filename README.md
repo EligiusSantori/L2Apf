@@ -27,11 +27,11 @@ Run entire realm of players:
 ```scheme
 #lang racket
 (require
+	(except-in srfi/1 drop)
 	"library/extension.scm"
+	"system/structure.scm"
 	"system/connection.scm"
 	"system/event.scm"
-	"system/structure.scm"
-	"model/creature.scm"
 	(only-in "program/program.scm" program)
 	(only-in "program/brain.scm"
 		make-brain
@@ -41,15 +41,31 @@ Run entire realm of players:
 	)
 	"program/idle.scm"
 	"program/print.scm"
-	"program/radar.scm"
+	"program/partying.scm"
 	"program/command.scm"
 	"bootstrap.scm"
 )
 
+(define (get-party cfg for)
+	(let ((parties (ref cfg "party")))
+		(if parties
+			(fold (lambda (party found)
+				(if (member for (cdr party) string-ci=?)
+					(filter (lambda (name) (not (string-ci=? for name))) (cdr party))
+					found
+				)
+			) (list) (dict->list parties))
+			(list)
+		)
+	)
+)
+
 (apply bootstrap (lambda (cn wr me events)
+	(define config (or (parse-config) (list)))
 	(define br (make-brain cn program-idle))
 	(load! br
 		(program program-print)
+		(program program-partying (get-party config (ref me 'name)))
 		(program program-command br)
 	)
 

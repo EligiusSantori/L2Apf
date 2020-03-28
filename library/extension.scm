@@ -22,6 +22,7 @@
 		alist-flip
 		alist-ref
 		alist-only
+		alist-except
 		alist-merge
 		alist-equal?
 		string-starts?
@@ -113,6 +114,14 @@
 			(and
 				(pair? p) ; Also filter out invalid pairs
 				(member (car p) keys eqp)
+			)
+		) lst)
+	)
+	(define (alist-except lst keys [eqp equal?])
+		(filter (lambda (p)
+			(and
+				(pair? p) ; Also filter out invalid pairs
+				(not (member (car p) keys eqp))
 			)
 		) lst)
 	)

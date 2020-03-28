@@ -1,16 +1,24 @@
 (module logic racket/base
 	(require
 		srfi/1
+		(only-in racket/set set->list)
 		(only-in racket/function negate)
 		(rename-in racket/contract (any all/c))
 		"../library/extension.scm"
 		"../system/structure.scm"
+		"../system/cache.scm"
 		"character.scm"
 	)
 	(provide (contract-out
 		(protagonist? (-> any/c boolean?))
 		(make-protagonist (-> list? box?))
 		(update-protagonist! (-> box? list? list?))
+		(attackers (-> box? list?))
+		(attackers-add! (-> box? integer? void?))
+		(attackers-delete! (-> box? integer? void?))
+		(attackers-clear! (-> box? void?))
+		(attackers-has? (-> box? integer? boolean?))
+		(attackers-count (-> box? integer?))
 	))
 
 	(define protagonist (list
@@ -39,6 +47,7 @@
 
 		(cons 'statements (negate alist-equal?))
 		(cons 'equipment (negate alist-equal?))
+		(cons 'attackers #f)
 	))
 
 	(define (protagonist? object)
@@ -50,7 +59,10 @@
 			(let ((type (cons 'protagonist (ref character 'type))))
 				(box (fold
 					(lambda (p r) (if (and p (assoc (car p) protagonist eq?)) (cons p r) r)) ; If field belongs to protagonist.
-					(cons (cons 'type type) (alist-delete 'type character))
+					(append (alist-delete 'type character) (list
+						(cons 'type type)
+						(cons 'attackers (make-cache-set 120 =))
+					))
 					data
 				))
 			)
@@ -67,5 +79,24 @@
 			(set-box! object (append rest updated))
 			changes
 		)
+	)
+
+	(define (attackers protagonist)
+		(set->list (cache-set-all (ref protagonist 'attackers)))
+	)
+	(define (attackers-add! protagonist object-id)
+		(cache-set-add! (ref protagonist 'attackers) object-id)
+	)
+	(define (attackers-delete! protagonist object-id)
+		(cache-set-delete! (ref protagonist 'attackers) object-id)
+	)
+	(define (attackers-clear! protagonist)
+		(cache-set-clear! (ref protagonist 'attackers))
+	)
+	(define (attackers-has? protagonist object-id)
+		(cache-set-has? (ref protagonist 'attackers) object-id)
+	)
+	(define (attackers-count protagonist)
+		(cache-set-count (ref protagonist 'attackers))
 	)
 )
