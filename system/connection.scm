@@ -52,7 +52,7 @@
 
 	(define (read-thread port crypter channel)
 		(let ((evt (choice-evt (wrap-evt (thread-receive-evt) (const #f)) (read-bytes-evt 2 port))))
-			(do ((buffer (sync evt) (sync evt))) ((not buffer))
+			(do ((buffer (sync evt) (sync evt))) ((or (not buffer) (eof-object? buffer)))
 				(let ((size (integer-bytes->integer buffer #f)))
 					(if (> size 2)
 						(let ((buffer (read-bytes (- size 2) port)))

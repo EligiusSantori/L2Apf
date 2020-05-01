@@ -36,6 +36,7 @@
 			(get-target (world? creature? . -> . (or/c creature? false/c))) ; FIXME move to creature?
 			(get-level (creature? . -> .  (or/c integer? false/c))) ; FIXME move to creature
 			(get-angle (world? creature? . -> . rational?))
+			(get-destination (-> world? creature? point/3d?))
 			(attackable? (any/c . -> . boolean?)) ; FIXME move to creature
 			(aimed-to? (creature? creature? . -> . boolean?)) ; FIXME move to creature
 			(behind? (->* (creature? creature?) (rational?) boolean?)) ; FIXME move to map
@@ -208,7 +209,7 @@
 	(define (get-destination wr creature)
 		(let ((dot (ref creature 'destination)))
 			(if (integer? dot)
-				(ref (object-ref wr dot) 'position)
+				(ref (object-ref wr dot) 'position) ; TODO get-position & protect from inf-loop.
 				dot
 			)
 		)

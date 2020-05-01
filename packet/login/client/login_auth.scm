@@ -7,9 +7,10 @@
 		(let ((s (open-output-bytes)) (rsa-key (cdr (assoc 'rsa-key struct))))
 			(if rsa-key
 				(begin
-					(file-position s 98)
+					(write-bytes (make-bytes 128))
+					(file-position s (- 128 16 14))
 					(write-ascii (cdr (assoc 'login struct)) s)
-					(file-position s 112)
+					(file-position s (- 128 16))
 					(write-ascii (cdr (assoc 'password struct)) s)
 
 					(let ((buffer (get-output-bytes s #t)))
@@ -21,9 +22,12 @@
 							#x18 #x30 #xb5 #x7c
 							#x96 #x61 #x41 #x47
 							#x05 #x07 #x96 #xfb
-							#x08 #x00 #x00 #x00
+
+							#x08
 							#x00 #x00 #x00 #x00
-							#x00 #x00 #x00
+							#x00 #x00 #x00 #x00
+
+							#x00 #x00
 						) s)
 					)
 				)

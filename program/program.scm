@@ -1,20 +1,28 @@
 (module ai racket/base
 	(require
-		srfi/1
+		(only-in srfi/1 make-list)
+		racket/string
+		racket/contract
 		racket/undefined
 		(relative-in "../.."
 			"library/extension.scm"
+			"system/connection.scm"
+			"system/event.scm"
 		)
 	)
 	(provide
-		program
 		define-program
-		program?
-		program-id
-		program-equal?
-		program-load!
-		program-free!
-		program-run!
+		(struct-out exn:error:program)
+		(contract-out
+			(program (->* (program?) #:rest any/c program?))
+			(program? (-> any/c boolean?))
+			(program-id (-> program? symbol?))
+			(program-equal? (-> program? program? boolean?))
+			(program-load! (-> connection? program? boolean?))
+			(program-free! (-> connection? program? void?))
+			(program-run! (-> connection? program? event? boolean?))
+			(raise-program-error (->* (symbol? string?) #:rest any/c any))
+		)
 	)
 
 	(struct base-program (
@@ -85,12 +93,13 @@
 	(define (program-load! cn program)
 		(let ((state ((base-program-constructor program) cn (base-program-config program))))
 			(when (state? state) (set-base-program-state! program state))
-			(void)
+			(not (eof-object? state))
 		)
 	)
 
 	(define (program-free! cn program)
 		((base-program-destructor program) cn (base-program-config program) (base-program-state program))
+		(void)
 	)
 
 	(define (program-run! cn p event) ; Iterate program for an event.
@@ -101,9 +110,25 @@
 	)
 
 	(define (program-equal? p1 p2)
-		(and
-			(program? p1) (program? p2)
-			(eq? (program-id p1) (program-id p2))
+		(eq? (program-id p1) (program-id p2))
+	)
+
+	(struct exn:error:program exn:fail:user (id)
+		#:extra-constructor-name make-exn:error:program
+		#:transparent
+	)
+	(define (error-format message args)
+		; (let ((ph (error-value->string-handler)) (pw (error-print-width)))
+		; 	(string-join (cons message (map (lambda (arg) (ph arg pw)) args)) " ")
+		; )
+
+		(let ((o (open-output-string))) ; Better compatibility with raise-user-error.
+			(display message o)
+			(map (lambda (arg) (display " " o) (display arg o)) args)
+			(get-output-string o)
 		)
+	)
+	(define (raise-program-error program-id message . args)
+		(raise (make-exn:error:program (error-format message args) (current-continuation-marks) program-id))
 	)
 )

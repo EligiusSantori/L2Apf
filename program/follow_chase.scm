@@ -18,16 +18,22 @@
 	)
 	(provide program-follow-chase)
 
-	(define (follow cn leader-id margin)
+	(define (raise-dont-see-leader object-id)
+		(raise-program-error 'program-follow-chase "Don't see the leader." object-id)
+	)
+
+	(define (get-leader cn leader-id)
 		(let ((leader (object-ref (connection-world cn) leader-id)))
-			(if leader
-				(move-to cn
-					(or (ref leader 'destination) (get-position leader))
-					(exact-round (+ margin (or (ref leader 'collision-radius) 0)))
-				)
-				(apf-warn "Don't see the leader ~v, program: follow-chase." leader-id)
-			)
+			(or leader (raise-dont-see-leader leader-id))
 		)
+	)
+
+	(define (follow cn leader margin)
+		(move-to cn
+			(or (get-destination cn leader) (get-position leader))
+			(exact-round (+ margin (or (ref leader 'collision-radius) 0)))
+		)
+		(void)
 	)
 
 	(define-program program-follow-chase
@@ -37,19 +43,25 @@
 		)
 		(lambda (cn config)
 			(let-values (((leader-id margin) (list->values config)))
-				(target cn leader-id)
-				(follow cn leader-id margin)
+				(let ((leader (get-leader cn leader-id)))
+					(target cn leader-id)
+					(follow cn leader margin)
+				)
 			)
-			(void)
 		)
 		undefined
 		(lambda (cn event config state)
 			(let-values (((leader-id margin) (list->values config)))
-				(when (and (eq? (car event) 'change-moving) (= (second event) leader-id))
-					(follow cn leader-id margin)
+				(cond
+					((and (eq? (car event) 'change-moving) (= (second event) leader-id))
+						(follow cn (get-leader cn leader-id) margin)
+					)
+					((and (eq? (car event) 'object-delete) (= (second event) leader-id))
+						(raise-dont-see-leader leader-id)
+					)
+					(else (void))
 				)
 			)
-			(void)
 		)
 	)
 )

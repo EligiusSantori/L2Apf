@@ -4,6 +4,7 @@
 		"program.scm"
 		(relative-in "../."
 			"library/extension.scm"
+			"system/debug.scm"
 		)
 	)
 	(provide
@@ -55,33 +56,56 @@
 		)
 	)
 
-	(define (brain-load! brain . programs) ; Load background programs.
-		(define cn (brain-connection brain))
-		(set-brain-todo! brain
-			(append (brain-todo brain) (filter (lambda (p)
-				(and (not (exists? brain p)) ; Don't replace existsing (use free before).
-					(begin (program-load! cn p) p) ; Execute loading program constructor.
-				)
-			) programs))
-		)
+	(define (log-program-error e)
+		(apf-warn "Program \"~a\" error: " (exn:error:program-id e) (exn-message e))
 	)
 
-	(define (filter-foreground! brain keep?)
+	(define (brain-load! brain . programs) ; Load background programs.
 		(define cn (brain-connection brain))
-		(let ((main (brain-main brain))) (when (not (null? main))
-			(let ((s (filter keep? (cdr main))))
-				(set-brain-main! brain
-					(if (not (keep? (car main))) ; If active program should be unloaded.
-						(begin
-							(program-free! cn (car main)) ; Execute current program destructor.
-							(program-load! cn (try-first s (brain-default brain))) ; Execute unstacking program constructor.
-							s
+		(set-brain-todo! brain (append (brain-todo brain) (filter (lambda (p)
+			(with-handlers ((exn:error:program?
+				(lambda (e)
+					(log-program-error e)
+					#f ; Don't add if loaded with error.
+				)))
+				(and
+					(not (exists? brain p)) ; Don't replace existsing (use free before).
+					(program-load! cn p) ; Execute loading program constructor and add if should be.
+				)
+			)
+		) programs)))
+	)
+
+	(define (chain-load! cn default lst)
+		(let ((p (if (null? lst) default (car lst))))
+			(with-handlers ((exn:error:program?
+				(lambda (e)
+					(log-program-error e)
+					(chain-load! cn (cdr lst)) ; Try next program on error.
+				)))
+				(if (program-load! cn p) ; Execute loading or default program constructor.
+					lst ; Return new foreground stack.
+					(chain-load! cn (cdr lst)) ; Try next program if this can't be loaded.
+				)
+			)
+		)
+	)
+	(define (filter-foreground! brain keep?)
+		(let ((cn (brain-connection brain)) (main (brain-main brain)))
+			(when (not (null? main))
+				(let ((s (filter keep? (cdr main))))
+					(set-brain-main! brain
+						(if (not (keep? (car main))) ; If active program should be unloaded.
+							(begin
+								(program-free! cn (car main)) ; Execute current program destructor.
+								(chain-load! cn (brain-default brain) s) ; Execute unstacking program constructor.
+							)
+							(cons (car main) s) ; Else just prepend to filtered stack.
 						)
-						(cons (car main) s) ; Else just prepend to filtered stack.
 					)
 				)
 			)
-		))
+		)
 	)
 
 	(define (filter-background! brain keep?)
@@ -110,58 +134,64 @@
 		(define (keep? p) (not (program-equal? p program)))
 
 		(filter-background! brain keep?) ; Remove existing from background set.
-
 		(program-free! cn (brain-active brain)) ; Execute current program destructor.
-		(set-brain-main! brain (cons program
-			(let ((main (brain-main brain)))
-				(cond
-					((null? main) (list))
-					(stack? (filter keep? main)) ; Remove same programs from foreground stack.
-					(else (filter keep? (cdr main))) ; Remove also current program if not stack?.
-				)
-			)
+		(set-brain-main! brain (chain-load! cn (brain-default brain) ; Drop programs from foreground stack till first doable.
+			(cons program (let ((main (brain-main brain))) ; Remove same as loading programs from foreground stack.
+				(filter keep? (if (or stack? (null? main)) main (cdr main))) ; Drop also current program if not stack?.
+			))
 		))
-		(program-load! cn program) ; Execute loading program constructor.
 	)
 
-	(define (brain-run! brain event) ; Execute iterations of all active programs.
-		(define cn (brain-connection brain))
-		(define turns (list)) ; Background programs which changed foreground program.
-		(define (log-turns! program) ; TODO Выбрасывать исключение по ходу. Избавиться от turns.
-			(let ((a (brain-active brain)))
-				(let ((r (program-run! cn program event))) ; Execute background program iterator.
-					(when (not (eq? a (brain-active brain))) ; If foreground program was changed during program iteration.
-						(set! turns (cons program turns))
-					)
-					r
-				)
+	(define (raise-ambiguous-main . causers)
+		(apply raise-user-error "Foreground program is ambiguous, causers: " (map program-id causers))
+	)
+
+	(define (program-log-run! cn p ev)
+		(with-handlers ((exn:error:program?
+			(lambda (e)
+				(log-program-error e)
+				#f ; Consider program finished on error.
+			)))
+			(program-run! cn p ev)
+		)
+	)
+	(define (bg-filter-run! br fn)
+		(set-brain-todo! br (append ; Rewind iterator.
+			(reverse (brain-done br))
+			(brain-todo br)
+		)) (set-brain-done! br (list))
+
+		(do ((todo (brain-todo br) (brain-todo br))) ((null? todo)) ; Handle programs.
+			(set-brain-todo! br (cdr todo))
+			(when (fn (car todo)) ; Drop program from queue if not continue?.
+				(set-brain-done! br (cons (car todo) (brain-done br)))
 			)
 		)
+	)
+	(define (brain-run! br ev) ; Execute iterations of all active programs.
+		(define cn (brain-connection br))
+		(define active-changer #f)
 
 		; Execute background programs.
-		(set-brain-todo! brain (append ; Rewind iterator.
-			(reverse (brain-done brain))
-			(brain-todo brain)
-		)) (set-brain-done! brain (list))
-
-		(do ((todo (brain-todo brain) (brain-todo brain))) ((null? todo)) ; Run programs.
-			(let ((p (car todo)))
-				(set-brain-todo! brain (cdr todo))
-				(if (log-turns! p) ; If program has not finished.
-					(set-brain-done! brain (cons p (brain-done brain))) ; Keep in queue.
-					(program-free! cn p) ; Unload & drop program from queue.
+		(bg-filter-run! br (lambda (p)
+			(let* ((a (brain-active br)) (continue? (program-log-run! cn p ev)))
+				(when (not (eq? a (brain-active br))) ; If foreground program was changed during program iteration.
+					(if (not active-changer) ; Error if foreground program was changed at least twice.
+						(set! active-changer p)
+						(raise-ambiguous-main active-changer p)
+					)
 				)
+				(when (not continue?)
+					(program-free! cn p) ; Unload program.
+				)
+				continue?
 			)
-		)
+		))
 
 		; Execute foreground program.
-		(when (list-try-ref turns 2) ; If foreground program was changed twice or more.
-			(apply raise-user-error "Foreground program is ambiguous, causers:" (map program-id turns))
-		)
-
-		(let ((p (brain-active brain)))
-			(when (not (program-run! cn p event))
-				(brain-stop! brain p)
+		(let ((p (brain-active br)))
+			(when (not (program-log-run! cn p ev))
+				(brain-stop! br p)
 			)
 		)
 	)
