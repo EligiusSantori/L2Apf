@@ -5,30 +5,44 @@
 
 	(define (login-client-packet/login-auth struct)
 		(let ((s (open-output-bytes)) (rsa-key (cdr (assoc 'rsa-key struct))))
-			(begin
-				(file-position s 98)
-				(write-ascii (cdr (assoc 'login struct)) s)
-				(file-position s 112)
-				(write-ascii (cdr (assoc 'password struct)) s)
+			(if rsa-key
+				(begin
+					(file-position s 98)
+					(write-ascii (cdr (assoc 'login struct)) s)
+					(file-position s 112)
+					(write-ascii (cdr (assoc 'password struct)) s)
 
-				(let ((buffer (get-output-bytes s #t)))
+					(let ((buffer (get-output-bytes s #t)))
+						(write-byte #x00 s)
+						(write-bytes (rsa-encrypt buffer rsa-key) s)
+						(write-int32 (cdr (assoc 'session-id struct)) #f s)
+						(write-bytes (bytes
+							#x23 #x92 #x90 #x4d
+							#x18 #x30 #xb5 #x7c
+							#x96 #x61 #x41 #x47
+							#x05 #x07 #x96 #xfb
+							#x08 #x00 #x00 #x00
+							#x00 #x00 #x00 #x00
+							#x00 #x00 #x00
+						) s)
+					)
+				)
+				(begin
 					(write-byte #x00 s)
-					(write-bytes (rsa-encrypt buffer rsa-key) s)
-					(write-int32 (cdr (assoc 'session-id struct)) #f s)
+					(write-ascii (cdr (assoc 'login struct)) s)
+					(file-position s (+ 1 14))
+					(write-ascii (cdr (assoc 'password struct)) s)
+					(file-position s (+ 1 14 16))
 					(write-bytes (bytes
-						#x23 #x92 #x90 #x4d
-						#x18 #x30 #xb5 #x7c
-						#x96 #x61 #x41 #x47
-						#x05 #x07 #x96 #xfb
-						#x08 #x00 #x00 #x00
+						#x08
 						#x00 #x00 #x00 #x00
-						#x00 #x00 #x00
+						#x00 #x00 #x00 #x00
 					) s)
-					(write-bytes (checksum (get-output-bytes s)) s)
-					(write-bytes (make-bytes 4) s)
-					(get-output-bytes s)
 				)
 			)
+			(write-bytes (checksum (get-output-bytes s)) s)
+			(write-bytes (make-bytes 4) s)
+			(get-output-bytes s)
 		)
 	)
 )

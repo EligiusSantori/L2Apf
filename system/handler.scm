@@ -161,16 +161,6 @@
 						((teleport)
 							(let ((me (world-me wr))) (when (= (second evt) (object-id me))
 								(async-channel-put tc (lambda () ; Discard after event processing.
-									(map ; Remove all known objects except myself & party memebers.
-										(lambda (object) (discard-object! wr (object-id object)))
-										(objects wr (lambda (object)
-											(not (or ; TODO Don't remove nearest objects?
-												(protagonist? object)
-												(member (object-id object) (party-members (world-party wr)) =)
-											))
-										))
-									)
-
 									(let ((position (ref me 'position)) (angle (ref me 'angle))) ; Request updates.
 										(send-packet cn (game-client-packet/validate-location position angle))
 										(send-packet cn (game-client-packet/appearing))
@@ -587,6 +577,18 @@
 				(attackers-clear! creature)
 			)
 			(trigger! ec 'teleport (object-id creature) (ref creature 'position))
+
+			(let ((party (party-members (world-party wr))))
+				(map ; Remove all known objects except myself & party memebers.
+					(lambda (object) (trigger! ec 'object-delete (object-id object)))
+					(objects wr (lambda (object)
+						(not (or ; TODO Don't remove nearest objects?
+							(protagonist? object)
+							(member (object-id object) party =)
+						))
+					))
+				)
+			)
 		))
 	)
 

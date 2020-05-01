@@ -61,7 +61,7 @@
 					(lambda (p r) (if (and p (assoc (car p) protagonist eq?)) (cons p r) r)) ; If field belongs to protagonist.
 					(append (alist-delete 'type character) (list
 						(cons 'type type)
-						(cons 'attackers (make-cache-set 120 =))
+						(cons 'attackers (make-cache-set 60 =)) ; Default aggro timeout.
 					))
 					data
 				))

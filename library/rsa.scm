@@ -1,5 +1,10 @@
 (module library racket/base ; https://www.openssl.org/docs/crypto/rsa.html
 	(require (rename-in racket/contract (-> ->/c)) openssl/libcrypto ffi/unsafe)
+	(provide (contract-out
+		(rsa-encrypt (bytes? bytes? . ->/c . (or/c false/c bytes?)))
+		;(rsa-decrypt (bytes? bytes? . ->/c . (or/c false/c bytes?)))
+	))
+
 
 	(define RSA_PKCS1_PADDING 1)
 	(define RSA_SSLV23_PADDING 2)
@@ -108,9 +113,4 @@
 	;(define (rsa-decrypt data key)
 	;	RSA_private_decrypt
 	;)
-
-	(provide (contract-out
-		(rsa-encrypt (bytes? bytes? . ->/c . (or/c false/c bytes?)))
-		;(rsa-decrypt (bytes? bytes? . ->/c . (or/c false/c bytes?)))
-	))
 )

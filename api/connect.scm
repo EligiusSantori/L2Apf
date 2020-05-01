@@ -15,10 +15,10 @@
 		)
 	)
 	(provide (contract-out
-		(connect (->* (string?) (integer? string? integer?) connection?))
+		(connect (->* (string?) (integer? integer? bytes?) connection?))
 	))
 
-	(define (connect host [port 2106] [token #"_;5.]94-31==-%xT!^[$"] [protocol 660])
+	(define (connect host [port 2106] [protocol 660] [token #"_;5.]94-31==-%xT!^[$\0"])
 		(let ((cn (connection protocol)) (pc (make-async-channel)) (crypter (make-blowfish-crypter token)))
 			(let-values (((input-port output-port) (tcp-connect host port)))
 				(let loop ()
@@ -30,10 +30,15 @@
 								(set-connection-send-thread! cn (thread (bind send-thread output-port crypter)))
 								(set-connection-session-id! cn (ref packet 'session-id))
 								(set-connection-session-key! cn (ref packet 'rsa-key))
-								(send-packet cn (login-client-packet/gg-auth (list
-									(cons 'session-id (connection-session-id cn))
-								)))
-								(loop)
+								(if (>= protocol 660)
+									(begin
+										(send-packet cn (login-client-packet/gg-auth (list
+											(cons 'session-id (connection-session-id cn))
+										)))
+										(loop)
+									)
+									cn
+								)
 							))
 							((#x0b) (let ((packet (login-server-packet/gg-reply buffer)))
 								cn

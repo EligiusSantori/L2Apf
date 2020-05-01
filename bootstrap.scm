@@ -89,6 +89,8 @@
 			)
 			((connection? value)
 				(display "#<connection:" port)
+				(display (connection-protocol value) port)
+				(display ":" port)
 				(display (connection-account value) port)
 				(display ">" port)
 			)
@@ -120,7 +122,7 @@
 
 	(define (bootstrap entry host port account password name)
 		(global-port-print-handler print-handler)
-		(let ((connection (connect host port)))
+		(let ((connection (connect host port 656)))
 			(let ((world (first (login connection account password))))
 				(let ((me (findf (char-name=? name) (select-server connection world))))
 					(let ((events (select-character connection me)))

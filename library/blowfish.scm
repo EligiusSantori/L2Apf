@@ -22,7 +22,7 @@
 	)
 
 	(define (blowfish-create-key key)
-		(let ((bf-key (ptr-ref (malloc _BF_KEY) _BF_KEY)) (key (bytes-append key (bytes #x0))))
+		(let ((bf-key (ptr-ref (malloc _BF_KEY) _BF_KEY)))
 			(begin
 				(BF_set_key bf-key (bytes-length key) key)
 				bf-key

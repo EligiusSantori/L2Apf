@@ -32,7 +32,7 @@
 				(let ((buffer (read-packet cn)))
 					(case (get-packet-id buffer)
 						((#x01) (let ((packet (login-server-packet/login-fail buffer)))
-							(disconnect connection)
+							(disconnect cn)
 							(raise-user-error "Authentication failed, reason:" (ref packet 'reason))
 						))
 						((#x03) (let ((packet (login-server-packet/login-ok buffer)))
