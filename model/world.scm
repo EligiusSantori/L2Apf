@@ -36,7 +36,7 @@
 			(get-target (world? creature? . -> . (or/c creature? false/c))) ; FIXME move to creature?
 			(get-level (creature? . -> .  (or/c integer? false/c))) ; FIXME move to creature
 			(get-angle (world? creature? . -> . rational?))
-			(get-destination (-> world? creature? point/3d?))
+			(get-destination (-> world? creature? (or/c point/3d? false/c)))
 			(attackable? (any/c . -> . boolean?)) ; FIXME move to creature
 			(aimed-to? (creature? creature? . -> . boolean?)) ; FIXME move to creature
 			(behind? (->* (creature? creature?) (rational?) boolean?)) ; FIXME move to map
@@ -181,7 +181,7 @@
 	)
 
 	(define (get-target wr creature)
-		(object-ref world (ref creature 'target-id))
+		(object-ref wr (ref creature 'target-id))
 	)
 
 	(define (get-level creature)

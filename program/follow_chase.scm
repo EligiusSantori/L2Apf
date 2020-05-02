@@ -30,7 +30,7 @@
 
 	(define (follow cn leader margin)
 		(move-to cn
-			(or (get-destination cn leader) (get-position leader))
+			(or (get-destination (connection-world cn) leader) (get-position leader))
 			(exact-round (+ margin (or (ref leader 'collision-radius) 0)))
 		)
 		(void)

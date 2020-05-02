@@ -46,34 +46,26 @@ Run entire realm of players:
 	"bootstrap.scm"
 )
 
-(define (get-party cfg for)
-	(let ((parties (ref cfg "party")))
-		(if parties
-			(fold (lambda (party found)
-				(if (member for (cdr party) string-ci=?)
-					(filter (lambda (name) (not (string-ci=? for name))) (cdr party))
-					found
-				)
-			) (list) (dict->list parties))
-			(list)
-		)
-	)
-)
-
 (apply bootstrap (lambda (cn wr me events)
 	(define config (or (parse-config) (list)))
 	(define br (make-brain cn program-idle))
 	(load! br
 		(program program-print)
-		(program program-partying (get-party config (ref me 'name)))
+		(program program-partying #f)
 		(program program-command br)
 	)
 
 	(do ((event (sync events) (sync events))) ((eq? (car event) 'disconnect))
 		; Triggers space.
-		(case (car event)
+		(case-event event
 			; Standard events.
+			(gesture (object-id action)
+				(printf "Gesture ~a on ~a~n" action object-id)
+				(flush-output)
+			)
+
 			; Custom events.
+
 		)
 
 		; Programs space.
@@ -84,6 +76,7 @@ Run entire realm of players:
 
 ###### config.yaml
 ```yaml
+host: "localhost"
 password: "123456"
 party:
   a: [first, second, third]

@@ -1,5 +1,6 @@
 (module system racket/base
 	(require
+		(for-syntax racket/base)
 		racket/contract
 		racket/function
 		racket/async-channel
@@ -17,6 +18,7 @@
 		(interval! (->* (connection? integer?) (#:id symbol?) #:rest list? symbol?))
 		(timer-stop! (-> connection? symbol? symbol?))
 	))
+	(provide case-event)
 
 	(define (make-event name . data)
 		(cons name data)
@@ -62,5 +64,20 @@
 	(define (timer-stop! cn timer)
 		(thread-send (connection-timer-thread cn) timer)
 		timer
+	)
+
+	(define-syntax case-event
+		(syntax-rules (else)
+			((_ EV) (void))
+			((_ EV (else . BODY))
+				(begin . BODY)
+			)
+			((_ EV (ID ARGS . BODY) . REST)
+				(if (eq? (event-name EV) (quote ID))
+					(apply (lambda ARGS . BODY) (cdr EV))
+					(case-event EV . REST)
+				)
+			)
+		)
 	)
 )

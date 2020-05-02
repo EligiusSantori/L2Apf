@@ -57,7 +57,7 @@
 	)
 
 	(define (log-program-error e)
-		(apf-warn "Program \"~a\" error: " (exn:error:program-id e) (exn-message e))
+		(apf-warn "Program \"~a\" error: ~a" (exn:error:program-id e) (exn-message e))
 	)
 
 	(define (brain-load! brain . programs) ; Load background programs.
@@ -76,16 +76,16 @@
 		) programs)))
 	)
 
-	(define (chain-load! cn default lst)
-		(let ((p (if (null? lst) default (car lst))))
+	(define (chain-load! cn def lst)
+		(let ((p (if (null? lst) def (car lst))))
 			(with-handlers ((exn:error:program?
 				(lambda (e)
 					(log-program-error e)
-					(chain-load! cn (cdr lst)) ; Try next program on error.
+					(chain-load! cn def (cdr lst)) ; Try next program on error.
 				)))
 				(if (program-load! cn p) ; Execute loading or default program constructor.
 					lst ; Return new foreground stack.
-					(chain-load! cn (cdr lst)) ; Try next program if this can't be loaded.
+					(chain-load! cn def (cdr lst)) ; Try next program if this can't be loaded.
 				)
 			)
 		)

@@ -6,13 +6,16 @@
 		"program.scm"
 		"follow_chase.scm"
 		"follow_repeat.scm"
+		"slay.scm"
 		"brain.scm"
 		(relative-in "../."
 			"library/extension.scm"
 			"system/structure.scm"
 			"system/connection.scm"
 			"system/event.scm"
+			"model/object.scm"
 			"model/creature.scm"
+			"model/npc.scm"
 			"model/party.scm"
 			"model/world.scm"
 			"api/say.scm"
@@ -20,6 +23,8 @@
 			"api/move_to.scm"
 			"api/move_on.scm"
 			"api/move_behind.scm"
+			"api/target.scm"
+			"api/attack.scm"
 			"api/logout.scm"
 		)
 	)
@@ -66,28 +71,39 @@
 	)
 
 	(define (command cn event config state)
-		(when (eq? (car event) 'message)
-			(let-values (((author-id channel author text) (apply values (cdr event))) ((brain) (car config)))
+		(define brain (car config))
+		(case-event event
+			(message (author-id channel author text)
 				(let* ((wr (connection-world cn)) (command (parse-command wr text channel author-id)))
 					(when command (case (car command)
-						(("chase") (brain-do! brain (program program-follow-chase author-id)))
-						(("repeat") (brain-do! brain (program program-follow-repeat author-id)))
-						(("relax") (brain-clear! brain #t))
+						(("hello") (gesture cn 'gesture/hello))
+
 						(("return") (let ((author (object-ref wr author-id)))
 							; (when author (move-to cn (get-position author) (or (ref author 'collision-radius) 10)))
 							(when author (move-behind cn author 50))
 						))
-						(("go") (let* ((on (or (string->number (list-try-ref command 1 "0")) 0)) (es (/ on (ref (world-me wr) 'run-speed))))
-							(when (> on 0)
-								(move-on cn on)
+						; (("go") (let* ((on (or (string->number (list-try-ref command 1 "0")) 0)) (es (/ on (ref (world-me wr) 'run-speed))))
+						; 	(when (> on 0)
+						; 		(move-on cn on)
+						; 	)
+						; ))
+						(("chase") (brain-do! brain (program program-follow-chase author-id)))
+						(("repeat") (brain-do! brain (program program-follow-repeat author-id)))
+
+						(("assist") (let ((author (object-ref wr author-id)))
+							(if author
+								(brain-do! brain (program program-slay (ref author 'target-id)) #t)
+								(say cn "Don't see the requester.")
 							)
 						))
-						(("hello") (gesture cn 'gesture/hello))
+
+						(("relax") (brain-clear! brain #t))
 						(("bye")
 							(brain-clear! brain #t) ; Call foreground program destructor before exit.
 							(logout cn)
 						)
-						(else (say cn "I don't understand"))
+
+						(else (say cn "I don't understand."))
 					))
 				)
 			)

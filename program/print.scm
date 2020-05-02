@@ -4,6 +4,7 @@
 		racket/string
 		racket/undefined
 		"program.scm"
+		"../system/event.scm"
 	)
 	(provide program-print) ; Redirect game chat to console
 
@@ -15,8 +16,8 @@
 
 	(define-program program-print undefined undefined undefined
 		(lambda (cn event . args)
-			(when (eq? (car event) 'message)
-				(let-values (((author-id channel author text) (apply values (cdr event))))
+			(case-event event
+				(message (author-id channel author text)
 					(displayln (format-chat-message author-id channel author text))
 				)
 			)

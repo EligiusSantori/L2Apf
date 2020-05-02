@@ -15,10 +15,10 @@
 		)
 	)
 	(provide (contract-out
-		(connect (->* (string?) (integer? integer? bytes?) connection?))
+		(connect (->* () (string? integer? integer? bytes?) connection?))
 	))
 
-	(define (connect host [port 2106] [protocol 660] [token #"_;5.]94-31==-%xT!^[$\0"])
+	(define (connect [host "l2authd.lineage2.com"] [port 2106] [protocol 660] [token #"_;5.]94-31==-%xT!^[$\0"])
 		(let ((cn (connection protocol)) (pc (make-async-channel)) (crypter (make-blowfish-crypter token)))
 			(let-values (((input-port output-port) (tcp-connect host port)))
 				(let loop ()

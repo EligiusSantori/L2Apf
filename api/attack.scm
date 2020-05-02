@@ -1,6 +1,7 @@
 (module logic racket/base
 	(require
 		"../packet/game/client/attack_request.scm"
+		"../model/object.scm"
 		"../model/creature.scm"
 		"../model/world.scm"
 		"../system/structure.scm"
@@ -8,13 +9,10 @@
 	)
 	(provide attack)
 
-	(define (attack cn [shift? #f])
-		(let* ((wr (connection-world cn))
-					(object-id (ref (world-me wr) 'target-id))
-						(object (object-ref world object-id))
-							(origin (ref object 'position))) ; TODO what is origin really means?
-			(when (and (creature? object) origin)
-				(send-packet cn (game-client-packet/attack-request object-id origin shift?))
+	(define (attack cn [shift? #f]) ; TODO what is origin really means?
+		(let* ((wr (connection-world cn)) (trg (get-target wr (world-me wr))))
+			(when (and (creature? trg) (get-position trg))
+				(send-packet cn (game-client-packet/attack-request (object-id trg) (get-position trg) shift?))
 			)
 		)
 	)

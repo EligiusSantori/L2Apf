@@ -26,6 +26,7 @@
 			"change_wait_type.scm"
 			"target_selected.scm"
 			"target_unselected.scm"
+			"my_target_selected.scm"
 			"social_action.scm"
 			"attack.scm"
 			"skill_list.scm"
@@ -146,20 +147,20 @@
 				((thread? evt) (make-event 'disconnect)) ; Connection closed => return immediately.
 				(else ; Postprocess event.
 					(apf-debug "Event ~a" evt)
-					(case (event-name evt) ; Regular event => postprocess or just return.
-						((logout) ; Close socket.
+					(case-event evt ; Regular event => postprocess or just return.
+						(logout () ; Close socket.
 							(disconnect cn)
 							evt
 						)
-						((object-delete) (let ((object-id (second evt)))
+						(object-delete (subject-id)
 							(async-channel-put tc (lambda () ; Discard after event processing.
-								(attackers-delete! (world-me wr) object-id)
-								(discard-object! wr object-id)
+								(attackers-delete! (world-me wr) subject-id)
+								(discard-object! wr subject-id)
 							))
 							evt
-						))
-						((teleport)
-							(let ((me (world-me wr))) (when (= (second evt) (object-id me))
+						)
+						(teleport (subject-id destination)
+							(let ((me (world-me wr))) (when (= subject-id (object-id me))
 								(async-channel-put tc (lambda () ; Discard after event processing.
 									(let ((position (ref me 'position)) (angle (ref me 'angle))) ; Request updates.
 										(send-packet cn (game-client-packet/validate-location position angle))
@@ -312,6 +313,12 @@
 	)
 	(define (packet-handler/target-unselected ec wr packet)
 		(handle-creature-update! ec wr (cons (cons 'target-id #f) packet))
+	)
+	(define (packet-handler/my-target-selected ec wr packet)
+		(handle-creature-update! ec wr (list
+			(cons 'object-id (object-id (world-me wr)))
+			(cons 'target-id (ref packet 'target-id))
+		))
 	)
 
 	(define (packet-handler/attack ec wr packet)
@@ -658,12 +665,13 @@
 		; #x86 Ride
 		; #x98 PlaySound
 		; #x99 StaticObject
-		; #xa6 MyTargetSelected
+		(cons #xa6 (cons game-server-packet/my-target-selected packet-handler/my-target-selected)) ; change-target
 		(cons #xa7 (cons game-server-packet/party-member-position packet-handler/party-member-position)) ; creature-update
 		(cons #xa8 (cons game-server-packet/ask-join-alliance packet-handler/ask-join-alliance)) ; ask
 		; #xc4 Earthquake
 		; #xc8 NormalCamera
 		; #xd0 MultiSellList
+		; #xd3 ?
 		; #xd4 Dice
 		; #xd5 Snoop
 		; (cons #xe4 'henna-info (cons game-server-packet/henna-info packet-handler/henna-info))

@@ -113,8 +113,8 @@
 	(define (terminate connection events)
 		(logout connection)
 		(let loop ()
-			(cond
-				((eq? 'logout (event-name (sync events))) (displayln "Logged out."))
+			(case-event (sync events)
+				(logout () (displayln "Logged out."))
 				(else (loop))
 			)
 		)

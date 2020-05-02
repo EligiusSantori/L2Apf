@@ -55,6 +55,7 @@
 				(enqueue! route (second event)) ; Queue leader position.
 				(or busy (go-next cn leader-id route gap)) ; Go next if not busy.
 			)
+			(else busy)
 		)
 	)
 

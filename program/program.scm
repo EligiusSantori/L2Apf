@@ -6,6 +6,7 @@
 		racket/undefined
 		(relative-in "../.."
 			"library/extension.scm"
+			"system/debug.scm"
 			"system/connection.scm"
 			"system/event.scm"
 		)
@@ -90,15 +91,17 @@
 		))
 	)
 
-	(define (program-load! cn program)
-		(let ((state ((base-program-constructor program) cn (base-program-config program))))
-			(when (state? state) (set-base-program-state! program state))
+	(define (program-load! cn p)
+		(apf-debug "Loading program ~a." (program-id p))
+		(let ((state ((base-program-constructor p) cn (base-program-config p))))
+			(when (state? state) (set-base-program-state! p state))
 			(not (eof-object? state))
 		)
 	)
 
-	(define (program-free! cn program)
-		((base-program-destructor program) cn (base-program-config program) (base-program-state program))
+	(define (program-free! cn p)
+		(apf-debug "Unloading program ~a." (program-id p))
+		((base-program-destructor p) cn (base-program-config p) (base-program-state p))
 		(void)
 	)
 
