@@ -37,19 +37,6 @@
 	)
 
 	(define-program program-follow-chase
-		(list
-			undefined ; leader-id (required)
-			30 ; margin
-		)
-		(lambda (cn config)
-			(let-values (((leader-id margin) (list->values config)))
-				(let ((leader (get-leader cn leader-id)))
-					(target cn leader-id)
-					(follow cn leader margin)
-				)
-			)
-		)
-		undefined
 		(lambda (cn event config state)
 			(let-values (((leader-id margin) (list->values config)))
 				(cond
@@ -62,6 +49,20 @@
 					(else (void))
 				)
 			)
+		)
+
+		#:constructor (lambda (cn config)
+			(let-values (((leader-id margin) (list->values config)))
+				(let ((leader (get-leader cn leader-id)))
+					(target cn leader-id)
+					(follow cn leader margin)
+				)
+			)
+		)
+		
+		#:defaults (list
+			undefined ; leader-id (required)
+			30 ; margin
 		)
 	)
 )

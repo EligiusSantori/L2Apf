@@ -13,11 +13,6 @@
 	(provide program-partying)
 
 	(define-program program-partying
-		(list
-			#f ; leader names filter
-		)
-		undefined
-		undefined
 		(lambda (cn event config . args)
 			(when (and (eq? (car event) 'ask/join-party) (not (in-party? (world-party (connection-world cn)))))
 				(let ((from (ref (cdr event) 'player)) (names (car config)))
@@ -25,6 +20,10 @@
 				)
 			)
 			(void)
+		)
+
+		#:defaults (list
+			#f ; leader names filter
 		)
 	)
 )

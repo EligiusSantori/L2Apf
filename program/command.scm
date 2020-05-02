@@ -112,11 +112,10 @@
 	)
 
 	(define-program program-command
-		(list
-			undefined ; program manager (required)
-		)
-		undefined
-		undefined
 		command
+
+		#:defaults (list
+			undefined ; program manager (required)
+		)	
 	)
 )

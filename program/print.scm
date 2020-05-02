@@ -14,7 +14,7 @@
 		)
 	)
 
-	(define-program program-print undefined undefined undefined
+	(define-program program-print
 		(lambda (cn event . args)
 			(case-event event
 				(message (author-id channel author text)

@@ -1,6 +1,8 @@
 (module ai racket/base
 	(require
 		(only-in srfi/1 make-list)
+		(for-syntax racket/base)
+		(for-syntax syntax/parse)
 		racket/string
 		racket/contract
 		racket/undefined
@@ -41,15 +43,20 @@
 	(define program? base-program?)
 	(define program-id base-program-id)
 
-	(define-syntax-rule (define-program ID CONFIG CONSTRUCTOR DESTRUCTOR ITERATOR)
-		(define ID (base-program
-			'ID
-			ITERATOR
-			(if (eq? CONSTRUCTOR undefined) void CONSTRUCTOR)
-			(if (eq? DESTRUCTOR undefined) void DESTRUCTOR)
-			(if (eq? CONFIG undefined) (list) CONFIG)
-			undefined
-		))
+	(define-syntax (define-program STX)
+		(syntax-parse STX
+			((define-program ID ITERATOR
+					(~optional (~seq #:constructor CONSTRUCTOR))
+					(~optional (~seq #:destructor DESTRUCTOR))
+					(~optional (~seq #:defaults CONFIG)))
+				(with-syntax (
+						(CONSTRUCTOR (or (attribute CONSTRUCTOR) void))
+						(DESTRUCTOR (or (attribute DESTRUCTOR) void))
+						(CONFIG (or (attribute CONFIG) #'(list))))
+					#'(define ID (base-program (quote ID) ITERATOR CONSTRUCTOR DESTRUCTOR CONFIG undefined))
+				)
+			)
+		)
 	)
 
 	(define (program base . config) ; Create configured instance of the program (instantiate).

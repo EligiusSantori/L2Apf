@@ -41,22 +41,23 @@
 	)
 
 	(define-program program-radar
-		(list
-			undefined ; event (required)
-			object? ; predicate
-			10000 ; radius
-			1000 ; interval
-		)
-		(lambda (cn config)
-			(let ((timer (interval! cn (fourth config))))
-				(cons timer (pulse cn config (seteq)))
-			)
-		)
-		undefined
 		(lambda (cn event config state)
 			(when (eq? (car event) (car state)) ; If timer event.
 				(cons (car state) (pulse cn config (cdr state)))
 			)
+		)
+
+		#:constructor (lambda (cn config)
+			(let ((timer (interval! cn (fourth config))))
+				(cons timer (pulse cn config (seteq)))
+			)
+		)
+
+		#:defaults (list
+			undefined ; event (required)
+			object? ; predicate
+			10000 ; radius
+			1000 ; interval
 		)
 	)
 )

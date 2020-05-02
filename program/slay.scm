@@ -30,30 +30,11 @@
 				(attack cn)
 				(target cn victim-id)
 			)
-(if (and target-id (= victim-id target-id))
-	(printf "{slay attack}~n")
-	(printf "{slay target}~n")
-)
 			(void)
 		)
 	)
 
 	(define-program program-slay
-		(list
-			undefined ; target-id (required)
-		)
-		(lambda (cn config)
-			(let-values (((target-id) (list->values config)))
-				(let* ((wr (connection-world cn)) (trg (object-ref wr target-id)))
-					(when (not trg) (program-error "Don't see the target." target-id))
-					(when (not (creature? trg)) (program-error "Target is not creature." target-id))
-					(when (protagonist? trg) (program-error "Can't attack myself." target-id))
-
-					(slay cn wr (world-me wr) target-id)
-				)
-			)
-		)
-		undefined
 		(lambda (cn ev config state)
 			(let-values (((victim-id) (list->values config)))
 				(let* ((wr (connection-world cn)) (me (world-me wr)))
@@ -70,6 +51,22 @@
 					)
 				)
 			)
+		)
+
+		#:constructor (lambda (cn config)
+			(let-values (((target-id) (list->values config)))
+				(let* ((wr (connection-world cn)) (trg (object-ref wr target-id)))
+					(when (not trg) (program-error "Don't see the target." target-id))
+					(when (not (creature? trg)) (program-error "Target is not creature." target-id))
+					(when (protagonist? trg) (program-error "Can't attack myself." target-id))
+
+					(slay cn wr (world-me wr) target-id)
+				)
+			)
+		)
+
+		#:defaults (list
+			undefined ; target-id (required)
 		)
 	)
 )

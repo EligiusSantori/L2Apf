@@ -31,6 +31,7 @@
 		try-first
 		try-second
 		try-third
+		chunk
 		call/wv
 		values->list
 		list->values
@@ -169,6 +170,18 @@
 	)
 	(define (try-third lst [default #f])
 		(list-try-ref lst 2 default)
+	)
+	(define (chunk size lst)
+		(define (r n f t)
+			(if (not (null? f))
+				(let-values (((c f) (split-at f n)))
+					(r n f (cons c t))
+				)
+				t
+			)
+		)
+
+		(reverse (r size lst (list)))
 	)
 
 	(define call/wv call-with-values)

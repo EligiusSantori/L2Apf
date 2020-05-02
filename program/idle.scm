@@ -7,7 +7,7 @@
 		program-idle
 	)
 
-	(define-program program-idle undefined undefined undefined
+	(define-program program-idle
 		(lambda args (void)) ; Do nothing
 	)
 )

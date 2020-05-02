@@ -64,20 +64,6 @@
 	)
 
 	(define-program program-follow-repeat
-		(list
-			undefined ; leader-id (required)
-			50 ; gap ; TODO add (or (ref leader 'collision-radius) 0)
-		)
-		(lambda (cn config)
-			(let-values (((leader-id gap) (list->values config)))
-				(let ((route (make-queue)) (point (leader-position cn leader-id)))
-					(target cn leader-id)
-					(enqueue! route point)
-					(make-state route (follow cn #f leader-id gap route #f))
-				)
-			)
-		)
-		undefined
 		(lambda (cn event config state)
 			(let-values (((leader-id gap) (list->values config)) ((route busy) (car+cdr state)))
 				(let ((my-id (object-id (world-me (connection-world cn)))))
@@ -92,6 +78,21 @@
 					)
 				)
 			)
+		)
+
+		#:constructor (lambda (cn config)
+			(let-values (((leader-id gap) (list->values config)))
+				(let ((route (make-queue)) (point (leader-position cn leader-id)))
+					(target cn leader-id)
+					(enqueue! route point)
+					(make-state route (follow cn #f leader-id gap route #f))
+				)
+			)
+		)
+
+		#:defaults (list
+			undefined ; leader-id (required)
+			50 ; gap ; TODO add (or (ref leader 'collision-radius) 0)
 		)
 	)
 )
