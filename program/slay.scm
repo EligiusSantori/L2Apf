@@ -1,7 +1,6 @@
 (module ai racket/base
 	(require
 		srfi/1
-		; racket/math
 		racket/undefined
 		"program.scm"
 		(relative-in "../."
@@ -9,7 +8,6 @@
 			"system/structure.scm"
 			"system/connection.scm"
 			"system/event.scm"
-			; "model/map.scm"
 			"model/object.scm"
 			"model/creature.scm"
 			"model/protagonist.scm"
@@ -24,10 +22,24 @@
 		(apply raise-program-error 'program-slay message args)
 	)
 
+	(define (slay/swordman cn wr me)
+		(attack cn) ; TODO Skills.
+	)
+	;(define (slay/maceman ...) ...)
+	;(define (slay/spearman ...) ...)
+	;(define (slay/dualist ...) ...)
+	;(define (slay/assassin ...) ...)
+	;(define (slay/archer ...) ...)
+	;(define (slay/wizard ...) ...)
+
+	(define (slay/auto cn wr me)
+		(slay/swordman cn wr me) ; TODO Resolve type.
+	)
+
 	(define (slay cn wr me victim-id)
 		(let ((target-id (ref me 'target-id)))
 			(if (and target-id (= victim-id target-id))
-				(attack cn)
+				(slay/auto cn wr me)
 				(target cn victim-id)
 			)
 			(void)
@@ -44,7 +56,7 @@
 								(slay cn wr me victim-id)
 							)
 						)
-						(else (if (and (member (car ev) (list 'die 'object-delete) eq?) (= (second ev) victim-id))
+						(else (if (and (member (event-name ev) (list 'die 'object-delete) eq?) (= (second ev) victim-id))
 							eof
 							(void)
 						))
@@ -54,19 +66,17 @@
 		)
 
 		#:constructor (lambda (cn config)
-			(let-values (((target-id) (list->values config)))
-				(let* ((wr (connection-world cn)) (trg (object-ref wr target-id)))
-					(when (not trg) (program-error "Don't see the target." target-id))
-					(when (not (creature? trg)) (program-error "Target is not creature." target-id))
-					(when (protagonist? trg) (program-error "Can't attack myself." target-id))
+			(let* ((victim-id (car config)) (wr (connection-world cn)) (victim (object-ref wr victim-id)))
+				(when (not victim) (program-error "Don't see the target." victim-id))
+				(when (not (creature? victim)) (program-error "Object is not creature." victim-id))
+				(when (protagonist? victim) (program-error "Can't attack myself." victim-id))
 
-					(slay cn wr (world-me wr) target-id)
-				)
+				(slay cn wr (world-me wr) victim-id)
 			)
 		)
 
 		#:defaults (list
-			undefined ; target-id (required)
+			undefined ; victim-id (required)
 		)
 	)
 )

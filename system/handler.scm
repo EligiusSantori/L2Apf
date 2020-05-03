@@ -178,22 +178,30 @@
 	)
 
 	(define (packet-handler/user-info ec wr packet)
-		(let ((me (world-me wr)))
-			(update-protagonist! me packet)
-			(register-object! wr me)
-			(trigger! ec 'creature-create (ref me 'object-id))
+		(let* ((me (world-me wr)) (changes (update-protagonist! me packet)))
+			(if (not (object-ref wr (ref packet 'object-id)))
+				(begin
+					(register-object! wr me)
+					(trigger! ec 'creature-create (object-id me))
+				)
+				(trigger-creature-update! ec (object-id me) changes)
+			)
 		)
 	)
 	(define (packet-handler/char-info ec wr packet)
-		(let ((antagonist (make-antagonist packet)))
-			(register-object! wr antagonist)
-			(trigger! ec 'creature-create (ref antagonist 'object-id))
-		)
+		(create-or-update-character! ec wr packet)
 	)
 	(define (packet-handler/npc-info ec wr packet)
-		(let ((npc (make-npc packet)))
-			(register-object! wr npc)
-			(trigger! ec 'creature-create (ref npc 'object-id))
+		(let* ((object-id (ref packet 'object-id)) (npc (object-ref wr object-id)))
+			(if (not npc)
+				(let ((npc (make-npc packet)))
+					(register-object! wr npc)
+					(trigger! ec 'creature-create object-id)
+				)
+				(let ((changes (update-npc! npc packet)))
+					(trigger-creature-update! ec object-id changes)
+				)
+			)
 		)
 	)
 	(define (packet-handler/status-update ec wr packet)
@@ -377,7 +385,7 @@
 			(make-skill (ref packet 'skill-id) (ref packet 'level) #t (timestamp) (ref packet 'reuse-delay))
 		)
 
-		(let ((me (world-me wr)) (creature (object-ref wr (ref packet 'object-id))) (skill (make-active-skill packet))) (when creature
+		(let ((creature (object-ref wr (ref packet 'object-id))) (skill (make-active-skill packet)) (me (world-me wr))) (when creature
 			(handle-creature-update! ec wr (list
 				(cons 'object-id (object-id creature))
 				(cons 'target-id (ref packet 'target-id))
@@ -386,7 +394,9 @@
 			) creature)
 
 			(if (= (ref packet 'target-id) (object-id me))
-				(attackers-add! me (object-id creature))
+				(when (skill-negative? (skill-id skill))
+					(attackers-add! me (object-id creature))
+				)
 				(attackers-delete! me (object-id creature))
 			)
 
@@ -405,12 +415,16 @@
 		))
 	)
 	(define (packet-handler/skill-launched ec wr packet)
-		(let ((creature (object-ref wr (ref packet 'object-id)))) (when creature
+		(let ((creature (object-ref wr (ref packet 'object-id))) (me (world-me wr))) (when creature
 			(let ((skill (or (ref creature 'casting) (make-skill (ref packet 'skill-id) (ref packet 'level) #t))))
 				(handle-creature-update! ec wr (list
 					(cons 'casting #f)
 					(cons 'located-at (timestamp))
 				) creature)
+
+				(when (and (member (object-id me) (ref packet 'targets) =) (skill-negative? (skill-id skill)))
+					(attackers-add! me (object-id creature))
+				)
 
 				(trigger! ec 'skill-launched (object-id creature) skill (remove zero? (ref packet 'targets)))
 			)
@@ -670,6 +684,7 @@
 		(cons #xa8 (cons game-server-packet/ask-join-alliance packet-handler/ask-join-alliance)) ; ask
 		; #xc4 Earthquake
 		; #xc8 NormalCamera
+		; #xce ?
 		; #xd0 MultiSellList
 		; #xd3 ?
 		; #xd4 Dice

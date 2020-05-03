@@ -6,7 +6,6 @@
 		"program.scm"
 		(relative-in "../."
 			"library/extension.scm"
-			"system/debug.scm"
 			"system/structure.scm"
 			"system/connection.scm"
 			"model/map.scm"
@@ -59,7 +58,7 @@
 				)
 			)
 		)
-		
+
 		#:defaults (list
 			undefined ; leader-id (required)
 			30 ; margin

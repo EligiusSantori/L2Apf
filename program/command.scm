@@ -7,6 +7,8 @@
 		"follow_chase.scm"
 		"follow_repeat.scm"
 		"slay.scm"
+		"pickup.scm"
+		"relax.scm"
 		"brain.scm"
 		(relative-in "../."
 			"library/extension.scm"
@@ -14,9 +16,11 @@
 			"system/connection.scm"
 			"system/event.scm"
 			"model/object.scm"
+			"model/item.scm"
 			"model/creature.scm"
 			"model/npc.scm"
 			"model/party.scm"
+			"model/map.scm"
 			"model/world.scm"
 			"api/say.scm"
 			"api/gesture.scm"
@@ -96,8 +100,29 @@
 								(say cn "Don't see the requester.")
 							)
 						))
+						(("pickup") (let ((position (get-position (world-me wr))))
+							(define (find-closest object closest)
+								(if (and (item? object) (on-ground? object))
+									(let ((d (points-distance (ref object 'position) position)))
+										(if (or (not closest) (< d (car closest)))
+											(cons d object)
+											closest
+										)
+									)
+									closest
+								)
+							)
 
-						(("relax") (brain-clear! brain #t))
+							(let ((closest (fold-objects wr #f find-closest)))
+								(if closest
+									(brain-do! brain (program program-pickup (object-id (cdr closest))) #t)
+									(say cn "Don't see an item.")
+								)
+							)
+						))
+						(("relax") (brain-do! brain (program program-relax)))
+
+						(("clear") (brain-clear! brain #t))
 						(("bye")
 							(brain-clear! brain #t) ; Call foreground program destructor before exit.
 							(logout cn)
@@ -116,6 +141,6 @@
 
 		#:defaults (list
 			undefined ; program manager (required)
-		)	
+		)
 	)
 )

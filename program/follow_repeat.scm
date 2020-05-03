@@ -6,7 +6,6 @@
 		"program.scm"
 		(relative-in "../.."
 			"library/extension.scm"
-			"system/debug.scm"
 			"system/connection.scm"
 			"model/map.scm"
 			"model/object.scm"

@@ -1,9 +1,9 @@
 (module logic racket/base
 	(require
-		srfi/1
+		(except-in srfi/1 any)
 		racket/set
 		racket/math
-		(rename-in racket/contract (any all/c))
+		racket/contract
 		(relative-in "../."
 			"library/extension.scm"
 			"library/geometry.scm"
@@ -26,7 +26,8 @@
 			(register-object! (-> world? (and/c box? object?) void?))
 			(discard-object! (-> world? integer? void?))
 			(objects (->* (world?) (procedure?) list?))
-			(nearest (-> world? point/3d? integer? list?))
+			(fold-objects (-> world? any/c procedure? any))
+			(near (-> world? point/3d? integer? list?))
 			(towards (-> world? point/3d? integer? list?))
 			(object-ref (-> world? (or/c integer? false/c) (or/c object? false/c)))
 			(skill-ref (-> world? (or/c integer? false/c) (or/c skill? false/c)))
@@ -83,7 +84,7 @@
 	(define (register-object! wr object)
 		(let ((object-id (ref object 'object-id)))
 			(hash-set! (world-objects wr) object-id object)
-			; TODO set 'characters name object-id
+			; TODO world-characters[name] = object-id
 			(void)
 		)
 	)
@@ -103,7 +104,14 @@
 		))
 		l
 	)
-	(define (nearest wr position radius)
+	(define (fold-objects wr init proc)
+		(define r init)
+		(hash-for-each (world-objects wr) (lambda (k v)
+			(set! r (proc v r))
+		))
+		r
+	)
+	(define (near wr position radius)
 		(objects wr (lambda (object)
 			(let ((p (cond ((creature? object) (get-position object)) ((item? object) (ref object 'position)) (else #f))))
 				(and p (<= (points-distance p position) radius))
