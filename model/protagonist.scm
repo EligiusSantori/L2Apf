@@ -28,7 +28,7 @@
 		(cons 'pk-count (negate =))
 		(cons 'pvp-count (negate =))
 
-		(cons 'died? (negate eq?))
+		(cons 'dead? (negate eq?))
 		(cons 'clan-leader? (negate eq?))
 		(cons 'dwarven-craft? (negate eq?))
 

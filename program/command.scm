@@ -7,6 +7,8 @@
 		"follow_chase.scm"
 		"follow_repeat.scm"
 		"slay.scm"
+		"bless.scm"
+		"support.scm"
 		"pickup.scm"
 		"relax.scm"
 		"brain.scm"
@@ -29,6 +31,7 @@
 			"api/move_behind.scm"
 			"api/target.scm"
 			"api/attack.scm"
+			"api/use_skill.scm"
 			"api/logout.scm"
 		)
 	)
@@ -91,12 +94,19 @@
 						; 		(move-on cn on)
 						; 	)
 						; ))
-						(("chase") (brain-do! brain (program program-follow-chase author-id)))
-						(("repeat") (brain-do! brain (program program-follow-repeat author-id)))
+						(("follow") (brain-do! brain (program program-follow-chase author-id 150)))
+						(("follow+") (brain-do! brain (program program-follow-repeat author-id)))
 
 						(("assist") (let ((author (object-ref wr author-id)))
 							(if author
 								(brain-do! brain (program program-slay (ref author 'target-id)) #t)
+								(say cn "Don't see the requester.")
+							)
+						))
+						(("support") (brain-do! brain (program program-support)))
+						(("bless") (let ((author (object-ref wr author-id)))
+							(if author
+								(brain-do! brain (program program-bless (ref author 'target-id)) #t)
 								(say cn "Don't see the requester.")
 							)
 						))

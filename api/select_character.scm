@@ -18,9 +18,9 @@
 			"model/protagonist.scm"
 			"model/world.scm"
 		)
-		"refresh_manor_list.scm"
-		"refresh_quest_list.scm"
-		"refresh_skill_list.scm"
+		"refresh_manor.scm"
+		"refresh_quests.scm"
+		"refresh_skills.scm"
 	)
 	(provide (contract-out
 		(select-character (-> connection? protagonist? evt?))
@@ -38,10 +38,9 @@
 						(update-protagonist! me packet)
 						(set-world-me! (connection-world cn) me)
 
-						(refresh-manor-list cn)
-						(refresh-quest-list cn)
+						(refresh-manor cn)
+						(refresh-quests cn)
 						(send-packet cn (game-client-packet/enter-world))
-						(refresh-skill-list cn)
 					))
 					(else (loop))
 				)

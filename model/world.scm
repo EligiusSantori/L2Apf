@@ -130,7 +130,7 @@
 		(hash-ref (world-objects wr) object-id #f)
 	)
 	(define (skill-ref wr skill-id)
-		(hash-ref (world-skills world) skill-id #f)
+		(hash-ref (world-skills wr) skill-id #f)
 	)
 	(define (inv-ref world object-id)
 		(hash-ref (world-inventory world) object-id #f)
@@ -225,7 +225,7 @@
 
 	(define (alive? creature)
 		(if (protagonist? creature)
-			(not (ref creature 'died?))
+			(not (ref creature 'dead?))
 			(not (ref creature 'alike-dead?))
 		)
 	)

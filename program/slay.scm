@@ -4,7 +4,7 @@
 		racket/undefined
 		"program.scm"
 		(relative-in "../."
-			"library/extension.scm"
+			; "library/extension.scm"
 			"system/structure.scm"
 			"system/connection.scm"
 			"system/event.scm"
@@ -48,19 +48,17 @@
 
 	(define-program program-slay
 		(lambda (cn ev config state)
-			(let-values (((victim-id) (list->values config)))
-				(let* ((wr (connection-world cn)) (me (world-me wr)))
-					(case-event ev
-						(change-target (subject-id target-id)
-							(when (and (= (object-id me) subject-id) target-id (= target-id victim-id))
-								(slay cn wr me victim-id)
-							)
+			(let* ((victim-id (car config)) (wr (connection-world cn)) (me (world-me wr)))
+				(case-event ev
+					(change-target (subject-id target-id)
+						(when (and (= (object-id me) subject-id) target-id (= target-id victim-id))
+							(slay cn wr me victim-id)
 						)
-						(else (if (and (member (event-name ev) (list 'die 'object-delete) eq?) (= (second ev) victim-id))
-							eof
-							(void)
-						))
 					)
+					(else (if (and (member (event-name ev) (list 'die 'object-delete) eq?) (= (second ev) victim-id))
+						eof
+						(void)
+					))
 				)
 			)
 		)

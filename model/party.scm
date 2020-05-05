@@ -4,22 +4,18 @@
 	)
 	(provide (contract-out
 		(make-party (->* (symbol? integer?) #:rest (listof integer?) list?))
-		(in-party? (->* ((or/c list? false/c)) (integer?) boolean?))
-		(party-members (-> list? (listof integer?)))
-		(party-leader (-> list? (or/c integer? false/c)))
-		(party-loot (-> list? symbol?))
+		(in-party? (-> (or/c list? false/c) integer? boolean?))
+		(party-members (-> (or/c list? false/c) (listof integer?)))
+		(party-leader (-> (or/c list? false/c) (or/c integer? false/c)))
+		(party-loot (-> (or/c list? false/c) (or/c symbol? false/c)))
 	))
 
 	(define (make-party loot-mode leader-id . object-ids)
 		(apply list loot-mode leader-id object-ids)
 	)
 
-	(define (in-party? party [object-id #f])
-		(cond
-			((not party) #f) ; Party empty.
-			(object-id (member object-id (cdr party) =)) ; Member exists.
-			(else #t) ; I'm in party.
-		)
+	(define (in-party? party object-id)
+		(if (and party (member object-id (cdr party) =)) #t #f)
 	)
 
 	(define (party-members party)
@@ -27,10 +23,10 @@
 	)
 
 	(define (party-leader party)
-		(if party (car (cdr party)) #f)
+		(and party (cadr party))
 	)
 
 	(define (party-loot party)
-		(if (in-party? party) (car party) #f)
+		(and party (car party))
 	)
 )

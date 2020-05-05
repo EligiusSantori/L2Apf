@@ -10,8 +10,8 @@
 
 	(define (use-skill cn skill-id [control? #f] [shift? #f])
 		(let* ((wr (connection-world cn)) (skill (skill-ref wr skill-id)))
-			(when (and (alive? (world-me wr)) (skill-ready? skill))
-				(send-packet cn (game-client-packet/use-skill skill-id control? shift?))
+			(and (alive? (world-me wr)) (skill-ready? skill)
+				(begin (send-packet cn (game-client-packet/use-skill skill-id control? shift?)) #t)
 			)
 		)
 	)

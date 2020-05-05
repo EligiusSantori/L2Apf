@@ -3,9 +3,9 @@
 		"../packet/game/client/refresh_skill_list.scm"
 		(only-in "../system/connection.scm" send-packet)
 	)
-	(provide refresh-skill-list)
+	(provide refresh-skills)
 
-	(define (refresh-skill-list connection)
+	(define (refresh-skills connection)
 		(send-packet connection (game-client-packet/refresh-skill-list))
 	)
 )
