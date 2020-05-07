@@ -17,15 +17,15 @@
 
 	(define (program-error message . args) (apply raise-program-error 'program-relax message args))
 	(define (error-already-restored hp mp) (program-error "Already restored." hp mp))
-	(define (error-under-attack attackers) (apply program-error "I'm under attack!" attackers))
+	(define (error-under-attack attackers) (apply program-error "Can't rest under attack." attackers))
 	(define (hp-max? creature) (= (ref creature 'hp) (ref creature 'max-hp)))
 	(define (mp-max? creature) (= (ref creature 'mp) (ref creature 'max-mp)))
 
 	(define-program program-relax
-		(lambda (cn event config state)
+		(lambda (cn event config timer)
 			(let ((duration (car config)) (me (world-me (connection-world cn))))
 				(if (case-event event ; End on fully restored or timeout.
-					(creature-update (id changes)
+					('creature-update (id changes)
 						(and
 							(= id (object-id me))
 							(or (assq 'hp changes) (assq 'mp changes))
@@ -33,14 +33,9 @@
 							(mp-max? me)
 						)
 					)
-					(else (cond
-						((eq? (event-name event) state) #t)
-						((> (attackers-count me) 0)
-							(error-under-attack (attackers me))
-						)
-						(else #f)
-					))
-				) eof state)
+					(timer () #t)
+					(else (if (> (attackers-count me) 0) (error-under-attack (attackers me)) #f))
+				) eof timer)
 			)
 		)
 

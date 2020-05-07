@@ -50,7 +50,7 @@
 		(lambda (cn ev config state)
 			(let* ((victim-id (car config)) (wr (connection-world cn)) (me (world-me wr)))
 				(case-event ev
-					(change-target (subject-id target-id)
+					('change-target (subject-id target-id . rest)
 						(when (and (= (object-id me) subject-id) target-id (= target-id victim-id))
 							(slay cn wr me victim-id)
 						)

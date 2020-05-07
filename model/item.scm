@@ -1,8 +1,8 @@
 (module logic racket/base
 	(require
-		srfi/1
+		(only-in srfi/1 fold alist-delete)
 		(only-in racket/function negate)
-		(rename-in racket/contract (any all/c))
+		racket/contract
 		"../library/geometry.scm"
 		"../system/structure.scm"
 		"object.scm"
@@ -18,14 +18,14 @@
 
 	(define item (list
 		(cons 'item-id (negate =))
-		(cons 'position (negate point/3d=))
+		(cons 'position (negate point/3d=?))
 		(cons 'count (negate =))
 		(cons 'enchant (negate =))
 		; TODO stackable? equipped? grade crystallizable? {weapon? shield? armor? accessory? thing? quest?}
 	))
 
 	(define (item? object)
-		(if (and object (member 'item (ref object 'type))) #t #f)
+		(object-of-type? object 'item)
 	)
 
 	(define (on-ground? item)

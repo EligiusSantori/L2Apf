@@ -1,20 +1,31 @@
 (module logic racket/base
 	(require
-		srfi/1
-		(rename-in racket/contract (any all/c))
+		(only-in srfi/1 proper-list?)
+		racket/contract
 		"../library/extension.scm"
 		"../system/structure.scm"
 	)
 	(provide (contract-out
-		(object? (any/c . -> . boolean?))
-		(object-id (object? . -> . (or/c integer? #f)))
-		(object=? (object? object? . -> . boolean?))
-		(make-object (list? . -> . list?))
-		(update-object (list? list? . -> . list?))
+		(object? (-> any/c boolean?))
+		(object-of-type? (-> any/c symbol? boolean?))
+		(object-id (-> object? (or/c integer? #f)))
+		(object=? (-> object? object? boolean?))
+		(make-object (-> list? list?))
+		(update-object (-> list? list? list?))
 	))
 
+	(define (object-of-type? object type)
+		(if (and object (box? object)
+			(let ((data (unbox object)))
+				(and
+					(proper-list? data)
+					(member type (or (ref data 'type) (list)))
+				)
+			)
+		) #t #f)
+	)
 	(define (object? object)
-		(if (and (box? object) (member 'object (ref object 'type))) #t #f)
+		(object-of-type? object 'object)
 	)
 
 	(define (object-id object)

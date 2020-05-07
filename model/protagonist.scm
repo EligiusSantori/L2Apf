@@ -1,12 +1,13 @@
 (module logic racket/base
 	(require
-		srfi/1
+		(only-in srfi/1 fold alist-delete)
 		(only-in racket/set set->list)
 		(only-in racket/function negate)
-		(rename-in racket/contract (any all/c))
+		racket/contract
 		"../library/extension.scm"
+		"../library/cache.scm"
 		"../system/structure.scm"
-		"../system/cache.scm"
+		"object.scm"
 		"character.scm"
 	)
 	(provide (contract-out
@@ -51,7 +52,7 @@
 	))
 
 	(define (protagonist? object)
-		(if (and object (member 'protagonist (ref object 'type))) #t #f)
+		(object-of-type? object 'protagonist)
 	)
 
 	(define (make-protagonist data)

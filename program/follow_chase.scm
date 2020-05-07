@@ -6,9 +6,11 @@
 		"program.scm"
 		(relative-in "../."
 			"library/extension.scm"
+			"library/date_time.scm"
 			"system/structure.scm"
 			"system/connection.scm"
 			"model/map.scm"
+			"model/object.scm"
 			"model/creature.scm"
 			"model/world.scm"
 			"api/target.scm"
@@ -28,9 +30,8 @@
 	)
 
 	(define (follow cn leader margin)
-		(move-to cn
-			(or (get-destination (connection-world cn) leader) (get-position leader))
-			(exact-round (+ margin (or (ref leader 'collision-radius) 0)))
+		(let ((destination (get-destination (connection-world cn) leader)) (margin (exact-round (+ margin (or (ref leader 'collision-radius) 0)))))
+			(or (move-to cn (or destination (get-position leader)) margin) (move-to cn #f)) ; Stop moving if destination is too close.
 		)
 		(void)
 	)

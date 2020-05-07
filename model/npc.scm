@@ -1,9 +1,10 @@
 (module logic racket/base
 	(require
-		srfi/1
+		(only-in srfi/1 fold alist-delete)
 		(only-in racket/function negate)
-		(rename-in racket/contract (any all/c))
+		racket/contract
 		"../system/structure.scm"
+		"object.scm"
 		"creature.scm"
 	)
 	(provide (contract-out
@@ -21,7 +22,7 @@
 	))
 
 	(define (npc? object)
-		(if (and object (member 'npc (ref object 'type))) #t #f)
+		(object-of-type? object 'npc)
 	)
 
 	(define (make-npc data)

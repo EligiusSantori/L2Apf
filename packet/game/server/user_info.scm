@@ -96,7 +96,7 @@
 				))
 				(cons 'recommendations-amount (read-int16 #f s))
 				(cons 'inventory-limit (begin
-					(read-int32 #f s)
+					(read-int32 #f s) ; MountNpcId
 					(read-int16 #f s)
 				))
 				(cons 'class-id (read-int32 #f s))
@@ -110,8 +110,8 @@
 					(read-byte s) ; TeamCircle
 					(read-int32 #f s)
 				))
-				(cons 'hero-icon? (not (zero? (read-byte s))))
-				(cons 'hero-glow? (not (zero? (read-byte s))))
+				(cons 'hero-icon? (not (zero? (read-byte s)))) ; TODO hero?
+				(cons 'hero-glow? (not (zero? (read-byte s)))) ; TODO noble?
 				(cons 'fishing? (not (zero? (read-byte s))))
 				(cons 'fish (read-point s))
 				(cons 'name-color (read-int32 #f s))

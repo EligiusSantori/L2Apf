@@ -6,7 +6,7 @@
 	(define (read-targets s c [l (list)])
 		(if (> c 0)
 			(let ((target-id (read-int32 #f s)))
-				(read-targets s (- c 1) (cons target-id l))
+				(read-targets s (- c 1) (if (zero? target-id) l (cons target-id l)))
 			)
 			l
 		)

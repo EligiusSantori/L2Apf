@@ -32,6 +32,8 @@ Run entire realm of players:
 	"system/structure.scm"
 	"system/connection.scm"
 	"system/event.scm"
+	"model/object.scm"
+	"api/say.scm"
 	(only-in "program/program.scm" program)
 	(only-in "program/brain.scm"
 		make-brain
@@ -59,9 +61,10 @@ Run entire realm of players:
 		; Triggers space.
 		(case-event event
 			; Standard events.
-			(gesture (object-id action)
-				(printf "Gesture ~a on ~a~n" action object-id)
-				(flush-output)
+			('creature-create (id) ; Unhide builder character on login.
+				(when (and (= (object-id me) id) (> (ref me 'access-level) 0))
+					(say cn "hide off" 'chat-channel/game-master)
+				)
 			)
 
 			; Custom events.

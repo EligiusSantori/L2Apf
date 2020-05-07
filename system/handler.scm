@@ -1,13 +1,15 @@
 (module system racket/base ; Intermediate layer between low-level protocol and user API to provide higher-level events and state of game world.
 	(require
-		srfi/1
+		(only-in srfi/1 fold car+cdr)
 		racket/function
 		racket/set
 		racket/async-channel
-		(rename-in racket/contract (any all/c))
+		racket/contract
 		"../library/extension.scm"
 		"../library/date_time.scm"
-		"debug.scm"
+		"../library/geometry.scm"
+		"error.scm"
+		"log.scm"
 		"structure.scm"
 		"connection.scm"
 		"event.scm"
@@ -79,20 +81,41 @@
 		(handle-interrupt (-> connection? async-channel? async-channel? async-channel? event?))
 	))
 
-	(define (trigger! ec name . data) (async-channel-put ec (apply make-event (cons name data))) name); async-channel? symbol? any/c ...
-	; (define (trigger-change-moving! cn object-id from to) (trigger! cn 'change-moving object-id from to)) ; connection? point? point?
-	; (define (trigger-creature-create! cn creature) (trigger! cn 'creature-create creature)) ; connection? creature?
+	(struct exn:error:handler exn:fail:user (name)
+		#:extra-constructor-name make-exn:error:handler
+		#:transparent
+	)
+	(define (raise-handler-error packet-name message . args)
+		(raise (make-exn:error:handler (error-format message args) (current-continuation-marks) packet-name))
+	)
+	(define (trigger ec name . data) (async-channel-put ec (apply make-event (cons name data))) name); async-channel? symbol? any/c ...
+	; (define (trigger-change-moving! cn object-id from to) (trigger cn 'change-moving object-id from to)) ; connection? point? point?
+	; (define (trigger-creature-create! cn creature) (trigger cn 'creature-create creature)) ; connection? creature?
 	(define (trigger-creature-update! ec object-id changes)
-		(let ((fc (alist-except changes (list 'target-id 'position 'destination 'angle 'walking? 'sitting?) eq?)))
+		(let ((fc (alist-except changes eq? 'target-id 'position 'destination 'angle 'walking? 'sitting?)))
 			(when (not (null? fc))
-				(trigger! ec 'creature-update object-id fc)
+				(trigger ec 'creature-update object-id fc)
+			)
+		)
+	)
+	(define delayed-stop-moving (gensym))
+	(define (will-finish-move creature)
+		(let ((destination (ref creature 'destination)))
+			(and destination
+; (when (zero? (get-move-speed creature)) (apf-error "{zero-speed of ~v: ~a => ~a}" creature (ref creature 'position) destination))
+				(+ (ref creature 'located-at) (/ (distance/3d (ref creature 'position) destination) (get-move-speed creature)))
 			)
 		)
 	)
 	(define (delayed-skill-reused! cn skill) ; Fix skill reused event via timer.
-		(let ((last-usage (ref skill 'last-usage)) (reuse-delay (ref skill 'reuse-delay)))
+		(let ((last-usage (ref skill 'last-usage))
+				(reuse-delay (ref skill 'reuse-delay))
+				(ev (make-event 'skill-reused skill)))
 			(and reuse-delay (> reuse-delay 0)
-				(alarm! #:id 'skill-reused cn (+ last-usage reuse-delay) skill)
+				(if (> (+ last-usage reuse-delay) (timestamp))
+					(alarm! cn (+ last-usage reuse-delay) ev)
+					(trigger! cn ev)
+				)
 			)
 		)
 	)
@@ -102,16 +125,26 @@
 			(when creature
 				(let ((changes (update-creature! creature data)))
 					(let ((change (assoc 'target-id changes eq?))) (when change
-						(trigger! ec 'change-target (object-id creature) (cadr change))
+						(trigger ec 'change-target (object-id creature) (cadr change) (cddr change))
 					))
-					(when (assoc 'destination changes eq?) ; Only on start or stop moving (skip position validation).
-						(trigger! ec 'change-moving (object-id creature) (ref creature 'position) (ref creature 'destination))
+					(let ((pc (assoc 'position changes eq?)) (dc (assoc 'destination changes eq?)))
+						(when dc ; If start or stop moving then trigger event (skip position validation).
+							(trigger ec 'change-moving (object-id creature) (ref creature 'position) (cadr dc))
+						)
+						(when (or pc dc) ; If position has been updated.
+							(trigger ec delayed-stop-moving
+								(object-id creature)
+								(will-finish-move creature)
+								(ref creature 'destination)
+								(ref creature 'moving-timer)
+							)
+						)
 					)
 					(let ((change (assoc 'walking? changes eq?))) (when change
-						(trigger! ec 'change-walking (object-id creature) (cadr change))
+						(trigger ec 'change-walking (object-id creature) (cadr change))
 					))
 					(let ((change (assoc 'sitting? changes eq?))) (when change
-						(trigger! ec 'change-sitting (object-id creature) (cadr change))
+						(trigger ec 'change-sitting (object-id creature) (cadr change))
 					))
 					(trigger-creature-update! ec (object-id creature) changes)
 				)
@@ -124,7 +157,7 @@
 			(if (not character)
 				(let ((character (make-antagonist data)))
 					(register-object! wr character)
-					(trigger! ec 'creature-create object-id)
+					(trigger ec 'creature-create object-id)
 					character
 				)
 				(let ((changes (update-character! character data)))
@@ -137,63 +170,153 @@
 
 	; Arguments: connection, event-channel, packet-channel, tick-channel
 	(define (handle-interrupt cn ec pc tc)
-		(let ((wr (connection-world cn)) (evt (sync/enable-break ec pc (connection-read-thread cn))))
+		(let ((wr (connection-world cn)) (ev (sync/enable-break ec pc (connection-read-thread cn))))
 			(cond
-				((bytes? evt) ; Incoming packet => handle then wait next.
-					(case (get-packet-id evt)
-						((#x04) (packet-handler/user-info cn ec wr (game-server-packet/user-info evt)))
-						((#x48) (packet-handler/skill-started cn ec wr (game-server-packet/skill-started evt)))
-						((#x64) (packet-handler/system-message cn ec wr (game-server-packet/system-message evt)))
-						(else	(let ((row (hash-ref handlers-table (get-packet-id evt) #f)))
+				((bytes? ev) ; Incoming packet => handle then wait next.
+					(if (= (get-packet-id ev) #x64)
+						(packet-handler/system-message cn ec wr (game-server-packet/system-message ev)) ; Special case.
+						(let ((row (hash-ref handlers-table (get-packet-id ev) #f)))
 							(if row
-								((cdr row) ec wr ((car row) evt))
-								(apf-warn "Unhandled packet ~v" evt)
+								((cdr row) ec wr ((car row) ev))
+								(apf-warn "Unhandled packet ~v" ev)
 							)
-						))
+						)
 					)
 
 					(handle-interrupt cn ec pc tc)
 				)
-				((thread? evt) (make-event 'disconnect)) ; Connection closed => return immediately.
-				(else ; Postprocess event.
-					(apf-debug "Event ~a" evt)
-					(case-event evt ; Regular event => postprocess or just return.
-						(logout () ; Close socket.
-							(disconnect cn)
-							evt
-						)
-						(object-delete (subject-id)
-							(async-channel-put tc (lambda () ; Discard after event processing.
-								(attackers-delete! (world-me wr) subject-id)
-								(discard-object! wr subject-id)
-							))
-							evt
-						)
-						(teleport (subject-id destination)
-							(let ((me (world-me wr))) (when (= subject-id (object-id me))
-								(async-channel-put tc (lambda () ; Discard after event processing.
-									(let ((position (ref me 'position)) (angle (ref me 'angle))) ; Request updates.
-										(send-packet cn (game-client-packet/validate-location position angle))
-										(send-packet cn (game-client-packet/appearing))
-									)
-								))
-							))
-							evt
-						)
-						(else evt)
+				((thread? ev) (make-event 'disconnect)) ; Connection closed => return immediately.
+				(else ; Preprocess or skip regular event.
+					(let ((ev (or (preprocess-event cn wr ev) (handle-interrupt cn ec pc tc))))
+						(apf-debug "Event ~a" ev)
+						ev
 					)
 				)
 			)
 		)
 	)
 
-	(define (packet-handler/user-info cn ec wr packet)
+	(define (preprocess-event cn wr ev)
+		(case-event ev
+			('logout () ; Close socket.
+				(disconnect cn)
+				ev
+			)
+			('creature-create (subject-id)
+				(when (= subject-id (object-id (world-me wr)))
+					(send-packet cn (game-client-packet/refresh-skill-list))
+				)
+				ev
+			)
+			('object-delete (subject-id)
+				(let ((creature (object-ref wr subject-id)))
+					(when (creature? creature) (timer-stop! cn (ref creature 'moving-timer)))
+				)
+
+				(next-tick! cn (lambda () ; Discard after event processing.
+					(attackers-delete! (world-me wr) subject-id)
+					(discard-object! wr subject-id)
+				))
+				ev
+			)
+			('teleport (subject-id destination)
+				(let ((me (world-me wr))) (when (= subject-id (object-id me))
+					(let ((position (ref me 'position)) (angle (ref me 'angle))) ; Request updates.
+						(send-packet cn (game-client-packet/validate-location position angle))
+						(send-packet cn (game-client-packet/appearing))
+					)
+					(attackers-clear! me)
+				))
+				ev
+			)
+			('change-target (subject-id target-id . rest)
+				(let ((me (world-me wr)) (subject (object-ref wr subject-id)))
+					(if (eq? (object-id me) target-id)
+						(when (npc? subject)
+							(attackers-add! me subject-id)
+						)
+						(when (attackers-has? me subject-id)
+							(next-tick! cn (lambda () (attackers-delete! me subject-id)))
+						)
+					)
+				)
+				ev
+			)
+			('attack (subject-id hits)
+				(let ((me (world-me wr)))
+					(when (assoc (object-id me) hits =)
+						(attackers-add! me subject-id)
+					)
+				)
+				ev
+			)
+			('skill-started (subject-id target-id skill)
+				(let ((me (world-me wr))) (cond
+					((= (object-id me) subject-id) ; I'm caster.
+						(delayed-skill-reused! cn skill)
+					)
+					((eq? (object-id me) target-id) ; I'm target.
+						(when (skill-harmful? (skill-id skill))
+							(attackers-add! me subject-id)
+						)
+					)
+					((and (attackers-has? me subject-id) (not (eq? target-id subject-id)))
+						(next-tick! cn (lambda () (attackers-delete! me subject-id)))
+					)
+				))
+				ev
+			)
+			('skill-launched (subject-id skill target-ids)
+				(let ((me (world-me wr)))
+					(when (and (member (object-id me) target-ids =) (skill-harmful? (skill-id skill)))
+						(attackers-add! me subject-id)
+					)
+				)
+				ev
+			)
+			('die (subject-id . rest)
+				(let ((me (world-me wr)))
+					(when (attackers-has? me subject-id)
+						(next-tick! cn (lambda () (attackers-delete! me subject-id)))
+					)
+				)
+				ev
+			)
+			('change-moving (subject-id position destination)
+				(when (not destination)
+					(let ((subject (object-ref wr subject-id)))
+						(when (and (creature? subject) (ref subject 'destination)) ; Stop moving by timer.
+							(update-creature! subject (list
+								(cons 'position position)
+								(cons 'destination destination)
+							))
+						)
+					)
+				)
+				ev
+			)
+			(delayed-stop-moving (subject-id will-finish destination timer)
+				(timer-stop! cn timer) ; If not moving just reset stop-moving event timer.
+				(when will-finish
+					(let ((ev (make-event 'change-moving subject-id destination #f)))
+						(if (> will-finish (timestamp))
+							(alarm! #:id timer cn will-finish ev)
+							(trigger! cn ev)
+						)
+					)
+				)
+				#f
+			)
+			(else ev)
+		)
+	)
+
+	(define (packet-handler/user-info ec wr packet)
 		(let* ((me (world-me wr)) (changes (update-protagonist! me packet)))
 			(if (not (object-ref wr (ref packet 'object-id)))
 				(begin
 					(register-object! wr me)
-					(send-packet cn (game-client-packet/refresh-skill-list))
-					(trigger! ec 'creature-create (object-id me))
+					(trigger ec 'creature-create (object-id me))
 				)
 				(trigger-creature-update! ec (object-id me) changes)
 			)
@@ -207,7 +330,7 @@
 			(if (not npc)
 				(let ((npc (make-npc packet)))
 					(register-object! wr npc)
-					(trigger! ec 'creature-create object-id)
+					(trigger ec 'creature-create object-id)
 				)
 				(let ((changes (update-npc! npc packet)))
 					(trigger-creature-update! ec object-id changes)
@@ -222,7 +345,7 @@
 					((npc? creature) (update-npc! creature packet))
 			)))
 			(when (not (null? changes))
-				(trigger! ec 'creature-update (object-id creature) changes)
+				(trigger ec 'creature-update (object-id creature) changes)
 			)
 		)
 	)
@@ -249,17 +372,17 @@
 	(define (packet-handler/spawn-item ec wr packet)
 		(let ((item (make-item packet)))
 			(register-object! wr item)
-			(trigger! ec 'item-spawn (object-id item) #f)
+			(trigger ec 'item-spawn (object-id item) #f)
 		)
 	)
 	(define (packet-handler/drop-item ec wr packet)
 		(let ((item (make-item packet)))
 			(register-object! wr item)
-			(trigger! ec 'item-spawn (object-id item) (ref packet 'subject-id))
+			(trigger ec 'item-spawn (object-id item) (ref packet 'subject-id))
 		)
 	)
 	(define (packet-handler/pick-item ec wr packet) ; Происходит перед object-delete.
-		(trigger! ec 'item-pick (ref packet 'object-id) (ref packet 'subject-id) (ref packet 'position))
+		(trigger ec 'item-pick (ref packet 'object-id) (ref packet 'subject-id) (ref packet 'position))
 	)
 	(define (packet-handler/object-deleted ec wr packet)
 		(let* ((object-id (ref packet 'object-id)) (object (object-ref wr object-id)))
@@ -270,7 +393,7 @@
 					)
 				))
 			)
-			(trigger! ec 'object-delete object-id)
+			(trigger ec 'object-delete object-id)
 		)
 	)
 
@@ -281,20 +404,20 @@
 		(let ((creature (object-ref wr (ref packet 'object-id))) (target (object-ref wr (ref packet 'target-id))))
 ; (when (antagonist? creature) (printf "<~a> {move-to-pawn ~a}~n" (format-time) packet)(flush-output))
 			(if (and creature target)
-				(begin
-					(when (npc? creature)
-						(if (protagonist? target)
-							(attackers-add! target (object-id creature))
-							(attackers-delete! (world-me wr) (object-id creature))
+				(handle-creature-update! ec wr (if (npc? creature)
+					(begin
+						(list
+							(cons 'object-id (object-id creature))
+							(cons 'target-id (object-id target))
+							(cons 'position (ref packet 'position))
+							(cons 'destination (ref target 'position))
 						)
 					)
-					(handle-creature-update! ec wr (list
+					(list
 						(cons 'object-id (object-id creature))
-						(cons 'target-id (object-id target))
 						(cons 'position (ref packet 'position))
-						(cons 'destination (ref target 'position))
-					) creature)
-				)
+					)
+				) creature)
 				(apf-warn "World object ~v is missed, handler: move-to-pawn." (ref packet 'target-id))
 			)
 		)
@@ -345,7 +468,7 @@
 		(define (group-hits hits)
 			(hash->list (fold (lambda (hit map)
 				(let* ((target-id (ref hit 'target-id)) (bucket (hash-ref map target-id (list))))
-					(hash-set! map target-id (cons (alist-except hit (list 'target-id) eq?) bucket))
+					(hash-set! map target-id (cons (alist-except hit eq? 'target-id) bucket))
 					map
 				)
 			) (make-hasheq) (ref packet 'hits)))
@@ -356,9 +479,6 @@
 		(define (handle-taget subject bucket in-combat?)
 			(let-values (((target-id hits) (car+cdr bucket)))
 				(let ((victim (object-ref wr target-id))) (when victim
-					(when (protagonist? victim)
-						(attackers-add! victim (object-id subject))
-					)
 					(let ((damage (apply + (map hit-damage hits))) (hp (ref victim 'hp)))
 						(if (> damage 0)
 							(begin
@@ -384,12 +504,12 @@
 					(if in-combat? (cons 'in-combat? #t) #f)
 				) subject)
 
-				(trigger! ec 'attack (object-id subject) hits) ; Trigger main event.
+				(trigger ec 'attack (object-id subject) hits) ; Trigger main event.
 			)
 		))
 	)
 	(define (packet-handler/social-action ec wr packet)
-		(trigger! ec 'gesture
+		(trigger ec 'gesture
 			(ref packet 'object-id)
 			(ref packet 'action)
 		)
@@ -405,29 +525,20 @@
 			) (ref packet 'list))))
 		)
 	)
-	(define (packet-handler/skill-started cn ec wr packet)
+	(define (packet-handler/skill-started ec wr packet)
 		(define (update-or-create-skill packet)
 			(or
 				(and (= (object-id (world-me wr)) (ref packet 'object-id))
-					(let ((skill (skill-ref wr (ref packet 'skill-id))))
-						(and skill
-							(update-skill! skill (list
-								(cons 'level (ref packet 'level))
-								(cons 'last-usage (timestamp))
-								(cons 'reuse-delay (ref packet 'reuse-delay))
-							))
-							(delayed-skill-reused! cn skill)
-							skill
-						)
-					)
+					(let ((skill (skill-ref wr (ref packet 'skill-id)))) (and skill (begin
+						(update-skill! skill (list
+							(cons 'level (ref packet 'level))
+							(cons 'last-usage (timestamp))
+							(cons 'reuse-delay (ref packet 'reuse-delay))
+						))
+						skill
+					)))
 				)
-				(make-skill
-					(ref packet 'skill-id)
-					(ref packet 'level)
-					#t
-					(timestamp)
-					(ref packet 'reuse-delay)
-				)
+				(make-skill (ref packet 'skill-id) (ref packet 'level) #t (timestamp) (ref packet 'reuse-delay))
 			)
 		)
 
@@ -435,20 +546,13 @@
 			(let ((skill (update-or-create-skill packet)) (me (world-me wr)))
 				(handle-creature-update! ec wr (list
 					(cons 'object-id (object-id creature))
-					(cons 'target-id (ref packet 'target-id))
+					; (cons 'target-id (ref packet 'target-id)) ; It's possible to cast on self without target changing.
 					(cons 'position (ref packet 'position))
 					(cons 'destination #f)
 					(cons 'casting skill)
 				) creature)
 
-				(if (= (ref packet 'target-id) (object-id me))
-					(when (skill-harmful? (skill-id skill))
-						(attackers-add! me (object-id creature))
-					)
-					(attackers-delete! me (object-id creature))
-				)
-
-				(trigger! ec 'skill-started (object-id creature) skill)
+				(trigger ec 'skill-started (object-id creature) (ref packet 'target-id) skill)
 			)
 		))
 	)
@@ -467,14 +571,10 @@
 			(let ((skill (find-or-create-skill creature packet)))
 				(handle-creature-update! ec wr (list
 					(cons 'casting #f)
-					(cons 'located-at (timestamp))
+					(cons 'located-at (timestamp)) ; FIXME NO REASON, VALUE WILL BE DROPPED.
 				) creature)
 
-				(when (and (member (object-id me) (ref packet 'targets) =) (skill-harmful? (skill-id skill)))
-					(attackers-add! me (object-id creature))
-				)
-
-				(trigger! ec 'skill-launched (object-id creature) skill (remove zero? (ref packet 'targets)))
+				(trigger ec 'skill-launched (object-id creature) skill (ref packet 'targets))
 			)
 		))
 	)
@@ -483,37 +583,37 @@
 			(let ((skill (ref creature 'casting)))
 				(update-creature! creature (list
 					(cons 'casting #f)
-					(cons 'located-at (timestamp))
+					(cons 'located-at (timestamp)) ; FIXME NO REASON, VALUE WILL BE DROPPED.
 				))
-				(trigger! ec 'skill-canceled (object-id creature) skill)
+				(trigger ec 'skill-canceled (object-id creature) skill)
 			)
 		))
 	)
 
 	(define (packet-handler/ask-join-clan ec wr packet)
-		(trigger! ec 'ask/join-clan
+		(trigger ec 'ask/join-clan
 			(cons 'clan (ref packet 'name))
 		)
 	)
 	(define (packet-handler/ask-join-party ec wr packet)
-		(trigger! ec 'ask/join-party
+		(trigger ec 'ask/join-party
 			(cons 'player (ref packet 'name))
 			(cons 'loot (ref packet 'loot))
 		)
 	)
 	(define (packet-handler/ask-be-friends ec wr packet)
-		(trigger! ec 'ask/be-friends
+		(trigger ec 'ask/be-friends
 			(cons 'player (ref packet 'name))
 		)
 	)
 	(define (packet-handler/ask-join-alliance ec wr packet)
-		(trigger! ec 'ask/join-alliance
+		(trigger ec 'ask/join-alliance
 			(cons 'alliance (ref packet 'name))
 		)
 	)
 	(define (packet-handler/reply-join-party ec wr packet)
 		(when (not (ref packet 'accept?))
-			(trigger! ec 'reject/join-party
+			(trigger ec 'reject/join-party
 				; (cons 'object-id ?) ; TODO
 				; (cons 'name ?) ; TODO?
 			)
@@ -521,26 +621,31 @@
 	)
 
 	(define (packet-handler/party-all-members ec wr packet)
-		(set-world-party! wr (apply make-party
-			(ref packet 'loot-mode)
-			(ref packet 'leader-id)
-			(fold (lambda (data members)
-				(let ((character (create-or-update-character! ec wr data)))
-					(if (not (= (object-id character) (ref packet 'leader-id)))
-						(cons (object-id character) members) ; Regular member.
-						members ; Party leader.
+		(let ((me (world-me wr)) (leader-id (ref packet 'leader-id)))
+			(set-world-party! wr (apply make-party
+				(ref packet 'loot-mode)
+				leader-id
+				(fold (lambda (data members)
+					(let ((character (create-or-update-character! ec wr data)))
+						(if (not (member (object-id character) (list (object-id me) leader-id)))
+							(cons (object-id character) members) ; Regular member.
+							members ; Party leader.
+						)
 					)
-				)
-			) (list) (ref packet 'members))
-		))
+				) (list (object-id me)) (ref packet 'members))
+			))
+		)
 
 		(let ((party (world-party wr)))
-			(trigger! ec 'party-join (party-loot party) (party-members party))
+			(trigger ec 'party-join (party-loot party) (party-members party))
 		)
 	)
 	(define (packet-handler/party-add-member ec wr packet)
 		(let ((character (create-or-update-character! ec wr packet)))
-			(trigger! ec 'party-memeber-join (object-id character))
+			(when (not (in-party? (world-party wr) (object-id character)))
+				(party-add! wr (object-id character))
+				(trigger ec 'party-memeber-join (object-id character))
+			)
 		)
 	)
 	(define (packet-handler/party-member-update ec wr packet)
@@ -553,21 +658,21 @@
 		(let ((object-id (ref packet 'object-id)))
 			(party-kick! wr object-id)
 			(if (world-party wr)
-				(trigger! ec 'party-memeber-leave object-id)
-				(trigger! ec 'party-leave)
+				(trigger ec 'party-memeber-leave object-id)
+				(trigger ec 'party-leave)
 			)
-			(trigger! ec 'party-memeber-leave object-id)
+			(trigger ec 'party-memeber-leave object-id)
 		)
 	)
 	(define (packet-handler/party-clear-members ec wr packet)
 		(when (world-party wr)
 			(party-clear! wr)
-			(trigger! ec 'party-leave)
+			(trigger ec 'party-leave)
 		)
 	)
 
 	(define (packet-handler/chat-message ec wr packet)
-		(trigger! ec 'message
+		(trigger ec 'message
 			(ref packet 'object-id)
 			(ref packet 'channel)
 			(ref packet 'author)
@@ -580,24 +685,24 @@
 				((or (= message-id 612) (= message-id 357)) ; Set spoiled state here bacause there is no other way.
 					(let ((target-id (ref (world-me wr) 'target-id)))
 						(let ((changes (update-npc! (object-ref wr target-id) (list (cons 'spoiled? #t)))))
-							(when (not (null? changes)) (trigger! ec 'creature-update target-id changes))
+							(when (not (null? changes)) (trigger ec 'creature-update target-id changes))
 						)
 					)
 				)
 				((= message-id 48) (let ((skill (skill-ref wr (ref arguments 'skill)))) (when skill
-					(when (skill-ready? skill)
+					(when (skill-ready? skill) ; Fix broken skill-ready?
 						(let ((reuse-delay (if (> (ref skill 'reuse-delay) 0) (ref skill 'reuse-delay) 3)))
 							(set-skill-used! skill (- (+ (timestamp) 3) reuse-delay) reuse-delay) ; Will ready after 3s.
 							(delayed-skill-reused! cn skill)
 						)
 					)
-					(trigger! ec 'skill-reusing (skill-id skill))
+					(trigger ec 'skill-reusing (skill-id skill))
 				)))
 			)
 
 			; TODO Set is effect failed?
 
-			(apply trigger! ec 'system-message message-id arguments)
+			(apply trigger ec 'system-message message-id arguments)
 		)
 	)
 
@@ -624,8 +729,6 @@
 				)
 			)
 
-			(attackers-delete! (world-me wr) (object-id creature))
-
 			; Fix missing change-moving event.
 			(handle-creature-update! ec wr (list
 				(cons 'object-id (object-id creature))
@@ -634,7 +737,7 @@
 			))
 
 			; Trigger main event.
-			(trigger! ec 'die (object-id creature) (if (protagonist? creature) (ref packet 'return) #f))
+			(trigger ec 'die (object-id creature) (if (protagonist? creature) (ref packet 'return) #f))
 		))
 	)
 	(define (packet-handler/revive ec wr packet)
@@ -653,20 +756,17 @@
 				)
 			)
 
-			(trigger! ec 'revive (object-id creature))
+			(trigger ec 'revive (object-id creature))
 		))
 	)
 
 	(define (packet-handler/teleport ec wr packet)
 		(let ((creature (handle-creature-update! ec wr (cons (cons 'destination #f) packet)))) (when creature
-			(when (protagonist? creature)
-				(attackers-clear! creature)
-			)
-			(trigger! ec 'teleport (object-id creature) (ref creature 'position))
+			(trigger ec 'teleport (object-id creature) (ref creature 'position))
 
 			(let ((party (party-members (world-party wr))))
 				(map ; Remove all known objects except myself & party memebers.
-					(lambda (object) (trigger! ec 'object-delete (object-id object)))
+					(lambda (object) (trigger ec 'object-delete (object-id object)))
 					(objects wr (lambda (object)
 						(not (or ; TODO Don't remove nearest objects?
 							(protagonist? object)
@@ -679,13 +779,13 @@
 	)
 
 	(define (packet-handler/logout ec wr packet)
-		(trigger! ec 'logout)
+		(trigger ec 'logout)
 	)
 
 	(define handlers-table (make-hash (list
 		(cons #x01 (cons game-server-packet/move-to-point packet-handler/move-to-point)) ; change-moving
 		(cons #x03 (cons game-server-packet/char-info packet-handler/char-info)) ; creature-create
-		; (cons #x04 (cons game-server-packet/user-info packet-handler/user-info)) ; creature-create (especial handling).
+		(cons #x04 (cons game-server-packet/user-info packet-handler/user-info)) ; creature-create
 		(cons #x05 (cons game-server-packet/attack packet-handler/attack)) ; attack
 		(cons #x06 (cons game-server-packet/die packet-handler/die)) ; die
 		(cons #x07 (cons game-server-packet/revive packet-handler/revive)) ; revive
@@ -716,7 +816,7 @@
 		; (cons #x3a (cons game-server-packet/reply-join-party packet-handler/reply-join-party)) ; reject
 		; (cons #x45 (cons game-server-packet/shortcut-init packet-handler/shortcut-init))
 		(cons #x47 (cons game-server-packet/stop-moving packet-handler/stop-moving)) ; change-moving
-		; #x48 game-server-packet/skill-started (especial handling).
+		(cons #x48 (cons game-server-packet/skill-started packet-handler/skill-started)) ; skill-started
 		(cons #x49 (cons game-server-packet/skill-canceled packet-handler/skill-canceled)) ; skill-canceled
 		(cons #x4a (cons game-server-packet/chat-message packet-handler/chat-message)) ; message
 		; #x4b EquipUpdate
@@ -728,7 +828,7 @@
 		(cons #x51 (cons game-server-packet/party-delete-member packet-handler/party-delete-member)) ; party-memeber-leave
 		(cons #x52 (cons game-server-packet/party-member-update packet-handler/party-member-update)) ; creature-update
 		(cons #x58 (cons game-server-packet/skill-list packet-handler/skill-list))
-		; (cons #x60 (cons game-server-packet/move-to-pawn packet-handler/move-to-pawn)) ; change-moving
+		(cons #x60 (cons game-server-packet/move-to-pawn packet-handler/move-to-pawn)) ; change-moving
 		(cons #x61 (cons game-server-packet/validate-location packet-handler/validate-location))
 		; #x63 ?
 		; (cons #x64 (cons game-server-packet/system-message packet-handler/system-message)) ; system-message (especial handling).

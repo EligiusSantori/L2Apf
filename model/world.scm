@@ -95,14 +95,19 @@
 		)
 	)
 
-	(define (objects wr [predicate always?])
+	(define (objects wr [predicate #f])
 		(define l (list))
-		(hash-for-each (world-objects wr) (lambda (k v)
-			(when (predicate v)
-				(set! l (cons v l))
+		(if predicate
+			(begin
+				(hash-for-each (world-objects wr) (lambda (k v)
+					(when (predicate v)
+						(set! l (cons v l))
+					)
+				))
+				l
 			)
-		))
-		l
+			(hash-values (world-objects wr))
+		)
 	)
 	(define (fold-objects wr init proc)
 		(define r init)
@@ -132,8 +137,28 @@
 	(define (skill-ref wr skill-id)
 		(hash-ref (world-skills wr) skill-id #f)
 	)
-	(define (inv-ref world object-id)
-		(hash-ref (world-inventory world) object-id #f)
+	(define (inv-ref wr object-id)
+		(hash-ref (world-inventory wr) object-id #f)
+	)
+
+	(define (items wr [predicate #f])
+		(define l (list))
+		(if predicate
+			(begin
+				(hash-for-each (world-inventory wr) (lambda (k v)
+					(when (predicate v) (set! l (cons v l)))
+				))
+				l
+			)
+			(hash-values (world-inventory wr))
+		)
+	)
+	(define (fold-items wr init proc)
+		(define r init)
+		(hash-for-each (world-inventory wr) (lambda (k v)
+			(set! r (proc v r))
+		))
+		r
 	)
 
 	(define (equipped wr item)
@@ -206,12 +231,16 @@
 	)
 
 	(define (get-angle wr creature)
-		(if (casting? creature)
+		(or (and
+			(casting? creature)
 			(let ((target (get-target wr creature)))
-				(or (and target (creatures-angle creature target)) (ref creature 'angle))
+				(and
+					target
+					(not (object=? creature target))
+					(creatures-angle creature target)
+				)
 			)
-			(ref creature 'angle)
-		)
+		) (ref creature 'angle))
 	)
 
 	(define (get-destination wr creature)
@@ -232,7 +261,7 @@
 
 	(define (party-add! wr object-id)
 		(let ((party (world-party wr)))
-			(set-world-party! wr (make-party
+			(set-world-party! wr (apply make-party
 				(party-loot party)
 				(party-leader party)
 				(cons object-id (cdr (party-members party)))
@@ -243,7 +272,7 @@
 		(set-world-party! wr #f)
 	)
 	(define (party-kick! wr object-id)
-		(let* ((party (world-party wr)) (left (remove (lambda (id) (= id object-id)) (party-members party))))
+		(let* ((party (world-party wr)) (left (list-except (party-members party) = object-id)))
 			(if (null? left)
 				(party-clear! wr)
 				(set-world-party! wr (apply make-party (party-loot party) left))
@@ -252,7 +281,7 @@
 	)
 	(define (party-leader! wr object-id)
 		(let ((party (world-party wr)))
-			(set-world-party! wr (make-party
+			(set-world-party! wr (apply make-party
 				(party-loot party)
 				object-id
 				(cdr (party-members party))

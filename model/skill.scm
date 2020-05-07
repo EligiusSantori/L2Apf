@@ -1,6 +1,6 @@
 (module logic racket/base
 	(require
-		(except-in srfi/1 any)
+		(only-in srfi/1 proper-list?)
 		(only-in racket/function negate)
 		racket/contract
 		"../library/date_time.scm"
@@ -20,7 +20,7 @@
 	))
 
 	(define (skill? skill)
-		(if (and skill (ref skill 'skill-id)) #t #f)
+		(if (and skill (box? skill) (proper-list? (unbox skill)) (ref skill 'skill-id)) #t #f)
 	)
 
 	(define (skill-id skill)

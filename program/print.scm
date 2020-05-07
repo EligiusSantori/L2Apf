@@ -17,7 +17,7 @@
 	(define-program program-print
 		(lambda (cn event . args)
 			(case-event event
-				(message (author-id channel author text)
+				('message (author-id channel author text)
 					(displayln (format-chat-message author-id channel author text))
 				)
 			)

@@ -4,7 +4,7 @@
 		"program.scm"
 		(relative-in "../."
 			"library/extension.scm"
-			"system/debug.scm"
+			"system/log.scm"
 		)
 	)
 	(provide

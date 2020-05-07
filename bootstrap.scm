@@ -1,22 +1,19 @@
 (module script racket/base
 	(require
-		srfi/1
+		(only-in srfi/1 fold)
 		racket/string
-		(rename-in racket/contract (any all/c))
+		racket/contract
 		(only-in yaml read-yaml)
 		"library/extension.scm"
 		"system/structure.scm"
 		"system/uri_scheme.scm"
-		"system/connection.scm"
 		"system/event.scm"
-		"model/creature.scm"
-		"model/world.scm"
+		"system/debug.scm"
 		"api/connect.scm"
 		"api/login.scm"
 		"api/select_server.scm"
 		"api/select_character.scm"
 		"api/logout.scm"
-		"program/program.scm"
 	)
 	(provide
 		parse-protocol
@@ -57,50 +54,20 @@
 		(lambda (ch) (string-ci=? name (ref ch 'name)))
 	)
 
-	(define (print-handler value port)
-		(cond
-			((bytes? value) ; Custom (hex) printer for byte string.
-				(display "[" port)
-				(display (string-join (map byte->hex (bytes->list value)) " ") port)
-				(display "]" port)
-			)
-			((connection? value)
-				(display "#<connection:" port)
-				(display (connection-protocol value) port)
-				(display ":" port)
-				(display (connection-account value) port)
-				(display ">" port)
-			)
-			((world? value)
-				(display "#<world(" port)
-				(display (hash-count (world-objects value)) port)
-				(display "):" port)
-				(display (ref (world-me value) 'name) port)
-				(display ">" port)
-			)
-			((program? value)
-				(display "#<program:" port)
-				(display (program-id value) port)
-				(display ">" port)
-			)
-			(else (write value port))
-		)
-	)
-
 	(define (terminate connection events)
 		(logout connection)
 		(let loop ()
 			(case-event (sync events)
-				(logout () (displayln "Logged out."))
+				('logout () (displayln "Logged out."))
 				(else (loop))
 			)
 		)
 	)
 
 	(define (bootstrap entry host port account password name)
-		(global-port-print-handler print-handler)
+		(global-port-print-handler apf-print-handler)
 		(let ((connection (connect host port 656)))
-			(let ((world (first (login connection account password))))
+			(let ((world (car (login connection account password))))
 				(let ((me (findf (char-name=? name) (select-server connection world))))
 					(let ((events (select-character connection me)))
 						(with-handlers ((exn:break? (lambda (e) (terminate connection events))))

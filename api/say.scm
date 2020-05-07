@@ -2,6 +2,7 @@
 	(require
 		srfi/1
 		"../packet/game/client/say.scm"
+		"../packet/game/client/command_builder.scm"
 		(only-in "../system/connection.scm" send-packet)
 	)
 	(provide say)
@@ -19,7 +20,14 @@
 
 	(define (say connection message . tail)
 		(let-values (((channel target) (parse-args tail)))
-			(send-packet connection (game-client-packet/say message channel target))
+			(case channel
+				((chat-channel/game-master)
+					(send-packet connection (game-client-packet/command-builder message))
+				)
+				(else
+					(send-packet connection (game-client-packet/say message channel target))
+				)
+			)
 		)
 	)
 )

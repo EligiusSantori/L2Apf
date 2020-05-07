@@ -1,8 +1,9 @@
 (module logic racket/base
 	(require
-		srfi/1
-		(rename-in racket/contract (any all/c))
+		(only-in srfi/1 alist-delete)
+		racket/contract
 		"../system/structure.scm"
+		"object.scm"
 		"character.scm"
 	)
 	(provide (contract-out
@@ -12,7 +13,7 @@
 	))
 
 	(define (antagonist? object)
-		(if (and object (member 'antagonist (ref object 'type))) #t #f)
+		(object-of-type? object 'antagonist)
 	)
 
 	(define (make-antagonist data)

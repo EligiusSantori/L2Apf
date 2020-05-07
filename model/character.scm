@@ -1,10 +1,11 @@
 (module logic racket/base
 	(require
-		srfi/1
+		(only-in srfi/1 fold alist-delete)
 		(only-in racket/function negate)
-		(rename-in racket/contract (any all/c))
+		racket/contract
 		"../library/geometry.scm"
 		"../system/structure.scm"
+		"object.scm"
 		"creature.scm"
 	)
 	(provide (contract-out
@@ -16,9 +17,10 @@
 		(find-class-name (->* (integer?) (list?) (or/c symbol? false/c)))
 		(fighter-type? (-> character? boolean?))
 		(mystic-type? (-> character? boolean?))
-		(wizard-class? (-> character? boolean?))
-		(support-class? (-> character? boolean?))
-		(summoner-class? (-> character? boolean?))
+		(wizard-class? (-> character? any))
+		(support-class? (-> character? any))
+		(recharger-class? (-> character? any))
+		(summoner-class? (-> character? any))
 	))
 
 	(define character (list
@@ -50,11 +52,11 @@
 		(cons 'ally-crest-id (negate =))
 
 		(cons 'cubics (negate equal?)) ; TODO use set
-		(cons 'fish (negate point/3d=))
+		(cons 'fish (negate point/3d=?))
 	))
 
 	(define (character? object)
-		(if (and object (member 'character (ref object 'type))) #t #f)
+		(object-of-type? object 'character)
 	)
 
 	(define (make-character data)
@@ -201,31 +203,39 @@
 	)
 	(define (wizard-class? character)
 		(let ((class (find-class-name (ref character 'class-id) classes)))
-			(if (member class (list
+			(and (member class (list
 				'sorcerer 'archmage
 				'spellsinger 'mystic-muse
 				'spellhowler 'storm-screamer
-			)) #t #f)
+			)) class)
 		)
 	)
 	(define (support-class? character)
 		(let ((class (find-class-name (ref character 'class-id) classes)))
-			(if (member class (list
+			(and (member class (list
 				'cleric
 					'bishop 'cardinal
 					'prophet 'hierophant
 				'elven-oracle 'elven-elder 'evas-saint
 				'shillien-oracle 'shillien-elder 'shillien-saint
-			)) #t #f)
+			)) class)
+		)
+	)
+	(define (recharger-class? character)
+		(let ((class (support-class? character)))
+			(and class (member class (list
+				'elven-oracle 'elven-elder 'evas-saint
+				'shillien-oracle 'shillien-elder 'shillien-saint
+			)) class)
 		)
 	)
 	(define (summoner-class? character)
 		(let ((class (find-class-name (ref character 'class-id) classes)))
-			(if (member class (list
+			(and (member class (list
 				'warlock 'arcana-lord
 				'elemental-summoner 'elemental-master
 				'phantom-summoner 'spectral-master
-			)) #t #f)
+			)) class)
 		)
 	)
 )

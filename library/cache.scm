@@ -1,12 +1,13 @@
-(module system racket/base
+(module library racket/base
 	(require
 		racket/contract
-		racket/math
+		(only-in racket/math exact-round)
 		racket/set
 		data/heap
 	)
 	(provide (contract-out
 		(make-cache-set (->* (integer?) (procedure?) cache-set?))
+		(cache-set? (-> any/c boolean?))
 		(cache-set-add! (->* (cache-set? any/c) (integer?) void?))
 		(cache-set-delete! (-> cache-set? any/c void?))
 		(cache-set-clear! (-> cache-set? void?))

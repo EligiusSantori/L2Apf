@@ -1,12 +1,12 @@
 (module system racket/base
 	(require
-		racket/contract
-		racket/function
-		racket/async-channel
+		(only-in racket/function const)
 		racket/port
+		racket/async-channel
+		racket/contract
 		(only-in "../packet/packet.scm" get-packet-id)
 		(only-in "crypter.scm" crypter?)
-		"debug.scm"
+		"log.scm"
 	)
 	(provide
 		(struct-out connection)
@@ -33,7 +33,6 @@
 
 		[read-thread #:auto]
 		[send-thread #:auto]
-		; [move-thread #:auto]
 		[timer-thread #:auto]
 
 		[world #:auto]

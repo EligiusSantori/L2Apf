@@ -8,7 +8,8 @@
 		racket/undefined
 		(relative-in "../.."
 			"library/extension.scm"
-			"system/debug.scm"
+			"system/error.scm"
+			"system/log.scm"
 			"system/connection.scm"
 			"system/event.scm"
 		)
@@ -126,17 +127,6 @@
 	(struct exn:error:program exn:fail:user (id)
 		#:extra-constructor-name make-exn:error:program
 		#:transparent
-	)
-	(define (error-format message args)
-		; (let ((ph (error-value->string-handler)) (pw (error-print-width)))
-		; 	(string-join (cons message (map (lambda (arg) (ph arg pw)) args)) " ")
-		; )
-
-		(let ((o (open-output-string))) ; Better compatibility with raise-user-error.
-			(display message o)
-			(map (lambda (arg) (display " " o) (display arg o)) args)
-			(get-output-string o)
-		)
 	)
 	(define (raise-program-error program-id message . args)
 		(raise (make-exn:error:program (error-format message args) (current-continuation-marks) program-id))

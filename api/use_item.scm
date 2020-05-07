@@ -7,7 +7,7 @@
 	)
 	(provide use-item)
 
-	(define (use-item cn object-id)
+	(define (use-item cn object-id) ; TODO item-id or item
 		(let ((item (inv-ref (connection-world cn) object-id))) (when item
 			(let ((slot (equipped (connection-world cn) item)))
 				(if (not slot)

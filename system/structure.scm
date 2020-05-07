@@ -1,18 +1,22 @@
 (module system racket/base
 	(require
 		(only-in srfi/1 fold car+cdr)
-		(only-in racket/dict dict? dict-ref)
-		(rename-in racket/contract (any all/c))
+		racket/hash
+		racket/contract
 		"../library/extension.scm"
 	)
 	(provide (contract-out
-		(ref (->* ((or/c box? list? dict?)) #:rest list? any/c))
+		(ref (->* ((or/c box? hash? list?)) #:rest list? any/c))
 		(struct-update (->* (list? list? list?) (list? list?) (values list? list? list?)))
 	))
 
 	(define (ref struct . chain) ; Ultimate dictionary path extractor.
-		(define (f a b) (if (and b a) (dict-ref (if (box? b) (unbox b) b) a #f) #f))
-		(fold f (f (car chain) struct) (cdr chain))
+		(fold (lambda (a b)
+			(and b a (cond
+				((hash? b) (hash-ref b a))
+				(else (alist-ref (if (box? b) (unbox b) b) a #f eq?))
+			))
+		) struct chain)
 	)
 
 	(define (struct-extract lst key [rst (list)]) ; O(n)

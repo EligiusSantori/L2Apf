@@ -31,7 +31,9 @@
 		try-first
 		try-second
 		try-third
-		chunk
+		list-only
+		list-except
+		list-chunk
 		call/wv
 		values->list
 		list->values
@@ -110,7 +112,7 @@
 			(if r (cdr (car r)) default)
 		)
 	)
-	(define (alist-only lst keys [eqp equal?])
+	(define (alist-only lst eqp equal? . keys)
 		(filter (lambda (p)
 			(and
 				(pair? p) ; Also filter out invalid pairs
@@ -118,7 +120,7 @@
 			)
 		) lst)
 	)
-	(define (alist-except lst keys [eqp equal?])
+	(define (alist-except lst eqp equal? . keys)
 		(filter (lambda (p)
 			(and
 				(pair? p) ; Also filter out invalid pairs
@@ -171,7 +173,17 @@
 	(define (try-third lst [default #f])
 		(list-try-ref lst 2 default)
 	)
-	(define (chunk size lst)
+	(define (list-only lst eqp . vs)
+		(filter (lambda (v)
+			(member v vs eqp)
+		) lst)
+	)
+	(define (list-except lst eqp . vs)
+		(filter (lambda (v)
+			(not (member v vs eqp))
+		) lst)
+	)
+	(define (list-chunk size lst)
 		(define (r n f t)
 			(if (not (null? f))
 				(let-values (((c f) (split-at f n)))

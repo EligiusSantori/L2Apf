@@ -6,17 +6,19 @@
 		(rename-in racket/contract (any all/c))
 	)
 	(provide (contract-out
-		(revert-angle (rational? . -> . rational?))
-		(simple-angle (rational? . -> . rational?))
+		(revert-angle (-> rational? rational?))
+		(simple-angle (-> rational? rational?))
+		(point/2d-round (-> point/2d? point/2d?))
+		(point/3d-round (-> point/3d? point/3d?))
+		(point/2d=? (-> point/2d? point/2d? boolean?))
+		(point/3d=? (-> point/3d? point/3d? boolean?))
+		(point=? (-> (or/c point/3d? point/2d?) (or/c point/3d? point/2d?) boolean?))
 	))
 	(provide
 		(struct-out point/2d)
 		(struct-out point/3d)
 		point/3d->point/2d
 		point/2d->point/3d
-		point/3d=
-		point/2d=
-		point=
 
 		pi/4 ; 45 deg
 		pi/2 ; 90 deg
@@ -198,24 +200,37 @@
 		(point/3d (point/2d-x p) (point/2d-y p) z)
 	)
 
-	(define (point/2d= p1 p2)
+	(define (point/2d=? p1 p2)
 		(and
 			(= (point/2d-x p1) (point/2d-x p2))
 			(= (point/2d-y p1) (point/2d-y p2))
 		)
 	)
-	(define (point/3d= p1 p2)
+	(define (point/3d=? p1 p2)
 		(and
 			(= (point/3d-x p1) (point/3d-x p2))
 			(= (point/3d-y p1) (point/3d-y p2))
 			(= (point/3d-z p1) (point/3d-z p2))
 		)
 	)
-	(define (point= p1 p2)
+	(define (point=? p1 p2)
 		(cond
-			((and (point/2d? p1) (point/2d? p2)) (point/2d= p1 p2))
-			((and (point/3d? p1) (point/3d? p2)) (point/3d= p1 p2))
+			((and (point/2d? p1) (point/2d? p2)) (point/2d=? p1 p2))
+			((and (point/3d? p1) (point/3d? p2)) (point/3d=? p1 p2))
 			(else #f)
+		)
+	)
+	(define (point/2d-round p)
+		(point/2d
+			(exact-round (point/2d-x p))
+			(exact-round (point/2d-y p))
+		)
+	)
+	(define (point/3d-round p)
+		(point/3d
+			(exact-round (point/3d-x p))
+			(exact-round (point/3d-y p))
+			(exact-round (point/3d-z p))
 		)
 	)
 

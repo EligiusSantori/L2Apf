@@ -26,8 +26,8 @@
 	)
 
 	(define (estimate character)
-		(cond
-			((fighter-type? character) (select-skills ; TODO Fill up.
+		(apply select-skills (append (cond
+			((fighter-type? character) (list ; TODO Fill up.
 				; Common.
 				'might
 				'shield
@@ -40,8 +40,8 @@
 				'vampiric-rage
 				'wind-walk
 			))
-			((mystic-type? character) (append (cond
-				((wizard-class?) (select-skills ; TODO Fill up.
+			((mystic-type? character) (cond
+				((wizard-class? character) (list ; TODO Fill up.
 					; Common.
 					'shield
 					'mental-shield
@@ -50,18 +50,16 @@
 					; Important.
 					'empower
 				))
-				(support-class?) (select-skills ; TODO Fill up.
+				((support-class? character) (list ; TODO Fill up.
 					; Common.
 					'shield
 					'mental-shield
 
 					; Important.
 					'concentration
-				)) (list
-					'wind-walk
-				))
-			)
-		)
+			))))) (list ; Global buffs.
+			'wind-walk
+		)))
 	)
 
 	(define (will-ready skill)
@@ -104,12 +102,12 @@
 		(lambda (cn ev config todo)
 			(let* ((target-id (car config)) (wr (connection-world cn)) (me (world-me wr)))
 				(or (case-event ev
-					(change-target (subject-id id)
+					('change-target (subject-id id . rest)
 						(and (= (object-id me) subject-id) id (= id target-id)
 							(next-buff cn todo) ; Start working.
 						)
 					)
-					(skill-launched (subject-id . rest)
+					('skill-launched (subject-id . rest)
 						(and (= (object-id me) subject-id)
 							(begin
 								(heap-remove-min! todo) ; Drop completed buff.
@@ -117,24 +115,24 @@
 							)
 						)
 					)
-					(skill-canceled (subject-id . rest) ; Sort queue then do nearest.
+					('skill-canceled (subject-id . rest) ; Sort queue then do nearest.
 						(and (= (object-id me) subject-id)
 							(buff-over cn todo)
 						)
 					)
-					(skill-reusing (id) ; Sort queue then do nearest.
+					('skill-reusing (id) ; Sort queue then do nearest.
 						(and (> (heap-count todo) 0) (= (skill-id (heap-min todo)) id)
 							(begin
 								(buff-over cn todo)
 							)
 						)
 					)
-					(skill-reused (skill)
+					('skill-reused (skill)
 						(and (> (heap-count todo) 0) (= (skill-id (heap-min todo)) (skill-id skill))
 							(next-buff cn todo) ; Next skill ready, do it.
 						)
 					)
-					(die (subject-id . rest) ; Exit if me or target died.
+					('die (subject-id . rest) ; Exit if me or target died.
 						(if (member subject-id (list (object-id me) target-id)) eof todo)
 					)
 				) todo)

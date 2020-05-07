@@ -1,8 +1,8 @@
 (module logic racket/base
 	(require
-		srfi/1
+		(only-in srfi/1 fold partition alist-delete)
 		(only-in racket/function negate)
-		(rename-in racket/contract (any all/c))
+		racket/contract
 		"../library/extension.scm"
 		"../library/date_time.scm"
 		"../library/geometry.scm"
@@ -18,7 +18,7 @@
 
 		(moving? (-> creature? boolean?))
 		(casting? (-> creature? boolean?))
-		(get-speed (-> creature? integer?))
+		(get-move-speed (-> creature? rational?))
 		(get-position (-> creature? (or/c point/3d? false/c)))
 		(creatures-angle (-> creature? creature? (or/c rational? false/c)))
 		(creatures-distance (-> creature? creature? integer?))
@@ -42,8 +42,8 @@
 		(cons 'casting #t)
 
 		(cons 'angle (negate =))
-		(cons 'position (negate point/3d=))
-		(cons 'destination (negate point/3d=))
+		(cons 'position (negate point/3d=?))
+		(cons 'destination (negate point/3d=?))
 		(cons 'located-at #t)
 
 		(cons 'collision-radius (negate =))
@@ -60,10 +60,12 @@
 		(cons 'fly-walk-speed (negate =))
 
 		(cons 'clothing (negate alist-equal?))
+
+		(cons 'moving-timer #f)
 	))
 
 	(define (creature? object)
-		(if (and object (member 'creature (ref object 'type))) #t #f)
+		(object-of-type? object 'creature)
 	)
 
 	(define (make-creature data)
@@ -71,7 +73,10 @@
 			(let ((type (cons 'creature (ref object 'type))))
 				(fold
 					(lambda (p r) (if (and p (assoc (car p) creature eq?)) (cons p r) r)) ; If field belongs to creature.
-					(cons (cons 'type type) (alist-delete 'type object))
+					(append (alist-delete 'type object) (list
+						(cons 'type type)
+						(cons 'moving-timer (gensym)) ; Timer for stop moving event.
+					))
 					data
 				)
 			)
@@ -84,12 +89,15 @@
 	(define (parse-location data)
 		(let ((pf (assoc 'position data eq?)) (df (assoc 'destination data eq?)) (af (assoc 'angle data eq?)) (at (cons 'located-at (timestamp))))
 			(cond
-				((and pf df) (let ((df (cons 'destination (and (cdr df) (not (point/3d= (cdr pf) (cdr df))) (cdr df))))) ; Reset destination if equal to position.
-						(if (or af (cdr df)) ; If angle specified or can be calculated.
-							(list pf df (or af (cons 'angle (points-angle (cdr pf) (cdr df)))) at) ; Update angle, position, destination, timestamp.
+				((and pf df)
+					(let ((df (cons 'destination (and (cdr df) (not (point/3d=? (cdr pf) (cdr df))) (cdr df)))) ; Reset destination if equal to position.
+							(af (cons 'angle (if af (cdr af) (and (cdr df) (points-angle (cdr pf) (cdr df))))))) ; Calculate angle if not specified and not (point/2d=? position destination).
+						(if (cdr af)
+							(list pf df af at) ; Update angle, position, destination, timestamp.
 							(list pf df at) ; Update position, destination, timestamp.
 						)
-				))
+					)
+				)
 				((and pf af) (list pf af at)) ; Update angle, position, timestamp.
 				(pf (list pf at)) ; Update position, timestamp.
 				(af (list af)) ; Just update angle.
@@ -121,20 +129,20 @@
 		) #t #f)
 	)
 
-	(define (get-speed creature)
+	(define (get-move-speed creature)
 		(if (moving? creature)
-			(if (ref creature 'walking?)
+			(* (if (ref creature 'walking?)
 				(or (ref creature 'walk-speed) 0)
 				(or (ref creature 'run-speed) 0)
-			)
+			) (or (ref creature 'move-speed-factor) 1))
 			0
 		)
 	)
 	(define (get-position creature)
-		(let ((speed (get-speed creature)) (at (ref creature 'located-at)) (p (ref creature 'position)) (d (ref creature 'destination)))
+		(let ((speed (get-move-speed creature)) (at (ref creature 'located-at)) (p (ref creature 'position)) (d (ref creature 'destination)))
 			(if (and (> speed 0) p at) ; If moving? and located-at is set.
 				(let ((cd (* (- (timestamp) at) speed)))
-					(if (< cd (distance/3d p d)) (segment-offset/3d p d cd) d) ; Total or calculated distance.
+					(if (< cd (distance/3d p d)) (point/3d-round (segment-offset/3d p d cd)) d) ; Total or calculated distance.
 				)
 				p
 			)

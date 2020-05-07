@@ -1,6 +1,6 @@
 (module ai racket/base
 	(require
-		srfi/1
+		(only-in srfi/1 remove)
 		racket/string
 		racket/undefined
 		"program.scm"
@@ -80,22 +80,47 @@
 	(define (command cn event config state)
 		(define brain (car config))
 		(case-event event
-			(message (author-id channel author text)
-				(let* ((wr (connection-world cn)) (command (parse-command wr text channel author-id)))
+			('message (author-id channel author text)
+				(let* ((wr (connection-world cn)) (me (world-me wr)) (command (parse-command wr text channel author-id)))
 					(when command (case (car command)
+						; Actions.
 						(("hello") (gesture cn 'gesture/hello))
-
 						(("return") (let ((author (object-ref wr author-id)))
 							; (when author (move-to cn (get-position author) (or (ref author 'collision-radius) 10)))
 							(when author (move-behind cn author 50))
 						))
+						; TODO
+						; (("use") (let* ((what (list-try-ref command 1)) (item-id (string->number (or what "")) 0)) (case what
+						; 	(("soe") (fold-items wr (list) (lambda (item lst)
+						; 		(if (member (ref item 'item-id) (list
+						; 			736 1829 1830  ; Normal.
+						; 			1538 5858 5859 3958 ; Blessed.
+						; 			7117 7118 7119 7120 7121 ; Villages.
+						; 			7122 7123 7124 7125 7126 7128 7129 7131 7132 7133 7134 7135 ; Towns.
+						; 		)) (cons (ref item 'item-id) (ref item 'object-id)) lst)
+						; 	))
+						; 	(else (when (> item-id 0) (use-item cn item-id)))
+						; )))
+						(("show") (let ((what (list-try-ref command 1))) (case what
+							(("level") (say cn (format "Level: ~a." (ref me 'level)) 'chat-channel/party))
+							(("sp") (say cn (format "SP: ~a." (ref me 'sp)) 'chat-channel/party))
+							; (("adena") ...) ; TODO
+						)))
 						; (("go") (let* ((on (or (string->number (list-try-ref command 1 "0")) 0)) (es (/ on (ref (world-me wr) 'run-speed))))
 						; 	(when (> on 0)
 						; 		(move-on cn on)
 						; 	)
 						; ))
-						(("follow") (brain-do! brain (program program-follow-chase author-id 150)))
-						(("follow+") (brain-do! brain (program program-follow-repeat author-id)))
+						(("bye")
+							(brain-clear! brain #t) ; Call foreground program destructor before exit.
+							(logout cn)
+						)
+
+						; Programs.
+						(("follow") (let ((gap (or (string->number (list-try-ref command 1 "30")) 30)))
+							(brain-do! brain (program program-follow-chase author-id gap))
+						))
+						(("follow+") (brain-do! brain (program program-follow-repeat author-id 50)))
 
 						(("assist") (let ((author (object-ref wr author-id)))
 							(if author
@@ -103,8 +128,11 @@
 								(say cn "Don't see the requester.")
 							)
 						))
-						(("support") (brain-do! brain (program program-support)))
-						(("bless") (let ((author (object-ref wr author-id)))
+						(("support")
+							(brain-load! brain (program program-support #t #t #f #t 1000))
+							(brain-do! brain (program program-follow-chase author-id 150))
+						)
+						(("buff") (let ((author (object-ref wr author-id)))
 							(if author
 								(brain-do! brain (program program-bless (ref author 'target-id)) #t)
 								(say cn "Don't see the requester.")
@@ -130,13 +158,10 @@
 								)
 							)
 						))
-						(("relax") (brain-do! brain (program program-relax)))
-
+						(("relax") (let ((duration (or (string->number (list-try-ref command 1 "0")) 0)))
+							(brain-do! brain (program program-relax duration))
+						))
 						(("clear") (brain-clear! brain #t))
-						(("bye")
-							(brain-clear! brain #t) ; Call foreground program destructor before exit.
-							(logout cn)
-						)
 
 						(else (say cn "I don't understand."))
 					))

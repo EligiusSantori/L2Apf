@@ -14,7 +14,7 @@
 
 	(define-program program-partying
 		(lambda (cn event config . args)
-			(when (and (eq? (car event) 'ask/join-party) (not (in-party? (world-party (connection-world cn)))))
+			(when (and (eq? (car event) 'ask/join-party) (not (world-party (connection-world cn))))
 				(let ((from (ref (cdr event) 'player)) (names (car config)))
 					(reply cn (car event) (or (not names) (member from names string-ci=?)))
 				)
