@@ -100,9 +100,9 @@
 	)
 	(define delayed-stop-moving (gensym))
 	(define (will-finish-move creature)
-		(let ((destination (ref creature 'destination)))
-			(and destination
-; (when (zero? (get-move-speed creature)) (apf-error "{zero-speed of ~v: ~a => ~a}" creature (ref creature 'position) destination))
+		(let ((destination (ref creature 'destination)) (speed (get-move-speed creature)))
+			(when (zero? speed) (apf-warn "Creature ~v started move but speed is not known." creature))
+			(and destination (not (null? speed)) ; Can be 0 if no walk-speed or run-speed known.
 				(+ (ref creature 'located-at) (/ (distance/3d (ref creature 'position) destination) (get-move-speed creature)))
 			)
 		)
@@ -696,7 +696,7 @@
 							(delayed-skill-reused! cn skill)
 						)
 					)
-					(trigger ec 'skill-reusing (skill-id skill))
+					(trigger ec 'skill-reusing skill)
 				)))
 			)
 
@@ -764,15 +764,17 @@
 		(let ((creature (handle-creature-update! ec wr (cons (cons 'destination #f) packet)))) (when creature
 			(trigger ec 'teleport (object-id creature) (ref creature 'position))
 
-			(let ((party (party-members (world-party wr))))
-				(map ; Remove all known objects except myself & party memebers.
-					(lambda (object) (trigger ec 'object-delete (object-id object)))
-					(objects wr (lambda (object)
-						(not (or ; TODO Don't remove nearest objects?
-							(protagonist? object)
-							(member (object-id object) party =)
+			(let ((me (world-me wr)) (party (party-members (world-party wr))))
+				(when (= (object-id creature) (object-id me))
+					(map ; Remove all known objects except myself & party memebers.
+						(lambda (object) (trigger ec 'object-delete (object-id object)))
+						(objects wr (lambda (object)
+							(not (or ; TODO Don't remove nearest objects?
+								(protagonist? object)
+								(member (object-id object) party =)
+							))
 						))
-					))
+					)
 				)
 			)
 		))

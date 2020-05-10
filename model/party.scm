@@ -1,7 +1,5 @@
 (module logic racket/base
-	(require
-		(rename-in racket/contract (any all/c))
-	)
+	(require racket/contract)
 	(provide (contract-out
 		(make-party (->* (symbol? integer?) #:rest (listof integer?) list?))
 		(in-party? (-> (or/c list? false/c) integer? boolean?))

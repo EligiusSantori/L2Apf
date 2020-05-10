@@ -2,6 +2,7 @@
 (module system racket/base
 	(require
 		"../../packet.scm"
+		"../race.scm"
 		"../cubics.scm"
 		"../clothing.scm"
 		"../mount_type.scm"
@@ -17,7 +18,7 @@
 				(cons 'angle (heading->angle (read-int32 #f s)))
 				(cons 'object-id (read-int32 #f s))
 				(cons 'name (read-utf16 s))
-				(cons 'race (read-int32 #f s))
+				(cons 'race (cdr (assoc (read-int32 #f s) races)))
 				(cons 'gender (if (zero? (read-int32 #f s)) 'gender/male 'gender/female))
 				(cons 'base-class-id (read-int32 #f s))
 				(cons 'level (read-int32 #f s))

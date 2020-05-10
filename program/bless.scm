@@ -120,8 +120,8 @@
 							(buff-over cn todo)
 						)
 					)
-					('skill-reusing (id) ; Sort queue then do nearest.
-						(and (> (heap-count todo) 0) (= (skill-id (heap-min todo)) id)
+					('skill-reusing (skill) ; Sort queue then do nearest.
+						(and (> (heap-count todo) 0) (= (skill-id (heap-min todo)) (skill-id skill))
 							(begin
 								(buff-over cn todo)
 							)

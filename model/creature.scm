@@ -22,6 +22,8 @@
 		(get-position (-> creature? (or/c point/3d? false/c)))
 		(creatures-angle (-> creature? creature? (or/c rational? false/c)))
 		(creatures-distance (-> creature? creature? integer?))
+		(hp-ratio (-> creature? rational?))
+		(mp-ratio (-> creature? rational?))
 	))
 
 	(define creature (list
@@ -155,5 +157,16 @@
 
 	(define (creatures-distance a b)
 		(points-distance (get-position a) (get-position b))
+	)
+
+	(define (hp-ratio creature) ; Always >= 1 if hp unknown.
+		(let ((max-value (max (or (ref creature 'max-hp) 0) 1)))
+			(/ (or (ref creature 'hp) max-value) max-value)
+		)
+	)
+	(define (mp-ratio creature) ; Always >= 1 if mp unknown.
+		(let ((max-value (max (or (ref creature 'max-mp) 0) 1)))
+			(/ (or (ref creature 'mp) max-value) max-value)
+		)
 	)
 )

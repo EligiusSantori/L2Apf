@@ -76,6 +76,8 @@
 		(cons 1217 'greater-heal)
 		(cons 1218 'greater-battle-heal)
 		(cons 1219 'greater-group-help)
+		(cons 58 'elemental-heal)
+		(cons 262 'holy-blessing)
 
 		; Regens.
 		(cons 1013 'recharge)
@@ -97,10 +99,21 @@
 		(cons 1242 'death-whisper)
 		(cons 1268 'vampiric-rage)
 
+		; Strikes.
+		(cons 3 'power-strike)
+		(cons 16 'mortal-blow)
+		(cons 56 'power-shot)
+
+		; Other harmful
+		(cons 254 'spoil)
+		(cons 302 'spoil-festival)
+
 		; Other neutral.
 		(cons 1016 'resurrection)
 		(cons 1254 'mass-resurrection)
 		(cons 1255 'party-recall)
+		(cons 42 'sweeper)
+		(cons 444 'sweeper-festival)
 	))
 	(define (select-skills . names)
 		(let ((db (alist-flip skills)))

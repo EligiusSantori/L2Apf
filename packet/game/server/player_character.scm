@@ -3,6 +3,7 @@
 	(require
 		"../../../library/geometry.scm"
 		"../../packet.scm"
+		"../race.scm"
 		"../clothing.scm"
 	)
 
@@ -21,7 +22,7 @@
 					(read-int32 #f s)
 					(if (= (read-int32 #f s) 0) 'gender/male 'gender/female)
 				))
-				(cons 'race (read-int32 #f s))
+				(cons 'race (cdr (assoc (read-int32 #f s) races)))
 				(cons 'base-class-id (read-int32 #f s))
 				(cons 'is-active (not (= (read-int32 #f s) 0)))
 				(cons 'position (point/3d

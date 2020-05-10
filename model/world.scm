@@ -240,7 +240,7 @@
 					(creatures-angle creature target)
 				)
 			)
-		) (ref creature 'angle))
+		) (ref creature 'angle) 0)
 	)
 
 	(define (get-destination wr creature)
