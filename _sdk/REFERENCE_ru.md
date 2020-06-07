@@ -95,4 +95,6 @@ TODO...
 ### Событие `disconnect`.
 Разрыв соединения.
 
+### Событие `radar` → `(list objects in out)`.
+
 TODO...

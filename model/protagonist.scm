@@ -14,6 +14,7 @@
 		(protagonist? (-> any/c boolean?))
 		(make-protagonist (-> list? box?))
 		(update-protagonist! (-> box? list? list?))
+		(equipped? (-> protagonist? integer? (or/c symbol? false/c)))
 		(attackers (-> box? list?))
 		(attackers-add! (-> box? integer? void?))
 		(attackers-delete! (-> box? integer? void?))
@@ -80,6 +81,12 @@
 			(set-box! object (append rest updated))
 			changes
 		)
+	)
+
+	(define (equipped? me object-id)
+		(fold (lambda (c p)
+			(if (eq? object-id (cdr c)) (car c) p)
+		) #f (ref me 'equipment))
 	)
 
 	(define (attackers protagonist)

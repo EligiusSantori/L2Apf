@@ -1,16 +1,26 @@
 (module system racket/base
 	(provide game-server-packet/character-list)
-	(require "../../packet.scm")
+	(require "../../packet.scm" "../race.scm")
 
 	(define (read-item s n)
 		(let ((name (read-utf16 s)))
 			(begin
 				(read-bytes 4 s) ; must be object-id, but trash
 				(read-utf16 s) ; login
-				(read-bytes (+ 4 4 4 4 4 4 4 12 8 8 4 4 4 4 36 64 64 4 4 4 8 8 4 4 4 1) s) ; other
+				(read-int32 #f s) ; session-id
+				(read-int32 #f s) ; clan-id
+				(read-int32 #f s) ; ?
 				(list
 					(cons 'character-id n)
 					(cons 'name name)
+					(cons 'gender (if (zero? (read-int32 #f s)) 'gender/male 'gender/female))
+					(cons 'race (cdr (assoc (read-int32 #f s) races)))
+					(cons 'base-class-id (read-int32 #f s))
+					(cons 'class-id (begin
+						(read-bytes (+ 4 12 8 8 4 4 4 4 36 64 64 4 4 4 8 8 4) s)
+						(read-int32 #f s)
+						; (read-bytes (+ 4 1) s)
+					))
 				)
 			)
 		)

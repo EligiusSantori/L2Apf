@@ -1,6 +1,6 @@
 (module ai racket/base
 	(require
-		srfi/1
+		(for-syntax racket/base)
 		"program.scm"
 		(relative-in "../."
 			"library/extension.scm"
@@ -123,24 +123,42 @@
 		)
 	)
 
-	(define (brain-clear! brain [foreground? #t] [background? #f] [except (list)]) ; Unload all foreground or/and background programs.
+	(define (clear! br foreground? background? except) ; Unload all foreground or/and background programs.
 		(define (keep? p) (member p except program-equal?))
-		(when foreground? (filter-foreground! brain keep?))
-		(when background? (filter-background! brain keep?))
+		(when foreground? (filter-foreground! br keep?))
+		(when background? (filter-background! br keep?))
+	)
+	(define-syntax brain-clear!
+		(syntax-rules ()
+			((_ #:foreground #:background BR EXCEPT) (clear! BR #t #t EXCEPT))
+			((_ #:foreground #:background BR) (clear! BR #t #t (list)))
+			((_ #:foreground BR EXCEPT) (clear! BR #t #f EXCEPT))
+			((_ #:foreground BR) (clear! BR #t #f (list)))
+			((_ #:background BR EXCEPT) (clear! BR #f #t EXCEPT))
+			((_ #:background BR) (clear! BR #f #t (list)))
+			((_ BR EXCEPT) (clear! BR #t #f EXCEPT))
+			((_ BR) (clear! BR #t #f (list)))
+		)
 	)
 
-	(define (brain-do! brain program [stack? #f]) ; Load a foreground program. If stack? the current program will be stacked.
-		(define cn (brain-connection brain))
-		(define (keep? p) (not (program-equal? p program)))
-
-		(filter-background! brain keep?) ; Remove existing from background set.
-		(program-free! cn (brain-active brain)) ; Execute current program destructor.
-		(set-brain-main! brain (chain-load! cn (brain-default brain) ; Drop programs from foreground stack till first doable.
-			(cons program (let ((main (brain-main brain))) ; Remove same as loading programs from foreground stack.
-				(filter keep? (if (or stack? (null? main)) main (cdr main))) ; Drop also current program if not stack?.
+	(define (brain-do! br program [stack? #f]) ; Load a foreground program. If stack? the current program will be stacked.
+		(let ((cn (brain-connection br)) (programs (if (program? program) (list program) program)))
+			(define (keep? p) (not (member p programs program-equal?)))
+			(filter-background! br keep?) ; Remove existing from background set.
+			(program-free! cn (brain-active br)) ; Execute current program destructor.
+			(set-brain-main! br (chain-load! cn (brain-default br) ; Drop programs from foreground stack till first doable.
+				(append programs (let ((main (brain-main br))) ; Remove same as loading programs from foreground stack.
+					(filter keep? (if (or stack? (null? main)) main (cdr main))) ; Drop also current program if not stack?.
+				))
 			))
-		))
+		)
 	)
+	; (define-syntax brain-do! ; Can't use like (apply brain-do! br (map ...))
+	; 	(syntax-rules ()
+	; 		((_ #:stack BR . PROGRAMS) (do! BR #t . PROGRAMS))
+	; 		((_ BR . PROGRAMS) (do! BR #f . PROGRAMS))
+	; 	)
+	; )
 
 	(define (raise-ambiguous-main . causers)
 		(apply raise-user-error "Foreground program is ambiguous, causers: " (map program-id causers))

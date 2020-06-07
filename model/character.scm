@@ -15,6 +15,7 @@
 		(update-character (-> list? list? (values list? list? list?)))
 		(update-character! (-> box? list? list?))
 
+		(get-class (-> character? symbol?))
 		(fighter-type? (-> character? boolean?))
 		(mystic-type? (-> character? boolean?))
 		(wizard-class? (-> character? any))
@@ -92,8 +93,11 @@
 	(define (mystic-type? character)
 		(if (find-class-name (ref character 'class-id) (caddr (cadr classes))) #t #f)
 	)
+	(define (get-class character)
+		(find-class-name (ref character 'class-id))
+	)
 	(define (wizard-class? character)
-		(let ((class (find-class-name (ref character 'class-id))))
+		(let ((class (get-class character)))
 			(and (member class (list
 				'sorcerer 'archmage
 				'spellsinger 'mystic-muse
@@ -102,7 +106,7 @@
 		)
 	)
 	(define (support-class? character)
-		(let ((class (find-class-name (ref character 'class-id))))
+		(let ((class (get-class character)))
 			(and (member class (list
 				'cleric
 					'bishop 'cardinal
@@ -121,7 +125,7 @@
 		)
 	)
 	(define (summoner-class? character)
-		(let ((class (find-class-name (ref character 'class-id))))
+		(let ((class (get-class character)))
 			(and (member class (list
 				'warlock 'arcana-lord
 				'elemental-summoner 'elemental-master
@@ -130,12 +134,12 @@
 		)
 	)
 	(define (artisan-class? character)
-		(let ((class (find-class-name (ref character 'class-id))))
+		(let ((class (get-class character)))
 			(and (member class (list 'artisan 'warsmith 'maestro)) class)
 		)
 	)
 	(define (scavenger-class? character)
-		(let ((class (find-class-name (ref character 'class-id))))
+		(let ((class (get-class character)))
 			(and (member class (list 'scavenger 'bounty-hunter 'fortune-seeker)) class)
 		)
 	)

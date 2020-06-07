@@ -7,11 +7,11 @@
 	(provide auto-shot)
 
 	(define (get-item type grade)
-		(let ((index (index-of (list 'ng 'd 'c 'b 'a 's) grade eq?)))
+		(let ((index (index-of (list 'novice 'ng 'd 'c 'b 'a 's) grade eq?)))
 			(case type
-				((soulshot) (list-ref (list 1835 1463 1464 1465 1466 1467) index))
-				((spiritshot) (list-ref (list 2509 2510 2511 2512 2513 2514) index))
-				((blessed-spiritshot) (list-ref (list 3947 3948 3949 3950 3951 3952) index))
+				((soulshot) (list-ref (list 5789 1835 1463 1464 1465 1466 1467) index))
+				((spiritshot) (list-ref (list 5790 2509 2510 2511 2512 2513 2514) index))
+				((blessed-spiritshot) (list-ref (list #f 3947 3948 3949 3950 3951 3952) index))
 				(else #f)
 			)
 		)

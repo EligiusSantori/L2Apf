@@ -24,6 +24,7 @@
 		(creatures-distance (-> creature? creature? integer?))
 		(hp-ratio (-> creature? rational?))
 		(mp-ratio (-> creature? rational?))
+		(wear? (-> creature? integer? (or/c symbol? false/c)))
 	))
 
 	(define creature (list
@@ -41,6 +42,14 @@
 		(cons 'walking? (negate eq?))
 		(cons 'in-combat? (negate eq?))
 		(cons 'alike-dead? (negate eq?))
+		(cons 'bleeding? (negate eq?))
+		(cons 'poisoned? (negate eq?))
+		(cons 'stunned? (negate eq?))
+		(cons 'sleeping? (negate eq?))
+		(cons 'silenced? (negate eq?))
+		(cons 'rooted? (negate eq?))
+		(cons 'paralyzed? (negate eq?))
+		(cons 'burning? (negate eq?))
 		(cons 'casting #t)
 
 		(cons 'angle (negate =))
@@ -168,5 +177,11 @@
 		(let ((max-value (max (or (ref creature 'max-mp) 0) 1)))
 			(/ (or (ref creature 'mp) max-value) max-value)
 		)
+	)
+
+	(define (wear? creature item-id)
+		(fold (lambda (c p)
+			(if (eq? item-id (cdr c)) (car c) p)
+		) #f (ref creature 'clothing))
 	)
 )

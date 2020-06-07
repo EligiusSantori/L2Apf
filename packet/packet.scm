@@ -12,6 +12,7 @@
 		(checksum ((and/c bytes? longer-then-4? multiple-of-4?) . -> . bytes?))
 		(heading->angle (integer? . -> . rational?))
 		(angle->heading (rational? . -> . integer?))
+		(parse-abnormal-effects (integer? . -> . list?))
 		(read-point (input-port? . -> . point/3d?))
 		(write-point (point/3d? output-port? . -> . void?))
 		(read-int16 (boolean? input-port? . -> . integer?))
@@ -167,6 +168,21 @@
 	)
 	(define (angle->heading angle)
 		(exact-round (* (radians->degrees (simple-angle (revert-angle angle))) 182.044444444))
+	)
+
+	(define (parse-abnormal-effects data)
+		(list
+			(cons 'bleeding? (bitwise-bit-set? data 0))
+			(cons 'poisoned? (bitwise-bit-set? data 1))
+			(cons 'stunned? (bitwise-bit-set? data 6))
+			(cons 'sleeping? (bitwise-bit-set? data 7))
+			(cons 'silenced? (bitwise-bit-set? data 8))
+			(cons 'rooted? (bitwise-bit-set? data 9))
+			; TODO paralyzed?
+				; (cons 'hold_1 (bitwise-bit-set? data 10))
+				; (cons 'hold_2 (bitwise-bit-set? data 11))
+			(cons 'burning? (bitwise-bit-set? data 14))
+		)
 	)
 
 	(define (longer-then-4? data)

@@ -1,7 +1,7 @@
 # L2Apf
 Lineage 2 C4 artificial player / framework (alpha).
 
-You can implement desired behavior right inside *entiry script* or use higher-level *programs interface* or connect actions/models/events to your *neural network*.
+You can implement desired behavior right inside *entry script* or use higher-level *programs interface* or connect actions/models/events to your *neural network*.
 
 ### Programs
 Program is a potentially reusable algorithm that can be instantiated with *parameters* and shares *state* between iterations.
@@ -18,20 +18,20 @@ Program can be finite or not. Can be foreground or background. Only one foregrou
 
 ## Examples
 Run script for solo player:  
-`racket -O 'warning@l2apf' player.scm l2apf://login:password@host:port/player`.  
+`racket -O 'info@l2apf' _sdk/player.scm l2apf://login:password@host:port/player`.  
 
-Run entire realm of players:  
-`racket realm.scm config.yaml party.a fifth`.
+Run a party of players (you are leader):
+`racket -O 'info@l2apf' _sdk/party.scm config.yaml hunt`.
 
-###### player.scm
+Minimal entry script:
 ```scheme
 #lang racket
 (require
-	(except-in srfi/1 drop)
 	"library/extension.scm"
 	"system/structure.scm"
 	"system/connection.scm"
 	"system/event.scm"
+	"system/debug.scm"
 	"model/object.scm"
 	"api/say.scm"
 	(only-in "program/program.scm" program)
@@ -44,17 +44,15 @@ Run entire realm of players:
 	"program/idle.scm"
 	"program/print.scm"
 	"program/partying.scm"
-	"program/command.scm"
 	"bootstrap.scm"
 )
 
-(apply bootstrap (lambda (cn wr me events)
-	(define config (or (parse-config) (list)))
+(global-port-print-handler apf-print-handler)
+(let-values (((cn wr me events) (bootstrap "localhost" 2106 "account" "password" "name")))
 	(define br (make-brain cn program-idle))
 	(load! br
 		(program program-print)
-		(program program-partying #f)
-		(program program-command br)
+		(program program-partying)
 	)
 
 	(do ((event (sync events) (sync events))) ((eq? (car event) 'disconnect))
@@ -74,7 +72,7 @@ Run entire realm of players:
 		; Programs space.
 		(run! br event)
 	)
-) (values->list (parse-protocol)))
+)
 ```
 
 ###### config.yaml
@@ -82,15 +80,8 @@ Run entire realm of players:
 host: "localhost"
 password: "123456"
 party:
-  a: [first, second, third]
-  b: [fourth, fifth, sixth, seventh, eighth]
-
-```
-
-###### realm.scm
-```scheme
-#lang racket
-TODO
+  hunt: [you, doc, grumpy, happy]
+  raid: [you, bashful, sleepy, sneezy, dopey]
 ```
 
 \* *Some pieces of code may be outdated or not fully implemented but I sustain operability of core and basic flow.*

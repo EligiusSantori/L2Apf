@@ -13,7 +13,7 @@
 	(define (ref struct . chain) ; Ultimate dictionary path extractor.
 		(fold (lambda (a b)
 			(and b a (cond
-				((hash? b) (hash-ref b a))
+				((hash? b) (hash-ref b a #f))
 				(else (alist-ref (if (box? b) (unbox b) b) a #f eq?))
 			))
 		) struct chain)

@@ -19,6 +19,7 @@
 			"char_info.scm"
 			"npc_info.scm"
 			"status_update.scm"
+			"magic_effects.scm"
 			"object_deleted.scm"
 			"validate_location.scm"
 			"move_to_point.scm"
@@ -99,14 +100,6 @@
 		)
 	)
 	(define delayed-stop-moving (gensym))
-	(define (will-finish-move creature)
-		(let ((destination (ref creature 'destination)) (speed (get-move-speed creature)))
-			(when (zero? speed) (apf-warn "Creature ~v started move but speed is not known." creature))
-			(and destination (not (null? speed)) ; Can be 0 if no walk-speed or run-speed known.
-				(+ (ref creature 'located-at) (/ (distance/3d (ref creature 'position) destination) (get-move-speed creature)))
-			)
-		)
-	)
 	(define (delayed-skill-reused! cn skill) ; Fix skill reused event via timer.
 		(let ((last-usage (ref skill 'last-usage))
 				(reuse-delay (ref skill 'reuse-delay))
@@ -128,15 +121,14 @@
 						(trigger ec 'change-target (object-id creature) (cadr change) (cddr change))
 					))
 					(let ((pc (assoc 'position changes eq?)) (dc (assoc 'destination changes eq?)))
-						(when dc ; If start or stop moving then trigger event (skip position validation).
-							(trigger ec 'change-moving (object-id creature) (ref creature 'position) (cadr dc))
-						)
-						(when (or pc dc) ; If position has been updated.
-							(trigger ec delayed-stop-moving
-								(object-id creature)
-								(will-finish-move creature)
-								(ref creature 'destination)
-								(ref creature 'moving-timer)
+						(when (or pc dc) ; If position validation or start/stop moving.
+							(let ((d (ref creature 'destination)) (p (ref creature 'position)) (s (get-move-speed creature)))
+								(when (and dc (or (not d) (> s 0))) ; If start moving and speed known (can be 0 if max speed missed) or stop moving.
+									(trigger ec 'change-moving (object-id creature) p d)
+								)
+								(let ((wf (and d (> s 0) (+ (ref creature 'located-at) (/ (distance/3d p d) s))))) ; Calculate finish time if moving.
+									(trigger ec delayed-stop-moving (object-id creature) wf d (ref creature 'moving-timer))
+								)
 							)
 						)
 					)
@@ -178,7 +170,7 @@
 						(let ((row (hash-ref handlers-table (get-packet-id ev) #f)))
 							(if row
 								((cdr row) ec wr ((car row) ev))
-								(apf-warn "Unhandled packet ~v" ev)
+								(apf-debug "Unhandled packet ~v" ev) ; TODO apf-warn
 							)
 						)
 					)
@@ -296,12 +288,12 @@
 				ev
 			)
 			(delayed-stop-moving (subject-id will-finish destination timer)
-				(timer-stop! cn timer) ; If not moving just reset stop-moving event timer.
-				(when will-finish
+				(timer-stop! cn timer) ; Reset stop moving timer.
+				(when will-finish ; If moving and speed known.
 					(let ((ev (make-event 'change-moving subject-id destination #f)))
 						(if (> will-finish (timestamp))
-							(alarm! #:id timer cn will-finish ev)
-							(trigger! cn ev)
+							(alarm! #:id timer cn will-finish ev) ; Set new stop moving timer.
+							(trigger! cn ev) ; Trigger immediately if time is already up.
 						)
 					)
 				)
@@ -344,11 +336,26 @@
 					((antagonist? creature) (update-antagonist! creature packet))
 					((npc? creature) (update-npc! creature packet))
 			)))
-			(when (not (null? changes))
+			(when (and creature (not (null? changes)))
 				(trigger ec 'creature-update (object-id creature) changes)
 			)
 		)
 	)
+	(define (packet-handler/magic-effects ec wr packet)
+		(printf "{magic-effects ~a}~n" packet)(flush-output)
+		; (define (make-effects data)
+		; 	(fold (lambda ()
+		;
+		; 	) #f data)
+		; )
+		; (let ((new (make-effects (ref packet 'effects))) (old (ref me 'effects)))
+		;
+		; )
+		;
+		;
+		; (trigger ec 'creature-update (object-id me) (cons 'effects (cons new old)))
+	)
+
 	(define (packet-handler/inventory-info ec wr packet)
 		(let ((inv (world-inventory wr)))
 			(hash-clear! inv)
@@ -410,7 +417,7 @@
 							(cons 'object-id (object-id creature))
 							(cons 'target-id (object-id target))
 							(cons 'position (ref packet 'position))
-							(cons 'destination (ref target 'position))
+							(cons 'destination (get-position target))
 						)
 					)
 					(list
@@ -502,6 +509,10 @@
 					(cons 'position (ref packet 'position))
 					(cons 'destination #f)
 					(if in-combat? (cons 'in-combat? #t) #f)
+					(if (not (assoc (ref subject 'target-id) hits eq?))
+						(assoc 'target-id (car (ref packet 'hits)) eq?)
+						#f
+					)
 				) subject)
 
 				(trigger ec 'attack (object-id subject) hits) ; Trigger main event.
@@ -591,25 +602,16 @@
 	)
 
 	(define (packet-handler/ask-join-clan ec wr packet)
-		(trigger ec 'ask/join-clan
-			(cons 'clan (ref packet 'name))
-		)
+		(trigger ec 'ask/join-clan (ref packet 'name))
 	)
 	(define (packet-handler/ask-join-party ec wr packet)
-		(trigger ec 'ask/join-party
-			(cons 'player (ref packet 'name))
-			(cons 'loot (ref packet 'loot))
-		)
+		(trigger ec 'ask/join-party (ref packet 'name) (ref packet 'loot))
 	)
 	(define (packet-handler/ask-be-friends ec wr packet)
-		(trigger ec 'ask/be-friends
-			(cons 'player (ref packet 'name))
-		)
+		(trigger ec 'ask/be-friends (ref packet 'name))
 	)
 	(define (packet-handler/ask-join-alliance ec wr packet)
-		(trigger ec 'ask/join-alliance
-			(cons 'alliance (ref packet 'name))
-		)
+		(trigger ec 'ask/join-alliance (ref packet 'name))
 	)
 	(define (packet-handler/reply-join-party ec wr packet)
 		(when (not (ref packet 'accept?))
@@ -698,11 +700,24 @@
 					)
 					(trigger ec 'skill-reusing skill)
 				)))
+				; ((= message-id 110)) ; You can feel <skill-id>'s effect.
 			)
 
 			; TODO Set is effect failed?
 
-			(apply trigger ec 'system-message message-id arguments)
+			(trigger ec 'system-message message-id arguments)
+		)
+	)
+	(define (packet-handler/confirm ec wr packet)
+		(let ((arguments (ref packet 'arguments)))
+			(case (ref packet 'message-id)
+				((1510)
+					(trigger ec 'confirm/resurrect
+						(cdr (assoc 'text arguments eq?))
+						(cdr (assoc 'number arguments eq?))
+					)
+				)
+			)
 		)
 	)
 
@@ -800,8 +815,8 @@
 		(cons #x12 (cons game-server-packet/object-deleted packet-handler/object-deleted)) ; object-delete
 		; #x13 CharSelectInfo
 		; #x15 CharSelected
-		; #x17 CharTemplates
 		(cons #x16 (cons game-server-packet/npc-info packet-handler/npc-info)) ; creature-create
+		; #x17 CharTemplates
 		(cons #x1b (cons game-server-packet/inventory-info packet-handler/inventory-info))
 		; #x25 ActionFailed
 		(cons #x27 (cons game-server-packet/inventory-update packet-handler/inventory-update))
@@ -832,7 +847,7 @@
 		(cons #x58 (cons game-server-packet/skill-list packet-handler/skill-list))
 		(cons #x60 (cons game-server-packet/move-to-pawn packet-handler/move-to-pawn)) ; change-moving
 		(cons #x61 (cons game-server-packet/validate-location packet-handler/validate-location))
-		; #x63 ?
+		; #x63 {FinishRotating}
 		; (cons #x64 (cons game-server-packet/system-message packet-handler/system-message)) ; system-message (especial handling).
 		; #x65 StartPledgeWar
 		; #x6d SetupGauge
@@ -841,7 +856,7 @@
 		; #x76 SetToLocation
 		(cons #x7d (cons game-server-packet/ask-be-friends packet-handler/ask-be-friends)) ; ask
 		(cons #x7e (cons void packet-handler/logout)) ; logout
-		; (cons #x7f (cons game-server-packet/ packet-handler/)) ; MagicEffectIcons
+		; (cons #x7f (cons game-server-packet/magic-effects packet-handler/magic-effects)) ; effect (skill-id, level, duration)
 		; (cons #x80 (cons game-server-packet/quest-list packet-handler/quest-list)) ; quest-list
 		; #x81 EnchantResult
 		; #x86 Ride
@@ -852,16 +867,18 @@
 		(cons #xa8 (cons game-server-packet/ask-join-alliance packet-handler/ask-join-alliance)) ; ask
 		; #xc4 Earthquake
 		; #xc8 NormalCamera
-		; #xce ?
+		; #xce {RelationChanged}
 		; #xd0 MultiSellList
-		; #xd3 ?
+		; #xd3 {NetPing}
 		; #xd4 Dice
 		; #xd5 Snoop
 		; (cons #xe4 'henna-info (cons game-server-packet/henna-info packet-handler/henna-info))
 		; (cons #xe7 'macro-list (cons game-server-packet/macro-list packet-handler/macro-list))
+		(cons #xed (cons game-server-packet/system-message packet-handler/confirm))
 		; #xee PartySpelled
 		; #xf5 SSQStatus
 		; (cons #xf8 'signs-sky (cons game-server-packet/signs-sky packet-handler/signs-sky)) SignsSky
+		; #xfa {L2FriendList}
 		; (cons #xfe 'Ex* (cons game-server-packet/ packet-handler/))
 
 		; (cons #x?? game-server-packet/ packet-handler/)

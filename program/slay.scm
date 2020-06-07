@@ -5,6 +5,7 @@
 		"program.scm"
 		(relative-in "../."
 			"library/extension.scm"
+			"library/date_time.scm"
 			"system/structure.scm"
 			"system/connection.scm"
 			"system/event.scm"
@@ -25,77 +26,29 @@
 		(apply raise-program-error 'program-slay message args)
 	)
 
-	(define (mp>2/3? me . rest)
-		(> (mp-ratio me) 2/3)
-	)
-	(define (mp>1/3? me . rest)
-		(> (mp-ratio me) 1/3)
-	)
-	(define (target-hp>2/3? me target . rest)
-		(> (hp-ratio target) 2/3)
-	)
-	(define (target-hp>1/3? me target . rest)
-		(> (hp-ratio target) 1/3)
-	)
-	(define (equip-sword? . rest)
-		#t ; TODO
-	)
-	(define (equip-blunt? . rest)
-		#t ; TODO
-	)
-	(define (equip-duals? . rest)
-		#t ; TODO
-	)
-	(define (equip-spear? . rest)
-		#t ; TODO
-	)
-	(define (equip-dagger? . rest)
-		#t ; TODO
-	)
-	(define (equip-bow? . rest)
-		#t ; TODO
-	)
-
-	(define (transform conditions)
-		(let ((skill-ids (apply select-skills (map car conditions))))
-			(map (lambda (skill-id pair) (cons skill-id (cdr pair))) skill-ids conditions)
-		)
-	)
-	(define conditions (transform (list
-		(cons 'power-strike (list equip-sword? mp>1/3? target-hp>1/3?))
-		(cons 'mortal-blow (list equip-dagger? mp>1/3? target-hp>2/3?))
-		(cons 'power-shot (list equip-bow? mp>2/3? target-hp>1/3?))
-		(cons 'spoil (lambda (me target . rest)
-			(and
-				(npc? target)
-				(not (ref target 'spoiled?))
-				(> (mp-ratio me) 1/5)
-			)
-		))
-	)))
-	(define (should-skill? me target skill)
-		(and skill (skill-ready? skill) (>= (ref me 'mp) (or (ref skill 'mp-cost) 0))
-			(let ((conditions (alist-ref conditions (skill-id skill) always?)))
-				(not (fold (lambda (condition failed)
-					(or failed (not (condition me target skill)))
-				) #f (if (procedure? conditions) (list conditions) conditions)))
-			)
+	(define (should-skill? me target skill check)
+		(and
+			(skill-ready? skill)
+			(>= (ref me 'mp) (or (ref skill 'mp-cost) 0))
+			(check me target skill)
 			skill
 		)
 	)
-	(define (find-skill wr me skill-ids) ; First fit.
+	(define (find-skill wr me skills) ; First fit.
 		(let ((target (get-target wr me)))
-			(fold (lambda (skill-id found)
-				(or found (should-skill? me target (skill-ref wr skill-id)))
-			) #f skill-ids)
+			(fold (lambda (p found)
+				(or found (should-skill? me target (skill-ref wr (car p)) (cdr p)))
+			) #f skills)
 		)
 	)
-	(define (exists-skills wr names)
-		(fold (lambda (skill-id name r)
-			(let ((skill (skill-ref wr skill-id)))
-				(if skill (cons skill-id r) r)
-			)
-		) (list) (apply select-skills names) names)
+	(define (parse-skills wr skills)
+		(let ((skill-ids (apply select-skills (map car skills))))
+			(fold (lambda (skill-id p r)
+				(let ((skill (skill-ref wr skill-id)))
+					(if skill (cons (cons skill-id (cdr p)) r) r)
+				)
+			) (list) skill-ids skills)
+		)
 	)
 
 	;(define (slay/soldier ...) ...)
@@ -103,10 +56,10 @@
 	;(define (slay/archer ...) ...)
 	;(define (slay/wizard ...) ...)
 
-	(define (slay/auto cn wr me skill-ids)
-		(let ((skill (find-skill wr me skill-ids)))
+	(define (slay/auto cn wr me skills)
+		(let ((skill (find-skill wr me skills)))
 			(if skill
-				(use-skill cn (skill-id skill))
+				(use-skill cn (skill-id skill) #t)
 				(attack cn)
 			)
 		)
@@ -122,33 +75,45 @@
 		(void)
 	)
 
-	(define-program program-slay ; TODO Auto-resolve default skills.
-		(lambda (cn event config skill-ids)
-			(let-values (((victim-id skills) (list->values config)))
-				(let* ((wr (connection-world cn)) (me (world-me wr)) (do-slay (bind-head slay cn wr me victim-id skill-ids)))
-					(if (case-event event
-						('change-target (subject-id target-id . rest)
-							(when (= (object-id me) subject-id)
+	(define on-changes (list 'hp 'bleeding? 'poisoned? 'burning? 'stunned? 'silenced?))
+
+	(define-program program-slay
+		(lambda (cn event config skills)
+			(let* ((wr (connection-world cn)) (me (world-me wr)) (victim-id (car config))
+					(do-slay (bind-head slay cn wr me victim-id skills)))
+				(if (case-event event
+					('change-target (subject-id target-id . rest)
+						(when (member subject-id (list (object-id me) victim-id) =)
+							(do-slay)
+						)
+					)
+					('creature-update (subject-id changes)
+						(when (member subject-id (list (object-id me) victim-id) =)
+							(when
+									(or
+										(fold (lambda (c r) (or r (member (car c) on-changes eq?))) #f changes)
+										(and (not (= subject-id victim-id)) (assoc 'mp changes eq?))
+									)
 								(do-slay)
 							)
 						)
-						('skill-launched (subject-id skill . rest)
-							(when (and (= (object-id me) subject-id) (member (skill-id skill) skill-ids =))
-								(do-slay)
-							)
+					)
+					('skill-launched (subject-id skill . rest)
+						(when (and (= (object-id me) subject-id) (assoc (skill-id skill) skills =))
+							(do-slay)
 						)
-						('skill-canceled (subject-id skill)
-							(when (and (= (object-id me) subject-id) (member (skill-id skill) skill-ids =))
-								(do-slay)
-							)
+					)
+					('skill-canceled (subject-id skill)
+						(when (and (= (object-id me) subject-id) (assoc (skill-id skill) skills =))
+							(do-slay)
 						)
-						('skill-reusing (skill) (when (member (skill-id skill) skill-ids =) (do-slay)))
-						('skill-reused (skill) (when (member (skill-id skill) skill-ids =) (do-slay)))
-						('object-delete (id) (not (= id victim-id)))
-						('die (id . rest) (not (member id (list (object-id me) victim-id) =)))
-						(else (void))
-					) skill-ids eof)
-				)
+					)
+					('skill-reusing (skill) (when (assoc (skill-id skill) skills =) (do-slay)))
+					('skill-reused (skill) (when (assoc (skill-id skill) skills =) (do-slay)))
+					('object-delete (id) (not (= id victim-id)))
+					('die (id . rest) (not (member id (list (object-id me) victim-id) =)))
+					(else (void))
+				) skills eof)
 			)
 		)
 
@@ -159,9 +124,9 @@
 					(when (not (creature? victim)) (program-error "Object is not creature." victim-id))
 					(when (protagonist? victim) (program-error "Can't attack myself." victim-id))
 
-					(let ((skill-ids (exists-skills wr skills)))
-						(slay cn wr (world-me wr) victim-id skill-ids)
-						skill-ids
+					(let ((skills (parse-skills wr skills)))
+						(slay cn wr (world-me wr) victim-id skills)
+						skills
 					)
 				)
 			)
@@ -169,7 +134,7 @@
 
 		#:defaults (list
 			undefined ; victim-id (required)
-			(list) ; skills
+			(list) ; skills (alist)
 		)
 	)
 )

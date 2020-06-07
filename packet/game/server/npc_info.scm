@@ -4,7 +4,7 @@
 
 	(define (game-server-packet/npc-info buffer)
 		(let ((s (open-input-bytes buffer)))
-			(list
+			(append (list
 				(cons 'id (read-byte s))
 				(cons 'object-id (read-int32 #f s))
 				(cons 'npc-id (- (read-int32 #f s) 1000000))
@@ -12,7 +12,7 @@
 				(cons 'position (read-point s))
 				(cons 'angle (heading->angle (read-int32 #f s)))
 				(cons 'magical-attack-speed (begin
-					(read-int32 #f s)
+					(read-int32 #f s) ; ?
 					(read-int32 #f s)
 				))
 				(cons 'physical-attack-speed (read-int32 #f s))
@@ -42,7 +42,12 @@
 				(cons 'summoned? (not (zero? (read-byte s))))
 				(cons 'name (read-utf16 s))
 				(cons 'title (read-utf16 s))
-			)
+			) (parse-abnormal-effects (begin
+				(read-int32 #f s)
+				(read-int32 #f s)
+				(read-int32 #f s)
+				(read-int32 #f s)
+			)))
 		)
 	)
 )

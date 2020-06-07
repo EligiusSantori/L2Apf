@@ -86,32 +86,64 @@
 		(cons 1012 'cure-poision)
 		(cons 1018 'purify)
 		(cons 1020 'vitalize)
+		(cons 34 'bandage)
+		(cons 61 'cure-bleeding)
 
-		; Buffs.
+		; Buffs & encouragements.
 		(cons 1035 'mental-shield)
 		(cons 1040 'shield)
 		(cons 1059 'empower)
 		(cons 1068 'might)
+		(cons 1073 'kiss-of-eva)
 		(cons 1077 'focus)
 		(cons 1078 'concentration)
+		(cons 1085 'acumen)
 		(cons 1204 'wind-walk)
 		(cons 1240 'guidance)
 		(cons 1242 'death-whisper)
 		(cons 1268 'vampiric-rage)
 
+		(cons 77 'attack-aura)
+		(cons 91 'defense-aura)
+		(cons 78 'war-cry)
+		(cons 82 'majesty)
+		(cons 110 'ultimate-defense)
+
+		; Toggles.
+		(cons 256 'accuracy)
+		(cons 312 'vicious-stance)
+
 		; Strikes.
 		(cons 3 'power-strike)
 		(cons 16 'mortal-blow)
 		(cons 56 'power-shot)
+		(cons 100 'stun-attack)
+		(cons 260 'hammer-crush)
+		(cons 92 'shield-stun)
+		(cons 245 'wild-sweep)
+		(cons 36 'whirlwind)
+		(cons 1239 'hurricane)
+		(cons 1267 'shadow-flare)
+		(cons 1234 'vampiric-claw)
+
+		(cons 70 'drain-health)
+
+		; Poisoning and bleeding.
+		(cons 129 'poison)
+		(cons 223 'sting)
+		(cons 1168 'curse-poison)
 
 		; Other harmful
+		(cons 28 'hate)
 		(cons 254 'spoil)
 		(cons 302 'spoil-festival)
 
 		; Other neutral.
+		(cons 60 'fake-death)
 		(cons 1016 'resurrection)
 		(cons 1254 'mass-resurrection)
 		(cons 1255 'party-recall)
+		(cons 226 'relax)
 		(cons 42 'sweeper)
 		(cons 444 'sweeper-festival)
 	))
@@ -129,10 +161,10 @@
 	)
 	(define (positive-skills)
 		(select-skills
-			'heal 'battle-heal 'group-heal 'greater-heal 'greater-battle-heal 'greater-group-help
+			'heal 'battle-heal 'group-heal 'greater-heal 'greater-battle-heal 'greater-group-help 'elemental-heal 'holy-blessing
 			'recharge
 			'cure-poision 'purify 'vitalize
-			'mental-shield 'shield 'empower 'might 'focus 'concentration 'wind-walk 'guidance 'death-whisper 'vampiric-rage
+			'mental-shield 'shield 'empower 'might 'kiss-of-eva 'focus 'concentration 'acumen 'wind-walk 'guidance 'death-whisper 'vampiric-rage
 			'resurrection 'mass-resurrection 'party-recall
 		)
 	)

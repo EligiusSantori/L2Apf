@@ -32,10 +32,8 @@
 			(object-ref (-> world? (or/c integer? false/c) (or/c object? false/c)))
 			(skill-ref (-> world? (or/c integer? false/c) (or/c skill? false/c)))
 			(inv-ref (-> world? (or/c integer? false/c) (or/c item? false/c)))
-			(equipped (-> world? item? (or/c symbol? false/c)))
-			(find-character-by-name (world? string? . -> . (or/c character? false/c))) ; FIXME rename
+			(find-character (world? string? . -> . (or/c character? false/c)))
 			(get-target (world? creature? . -> . (or/c creature? false/c))) ; FIXME move to creature?
-			(get-level (creature? . -> .  (or/c integer? false/c))) ; FIXME move to creature
 			(get-angle (world? creature? . -> . rational?))
 			(get-destination (-> world? creature? (or/c point/3d? false/c)))
 			(attackable? (any/c . -> . boolean?)) ; FIXME move to creature
@@ -46,6 +44,14 @@
 			(party-kick! (world? integer? . -> . void?))
 			(party-leader! (world? integer? . -> . void?))
 			(party-clear! (world? . -> . void?))
+			(equip-sword? (-> character? boolean?))
+			(equip-blunt? (-> character? boolean?))
+			(equip-duals? (-> character? boolean?))
+			(equip-spear? (-> character? boolean?))
+			(equip-dagger? (-> character? boolean?))
+			(equip-bow? (-> character? boolean?))
+			(equip-shield? (-> character? boolean?))
+			(get-level (-> creature? (or/c rational? false/c)))
 		)
 	)
 
@@ -141,37 +147,9 @@
 		(hash-ref (world-inventory wr) object-id #f)
 	)
 
-	(define (items wr [predicate #f])
-		(define l (list))
-		(if predicate
-			(begin
-				(hash-for-each (world-inventory wr) (lambda (k v)
-					(when (predicate v) (set! l (cons v l)))
-				))
-				l
-			)
-			(hash-values (world-inventory wr))
-		)
-	)
-	(define (fold-items wr init proc)
-		(define r init)
-		(hash-for-each (world-inventory wr) (lambda (k v)
-			(set! r (proc v r))
-		))
-		r
-	)
-
-	(define (equipped wr item)
-		(let ((object-id (ref item 'object-id)))
-			(fold (lambda (c p)
-				(if (eq? object-id (cdr c)) (car c) p)
-			) #f (ref (world-me wr) 'equipment))
-		)
-	)
-
-	(define (find-character-by-name wr name)
+	(define (find-character wr name)
 		(define (test? k v)
-			(and (integer? k) (character? v) (string-ci=? (ref v 'name) name))
+			(and (character? v) (string-ci=? (ref v 'name) name))
 		)
 
 		(let ((found (hash-find (world-objects wr) test?)))
@@ -215,19 +193,6 @@
 
 	(define (get-target wr creature)
 		(object-ref wr (ref creature 'target-id))
-	)
-
-	(define (get-level creature)
-		(or
-			(and (character? creature)
-				(ref creature 'level)
-			)
-			(and (npc? creature)
-				(let ((match (regexp-match (pregexp "(?i:Lv)\\s*(\\d+)") (or (ref creature 'title) ""))))
-					(and match (string->number (last match)))
-				)
-			)
-		)
 	)
 
 	(define (get-angle wr creature)
@@ -286,6 +251,133 @@
 				object-id
 				(cdr (party-members party))
 			))
+		)
+	)
+
+	; TODO Use shared database.
+	(define (equip-sword? character)
+		#t ; TODO item-id in creature.clothing
+	)
+	(define (equip-blunt? character)
+		#t ; TODO item-id in creature.clothing
+	)
+	(define (equip-duals? character)
+		#t ; TODO item-id in creature.clothing
+	)
+	(define (equip-spear? character)
+		#t ; TODO item-id in creature.clothing
+	)
+	(define (equip-dagger? character)
+		#t ; TODO item-id in creature.clothing
+	)
+	(define (equip-bow? character)
+		#t ; TODO item-id in creature.clothing
+	)
+	(define (equip-shield? character)
+		#t ; TODO item-id in creature.clothing
+	)
+
+	(define xp-table (list ; PTS
+		0
+		68
+		363
+		1168
+		2884
+		6038
+		11287
+		19423
+		31378
+		48229
+		71202
+		101677
+		141193
+		191454
+		254330
+		331867
+		426288
+		540000
+		675596
+		835862
+		1023784
+		1242546
+		1495543
+		1786379
+		2118876
+		2497077
+		2925250
+		3407897
+		3949754
+		4555796
+		5231246
+		5981576
+		6812513
+		7730044
+		8740422
+		9850166
+		11066072
+		12395215
+		13844951
+		15422929
+		17137087
+		18995665
+		21007203
+		23180550
+		25524868
+		28049635
+		30764654
+		33680052
+		36806289
+		40154162
+		45525133
+		51262490
+		57383988
+		63907911
+		70853089
+		80700831
+		91162654
+		102265881
+		114038596
+		126509653
+		146308200
+		167244337
+		189364894
+		212717908
+		237352644
+		271975263
+		308443198
+		346827154
+		387199547
+		429634523
+		474207979
+		532694979
+		606322775
+		696381369
+		804225364
+		931275828
+		1151275834
+		1511275834
+	))
+	(define (get-level creature)
+		(cond
+			((protagonist? creature)
+				(let ((level (ref creature 'level)) (xp (ref creature 'xp)))
+					(let ((base (list-ref xp-table (- level 1))) (next (list-try-ref xp-table level)))
+						(if next
+							(+ level (/ (- xp base) (- next base)))
+							level
+						)
+					)
+				)
+			)
+			((character? creature)
+				(ref creature 'level)
+			)
+			((npc? creature)
+				(let ((match (regexp-match (pregexp "(?i:Lv)\\s*(\\d+)") (or (ref creature 'title) ""))))
+					(and match (string->number (last match)))
+				)
+			)
+			(else #f)
 		)
 	)
 )
