@@ -70,14 +70,15 @@
 	; TODO Use shared database.
 	(define skills (list
 		; Heals.
+		(cons 58 'elemental-heal)
+		(cons 262 'holy-blessing)
 		(cons 1011 'heal)
 		(cons 1015 'battle-heal)
 		(cons 1027 'group-heal)
 		(cons 1217 'greater-heal)
 		(cons 1218 'greater-battle-heal)
 		(cons 1219 'greater-group-help)
-		(cons 58 'elemental-heal)
-		(cons 262 'holy-blessing)
+		(cons 1229 'chant-of-life)
 
 		; Regens.
 		(cons 1013 'recharge)
@@ -92,6 +93,7 @@
 		; Buffs & encouragements.
 		(cons 1035 'mental-shield)
 		(cons 1040 'shield)
+		(cons 1043 'holy-weapon)
 		(cons 1059 'empower)
 		(cons 1068 'might)
 		(cons 1073 'kiss-of-eva)
@@ -102,6 +104,9 @@
 		(cons 1240 'guidance)
 		(cons 1242 'death-whisper)
 		(cons 1268 'vampiric-rage)
+		(cons 1006 'chant-of-fire)
+		(cons 1009 'chant-of-shielding)
+		(cons 1007 'chant-of-battle)
 
 		(cons 77 'attack-aura)
 		(cons 91 'defense-aura)
@@ -115,26 +120,49 @@
 
 		; Strikes.
 		(cons 3 'power-strike)
-		(cons 16 'mortal-blow)
-		(cons 56 'power-shot)
+		(cons 255 'power-smash)
 		(cons 100 'stun-attack)
 		(cons 260 'hammer-crush)
-		(cons 92 'shield-stun)
+		(cons 16 'mortal-blow)
+		(cons 29 'iron-punch)
+		(cons 120 'stunning-fist)
+		(cons 56 'power-shot)
 		(cons 245 'wild-sweep)
 		(cons 36 'whirlwind)
+		(cons 92 'shield-stun)
+
 		(cons 1239 'hurricane)
 		(cons 1267 'shadow-flare)
-		(cons 1234 'vampiric-claw)
 
 		(cons 70 'drain-health)
+		(cons 1147 'vampiric-touch)
+		(cons 1190 'life-drain)
+		(cons 1234 'vampiric-claw)
 
 		; Poisoning and bleeding.
 		(cons 129 'poison)
 		(cons 223 'sting)
+		(cons 1095 'venom)
+		(cons 1100 'chill-flame)
+		(cons 1107 'frost-flame)
 		(cons 1168 'curse-poison)
+		(cons 1209 'seal-of-poison)
+
+		; Curses.
+		(cons 1064 'silence)
+		(cons 1069 'sleep)
+		(cons 1097 'dreaming-spirit)
+		(cons 1201 'dryad-root)
+		(cons 1208 'seal-of-binding)
 
 		; Other harmful
+		(cons 2 'confusion)
+		(cons 15 'charm)
 		(cons 28 'hate)
+		(cons 1092 'fear)
+		(cons 1105 'madness)
+		(cons 1169 'curse-fear)
+
 		(cons 254 'spoil)
 		(cons 302 'spoil-festival)
 

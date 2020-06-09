@@ -3,6 +3,12 @@ Lineage 2 C4 artificial player / framework (alpha).
 
 You can implement desired behavior right inside *entry script* or use higher-level *programs interface* or connect actions/models/events to your *neural network*.
 
+## Requirements
+* Racket language (version 6 or newer).
+	* Packages: srfi-lite-lib, r6rs-lib, yaml.
+* L2J Chronicle 4 [server](https://bitbucket.org/l2jserver/l2j-server-game/src/C4) & [datapack](https://bitbucket.org/l2jserver/l2j-server-datapack/src/C4).
+* Lineage 2 Chronicle 4 installer & [protocol 656 update](https://drive.google.com/open?id=10uYHb6Hg07me7Y88xHDRUs4zI-c-njnE).
+
 ### Programs
 Program is a potentially reusable algorithm that can be instantiated with *parameters* and shares *state* between iterations.
 
@@ -10,13 +16,13 @@ Iteration can be caused by a *server event*, *custom event* or *timer event*.
 
 Program can be finite or not. Can be foreground or background. Only one foreground program can handle an iteration event but previous programs can be stacked on load.
 
-## Requirements
-* Racket language (version 6 or newer).
-	* Packages: srfi-lite-lib, r6rs-lib, yaml.
-* L2J Chronicle 4 [server](https://bitbucket.org/l2jserver/l2j-server-game/src/C4) & [datapack](https://bitbucket.org/l2jserver/l2j-server-datapack/src/C4).
-* Lineage 2 Chronicle 4 installer & [protocol 656 update](https://drive.google.com/open?id=10uYHb6Hg07me7Y88xHDRUs4zI-c-njnE).
-
 ## Examples
+[Raid on Madness Beast](https://www.youtube.com/watch?v=HDGMbAhi6dA).
+
+![Madness Beast](https://raw.githubusercontent.com/EligiusSantori/L2Apf/master/_sdk/screenshot_mbf.jpg)
+
+![Scroll of Escape](https://raw.githubusercontent.com/EligiusSantori/L2Apf/master/_sdk/screenshot_soe.jpg)
+
 Run script for solo player:  
 `racket -O 'info@l2apf' _sdk/player.scm l2apf://login:password@host:port/player`.  
 

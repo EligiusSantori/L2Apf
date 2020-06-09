@@ -20,9 +20,17 @@
 		(cons 'item-id (negate =))
 		(cons 'position (negate point/3d=?))
 		(cons 'count (negate =))
+		; (cons 'quest? (negate eq?))
+		; (cons 'type (negate eq?)) ; ... 'scroll 'potion 'blunt
 		(cons 'enchant (negate =))
 		; TODO stackable? equipped? grade crystallizable? {weapon? shield? armor? accessory? thing? quest?}
 	))
+
+	; ? (define weapon? ... type in 'dagger 'sword ...)
+	; (define armor? ... type in 'body 'legs ...)
+	; (define jewelry? ... type in 'earing 'ring ...)
+	; ? (define usable? ...)
+	; ? (define equipable? ...)
 
 	(define (item? object)
 		(object-of-type? object 'item)

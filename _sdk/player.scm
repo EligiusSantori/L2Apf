@@ -89,6 +89,11 @@
 					(("hello") (gesture cn 'gesture/hello))
 					(("show") (command-show cn (cdr command)))
 
+					(("pick") (command-pick cn))
+					(("use") (command-use cn (cdr command)))
+					(("drop") (command-drop cn br (cdr command)))
+					(("skill") (command-skill cn (cdr command)))
+
 					(("return") (let ((author (object-ref wr author-id))) (when author (move-behind cn author 50))))
 					(("follow") (let ((gap (or (string->number (list-try-ref command 1 "30")) 30)))
 						(brain-do! br (program program-follow-chase author-id gap))

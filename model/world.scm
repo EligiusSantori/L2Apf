@@ -46,9 +46,10 @@
 			(party-clear! (world? . -> . void?))
 			(equip-sword? (-> character? boolean?))
 			(equip-blunt? (-> character? boolean?))
-			(equip-duals? (-> character? boolean?))
-			(equip-spear? (-> character? boolean?))
 			(equip-dagger? (-> character? boolean?))
+			(equip-spear? (-> character? boolean?))
+			(equip-duals? (-> character? boolean?))
+			(equip-fists? (-> character? boolean?))
 			(equip-bow? (-> character? boolean?))
 			(equip-shield? (-> character? boolean?))
 			(get-level (-> creature? (or/c rational? false/c)))
@@ -255,19 +256,25 @@
 	)
 
 	; TODO Use shared database.
+	; (define (creature-weapon ...)) => item-id or #f ; TODO
+	; (define (weapon-type ...)) => symbol ; TODO
+	; (define (creature-shield ...)) => item-id or #f ; TODO
 	(define (equip-sword? character)
 		#t ; TODO item-id in creature.clothing
 	)
 	(define (equip-blunt? character)
 		#t ; TODO item-id in creature.clothing
 	)
-	(define (equip-duals? character)
+	(define (equip-dagger? character)
 		#t ; TODO item-id in creature.clothing
 	)
 	(define (equip-spear? character)
 		#t ; TODO item-id in creature.clothing
 	)
-	(define (equip-dagger? character)
+	(define (equip-duals? character)
+		#t ; TODO item-id in creature.clothing
+	)
+	(define (equip-fists? character)
 		#t ; TODO item-id in creature.clothing
 	)
 	(define (equip-bow? character)

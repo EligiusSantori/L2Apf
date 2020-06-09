@@ -67,19 +67,26 @@
 	; TODO Use shared database.
 	(define npcs (list
 		(cons 10372 "Discarded Guardian")
+
+		(cons 10378 "Madness Beast")
+		(cons 10379 "Dementia Beast")
+
 		(cons 10373 "Malex Herald of Dagoniel")
 		(cons 10374 "Abyss Flyer")
+
 		(cons 10380 "Kaysha Herald Of Ikaros")
 		(cons 10381 "Nightmare Flyer")
 		(cons 10382 "Hostile Flyer")
+
 		(cons 10001 "Greyclaw Kutus")
 		(cons 10002 "Guard of Kutus")
 		(cons 10003 "Pawn of Kutus")
 	))
 
-	(define bosses (list 10372 10373 10380 10001))
+	(define bosses (list 10372 10373 10378 10380 10001))
 	(define minions (list
 		10374
+		10379
 		10381 10382
 		10002 10003
 	))

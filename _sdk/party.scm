@@ -32,7 +32,7 @@
 		"program/auto_confirm.scm"
 		"program/follow_chase.scm"
 		; "program/follow_repeat.scm"
-		; "program/loot.scm"
+		"program/loot.scm"
 		"program/relax.scm"
 		; "program/support.scm"
 		; "program/auto_return.scm"
@@ -47,6 +47,8 @@
 ; Logic code.
 
 (define tank #f)
+(define looter #f)
+
 (define (party-angle wr [arc 2pi] [except-id #f])
 	(let ((members (remove except-id (party-members (world-party wr)) eq?)))
 		(if (not (null? members))
@@ -75,6 +77,17 @@
 		; Triggers space.
 		(case-event ev
 			; Standard events.
+			('creature-update (id changes)
+				(when (eq? (get-class me) 'orc-shaman) (cond
+					((car (or (ref changes 'poisoned?) (cons #f #f))) (say cn "Poisoned!"))
+					((car (or (ref changes 'bleeding?) (cons #f #f))) (say cn "Ignited!"))
+				))
+			)
+			('item-spawn (id . rest) ; Auto loot if I'm looter.
+				(when (and (eq? looter (object-id me)) (not (eq? (program-id (brain-active br)) 'program-loot)))
+					(brain-do! br (program program-loot #f) #t)
+				)
+			)
 			('message (author-id channel name text) ; Execute commands from game chat.
 				(let ((command (parse-command wr text channel author-id))) (when command (case (car command)
 					(("hello") (gesture cn 'gesture/hello))
@@ -82,28 +95,26 @@
 
 					(("pick") (command-pick cn))
 					(("use") (command-use cn (cdr command)))
-					(("drop") (command-drop cn (cdr command)))
+					(("drop") (command-drop cn br (cdr command)))
 					(("skill") (command-skill cn (cdr command)))
 
 					(("invite") (brain-do! br (program program-make-party party 'finder 0.5)))
 					(("crown") (party-crown cn name))
 
-					(("return") (let ((author (object-ref wr author-id)))
-						(brain-clear! br)
-						(when author (move-behind cn author 50 (party-angle wr)))
-					))
 					(("follow") (let ((gap (or (string->number (list-try-ref command 1 "30")) 30))) ; TODO comb style
 						(brain-clear! br)
 						(brain-do! br (program program-follow-chase author-id gap))
 					))
-					(("ready") (let ((author (object-ref wr author-id))) (when author
-						(let ((target (get-target wr author))) (when (and target (not (object=? author target)))
+					(("return") (let ((author (object-ref wr author-id))) (when (and author (get-position author))
+						(brain-clear! br)
+						(let* ((target (or (get-target wr author) author))
+								(angle (if (object=? author target) (get-angle wr author) (creatures-angle author target))))
 							(cond
 								((not tank) (move-behind cn target 50 (party-angle wr)))
-								((= (object-id me) tank) (move-behind cn target 50 (creatures-angle author target)))
-								(else (move-behind cn target 50 (+ (- (party-angle wr pi/2 tank) pi/4) (creatures-angle author target) pi)))
+								((= (object-id me) tank) (move-behind cn target 50 angle))
+								(else (move-behind cn target 50 (+ (party-angle wr pi/2 tank) angle (- pi/4) pi)))
 							)
-						))
+						)
 					)))
 
 					(("assist") (command-assist cn br author-id (list
@@ -123,6 +134,18 @@
 							((string-ci=? name (ref me 'name))
 								(set! tank (object-id me))
 								(use-skill cn (car (select-skills 'majesty)))
+							)
+						)
+					))
+					(("looter") (let ((name (list-try-ref command 1 "?")))
+						(cond
+							((string-ci=? name "?") (let ((character (object-ref wr looter))) (when character
+								(say cn (format "Looter: ~a." (ref character 'name)) 'chat-channel/party)
+							)))
+							((string-ci=? name "off") (set! looter #f))
+							((string-ci=? name (ref me 'name))
+								(set! looter (object-id me))
+								(brain-do! br (program program-loot #f) #t)
 							)
 						)
 					))
