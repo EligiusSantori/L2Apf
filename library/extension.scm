@@ -112,7 +112,7 @@
 			(if r (cdr (car r)) default)
 		)
 	)
-	(define (alist-only lst eqp equal? . keys)
+	(define (alist-only lst eqp . keys)
 		(filter (lambda (p)
 			(and
 				(pair? p) ; Also filter out invalid pairs
@@ -120,7 +120,7 @@
 			)
 		) lst)
 	)
-	(define (alist-except lst eqp equal? . keys)
+	(define (alist-except lst eqp . keys)
 		(filter (lambda (p)
 			(and
 				(pair? p) ; Also filter out invalid pairs

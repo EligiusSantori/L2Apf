@@ -29,7 +29,7 @@ Run script for solo player:
 Run a party of players (you are leader):
 `racket -O 'info@l2apf' _sdk/party.scm config.yaml hunt`.
 
-Minimal entry script:
+Minimalistic entry script:
 ```scheme
 #lang racket
 (require

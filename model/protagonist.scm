@@ -12,7 +12,7 @@
 	)
 	(provide (contract-out
 		(protagonist? (-> any/c boolean?))
-		(make-protagonist (-> list? box?))
+		(make-protagonist (-> list? any/c box?))
 		(update-protagonist! (-> box? list? list?))
 		(equipped? (-> protagonist? integer? (or/c symbol? false/c)))
 		(attackers (-> box? list?))
@@ -56,8 +56,8 @@
 		(object-of-type? object 'protagonist)
 	)
 
-	(define (make-protagonist data)
-		(let ((character (make-character data)))
+	(define (make-protagonist data db)
+		(let ((character (make-character data db)))
 			(let ((type (cons 'protagonist (ref character 'type))))
 				(box (fold
 					(lambda (p r) (if (and p (assoc (car p) protagonist eq?)) (cons p r) r)) ; If field belongs to protagonist.

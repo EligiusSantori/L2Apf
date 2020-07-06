@@ -40,8 +40,8 @@
 				(cons 'in-combat? (not (zero? (read-byte s))))
 				(cons 'alike-dead? (not (zero? (read-byte s))))
 				(cons 'summoned? (not (zero? (read-byte s))))
-				(cons 'name (read-utf16 s))
-				(cons 'title (read-utf16 s))
+				; (cons 'name (read-utf16 s)) ; Always empty, excluded.
+				(cons 'title (begin (read-utf16 s) (read-utf16 s)))
 			) (parse-abnormal-effects (begin
 				(read-int32 #f s)
 				(read-int32 #f s)

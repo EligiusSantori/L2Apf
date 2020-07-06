@@ -22,8 +22,10 @@
 		(cons 'count (negate =))
 		; (cons 'quest? (negate eq?))
 		; (cons 'type (negate eq?)) ; ... 'scroll 'potion 'blunt
+		; (cons 'stackable? )
+		; (cons 'equipped? )
 		(cons 'enchant (negate =))
-		; TODO stackable? equipped? grade crystallizable? {weapon? shield? armor? accessory? thing? quest?}
+		; TODO grade crystallizable? {weapon? shield? armor? accessory? thing? quest?}
 	))
 
 	; ? (define weapon? ... type in 'dagger 'sword ...)

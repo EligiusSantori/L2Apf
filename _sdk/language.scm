@@ -7,6 +7,7 @@
 		(only-in racket/format ~r)
 		(relative-in "../."
 			"library/extension.scm"
+			"library/date_time.scm"
 			"system/structure.scm"
 			"system/connection.scm"
 			"model/map.scm"
@@ -43,13 +44,14 @@
 		command-drop
 		command-pick
 		command-skill
+		command-repeat
 		command-assist
 		command-buff
 	)
 
 	(define (parse-command wr text channel author-id) ; TODO parse(command) e.g. (parse "follow [me]|my|<name>") ; string -> verb, [noun], [noun...]
 		(if (or
-				(member channel (list 'chat-channel/tell 'chat-channel/clan) eq?)
+				(member channel (list 'chat-channel/tell 'chat-channel/clan 'chat-channel/trade) eq?)
 				(and (eq? channel 'chat-channel/party) (eq? author-id (party-leader (world-party wr)))))
 			(filter (compose not zero? string-length) (string-split (string-downcase text) " "))
 			#f
@@ -86,8 +88,10 @@
 
 	(define (command-show cn arguments)
 		(let ((me (world-me (connection-world cn))) (what (try-first arguments))) (case what
-			(("level") (say cn (format "Level: ~a." (~r (get-level me) #:precision (list '= 2))) 'chat-channel/party))
-			(("sp") (say cn (format "SP: ~a." (ref me 'sp)) 'chat-channel/party))
+			(("level") (say cn (format "Level: ~a." (~r (ref me 'level) #:precision (list '= 2)))))
+			(("sp") (say cn (format "SP: ~a." (ref me 'sp))))
+			(("hp") (say cn (format "HP: ~a%." (round (* (hp-ratio me) 100)))))
+			(("mp") (say cn (format "MP: ~a%." (round (* (mp-ratio me) 100)))))
 		))
 	)
 
@@ -99,6 +103,8 @@
 				(("aa") (find-items inv 5575 6360 6361 6362))
 				(("antidote") (find-items inv 1831 1832))
 				(("bandage") (find-items inv 1833 1834))
+				(("heal") (find-items inv 1060 1061))
+				(("haste") (find-items inv 735))
 				(else (list))
 			)
 		)
@@ -160,13 +166,32 @@
 
 	(define (command-skill cn arguments)
 		(let ((what (try-first arguments))) (case what
-			(("vic") (use-skill cn (car (select-skills 'vicious-stance))))
-			(("clf") (use-skill cn (car (select-skills 'chant-of-life))))
-			(("hate") (use-skill cn (car (select-skills 'hate))))
+			(("arr") (use-skill cn (car (select-skills 'deflect-arrow))))
+
+			(("lif") (use-skill cn (car (select-skills 'chant-of-life))))
+
+			; (("hate") (use-skill cn (car (select-skills 'hate))))
+			(("con") (use-skill cn (car (select-skills 'confusion))))
+			(("pic") (use-skill cn (car (select-skills 'charm))))
+			(("mad") (use-skill cn (car (select-skills 'madness))))
 			(else (let ((skill-id (string->number what)))
 				(when skill-id (use-skill cn skill-id))
 			))
 		))
+	)
+	(define (command-repeat cn br skill author-id arguments)
+		(let* ((wr (connection-world cn)) (author (object-ref wr author-id)))
+			(when author
+				(let ((targets (parse-targets wr author arguments "target")))
+					(if (not (null? targets))
+						(brain-do! br (program program-slay (car targets) (list
+							(cons skill (lambda (me . rest) (> (mp-ratio me) 1/10)))
+						) void))
+						(say cn "Target not found.")
+					)
+				)
+			)
+		)
 	)
 
 	(define (skill-exists wr name)
@@ -181,7 +206,7 @@
 	(define (stun-skill-pointful? me target) ; Party-tuned. ; TODO Target.HP > (1/5)Party.HP
 		(and
 			(not (ref target 'stunned?))
-			(not (or (boss? target) (minion? target))) ; Won't work on boss.
+			(not (or (ref target 'boss?) (ref target 'minion?))) ; Won't work on boss.
 			(>= (or (ref target 'hp) 0) (* (ref me 'hp) 2)) ; Target.HP > (2)Me.HP
 		)
 	)
@@ -199,18 +224,23 @@
 	(define (hp-critical? me) (<= (hp-ratio me) 1/10))
 	(define (skill-settings wr)
 		(list
+			(cons 'wind-strike (lambda (me target skill) (and
+				(mp>critical? me)
+				(medium-damage-skill-pointful? me target)
+				(>= (- (timestamp) (or (ref skill 'last-usage) 0)) 7) ; Delay 7s.
+			)))
+
 			(cons 'power-strike (lambda (me target . rest) (and
 				(equip-sword? me)
 				(mp>reserve? me)
 				(not (skill-exists wr 'shield-stun))
 				(not (skill-exists wr 'power-smash))
-				; TODO not tank
 				(medium-damage-skill-pointful? me target)
 			)))
 			(cons 'power-smash (lambda (me target . rest) (and
 				(equip-sword? me)
 				(mp>reserve? me)
-				(if (or (boss? target) (minion? target))
+				(if (or (ref target 'boss?) (ref target 'minion?))
 					(not (skill-exists wr 'vicious-stance))
 					(medium-damage-skill-pointful? me target)
 				)
@@ -218,7 +248,7 @@
 			(cons 'mortal-blow (lambda (me target . rest) (and
 				(equip-dagger? me)
 				(mp>reserve? me)
-				(if (or (boss? target) (minion? target))
+				(if (or (ref target 'boss?) (ref target 'minion?))
 					(not (skill-exists wr 'vicious-stance))
 					(high-damage-skill-pointful? me target)
 				)
@@ -236,7 +266,21 @@
 			(cons 'wild-sweep (lambda (me target . rest) (and
 				(equip-spear? me)
 				(mp>reserve? me)
-				(if (or (boss? target) (minion? target))
+				(if (or (ref target 'boss?) (ref target 'minion?))
+					(and
+						(not (skill-exists wr 'vicious-stance))
+						(not (skill-exists wr 'whirlwind))
+					)
+					(and
+						(not (skill-exists wr 'spoil))
+						(medium-damage-skill-pointful? me target)
+					)
+				)
+			)))
+			(cons 'whirlwind (lambda (me target . rest) (and
+				(equip-spear? me)
+				(mp>reserve? me)
+				(if (or (ref target 'boss?) (ref target 'minion?))
 					(not (skill-exists wr 'vicious-stance))
 					(and
 						(not (skill-exists wr 'spoil))
@@ -258,7 +302,10 @@
 				(or (equip-duals? me) (equip-sword? me) (equip-dagger? me))
 				(mp>shortage? me)
 				(not (ref target 'bleeding?))
-				(fast-decay-skill-pointful? me target)
+				(if (or (ref target 'boss?) (ref target 'minion?))
+					(not (skill-exists wr 'vicious-stance))
+					(fast-decay-skill-pointful? me target)
+				)
 			)))
 
 			(cons 'poison (lambda (me target . rest) (and
@@ -266,7 +313,7 @@
 				(not (ref target 'poisoned?))
 				; (slow-decay-skill-pointful? me target)
 				(not (world-party wr)) ; Too slow casting for party.
-				(not (or (boss? target) (minion? target))) ; Too slow casting & too small chances for raid.
+				(not (or (ref target 'boss?) (ref target 'minion?))) ; Too slow casting & too small chances for raid.
 				(>= (or (ref target 'hp) 0) (ref me 'hp)) ; Target.HP > Me.HP
 			)))
 			#|(cons 'frost-flame (lambda (me target . rest) (and
@@ -274,7 +321,7 @@
 				(not (ref target 'bleeding?)) ; (not (ref target 'burning?)) ; Bug?
 				; (fast-decay-skill-pointful? me target)
 				(or
-					(boss? target) (minion? target)
+					(ref target 'boss?) (ref target 'minion?)
 					(not (world-party wr)) ; Too slow casting for party.
 				)
 			)))
@@ -283,15 +330,25 @@
 				(not (ref target 'poisoned?))
 				; (slow-decay-skill-pointful? me target)
 				(or
-					(boss? target) (minion? target)
+					(ref target 'boss?) (ref target 'minion?)
 					(not (world-party wr)) ; Too slow casting for party.
 				)
 			)))|#
+			(cons 'aura-sink (lambda (me target skill) (and
+				(mp>reserve? me)
+				(not (ref target 'bleeding?)) ; TODO check
+				(member (ref target 'name) (list
+					"Kaysha Herald Of Ikaros" ; Bleed.
+					"Soul Scavenger" ; Sleep.
+					"Princess Molrang" ; Poison.
+				) string-ci=?)
+				(>= (- (timestamp) (or (ref skill 'last-usage) 0)) 30) ; Delay 30s.
+			)))
 
 			(cons 'drain-health  (lambda (me target . rest) (and
 				(hp-danger? me)
 				(mp>shortage? me)
-				(not (or (boss? target) (minion? target))) ; Ineffective for targets with high physical defense.
+				(not (or (ref target 'boss?) (ref target 'minion?))) ; Ineffective for targets with high physical defense.
 			)))
 
 			(cons 'elemental-heal  (lambda (me . rest) (and
@@ -302,24 +359,42 @@
 				(mp>critical? me) ; TODO just check if mp enough.
 				(ref me 'bleeding?)
 			)))
-			(cons 'cure-bleeding (lambda (me . rest) (and
+			#|(cons 'cure-bleeding (lambda (me . rest) (and
 				(mp>critical? me) ; TODO just check if mp enough.
 				(ref me 'bleeding?)
 			)))
+			(cons 'poison-recovery (lambda (me . rest) (and
+				(mp>critical? me) ; TODO just check if mp enough.
+				(ref me 'poisoned?)
+			)))|#
 
 			(cons 'spoil (lambda (me target . rest) (and
 				(mp>critical? me) ; TODO just check if mp enough.
 				(npc? target)
-				(not (or (boss? target) (minion? target)))
+				(member (ref me 'class) (list 'dwarven-fighter 'scavenger 'bounty-hunter) eq?)
+				(not (or (ref target 'boss?) (ref target 'minion?)))
 				(not (ref target 'spoiled?))
 			)))
 
 			(cons 'war-cry (lambda (me target . rest) (and
 				(mp>critical? me) ; TODO just check if mp enough.
-				(or (boss? target) (minion? target))
+				(or (ref target 'boss?) (ref target 'minion?))
 			)))
+			(cons 'rage (lambda (me target . rest) (and
+				(mp>critical? me) ; TODO just check if mp enough.
+				(or (ref target 'boss?) (ref target 'minion?))
+			)))
+			(cons 'bear-spirit-totem (lambda (me target . rest) (and
+				(mp>critical? me) ; TODO just check if mp enough.
+				(or (ref target 'boss?) (ref target 'minion?))
+			)))
+
 			(cons 'ultimate-defense  (lambda (me . rest) (and
 				(hp-critical? me)
+				(mp>critical? me) ; TODO just check if mp enough.
+			)))
+			(cons 'ultimate-evasion  (lambda (me . rest) (and
+				(<= (hp-ratio me) 1/4)
 				(mp>critical? me) ; TODO just check if mp enough.
 			)))
 		)
@@ -327,18 +402,14 @@
 	(define (command-assist cn br author-id [skills (list)])
 		(let* ((wr (connection-world cn)) (author (object-ref wr author-id)))
 			(if author
-				(let ((target-id (ref author 'target-id)))
-					(when (and (fighter-type? (world-me wr)) target-id (not (in-party? (world-party wr) target-id)))
-						(brain-do! br (program program-slay
-							target-id
-							(alist-merge (skill-settings wr) skills)
-							(lambda (me target)
-								(if (fighter-type? me)
-									(attack cn)
-									(move-to cn (get-position author) 50)
-								)
+				(let ((target-id (ref author 'target-id)) (me (world-me wr)))
+					(when (and (fighter-type? me) target-id (not (in-party? (world-party wr) target-id)))
+						(brain-do! br (program program-slay target-id (alist-merge (skill-settings wr) skills) (lambda (me target)
+							(if (fighter-type? me) ; (or ... (eq? (ref me 'race) 'orc))
+								(attack cn)
+								(move-to cn (get-position author) 50)
 							)
-						))
+						)))
 					)
 				)
 				(say cn "Don't see the requester.")
@@ -349,31 +420,56 @@
 	(define (parse-buffs me pack)
 		(case pack
 			(("ww") (const (list 'wind-walk)))
-			(("acum") (const (list 'acumen)))
-			(("mgr") (lambda (character)
-				(if (fighter-type? character)
-					(list 'vampiric-rage 'shield 'focus 'death-whisper 'might 'guidance)
-					(list 'wind-walk)
+			(("solo") (lambda (character)
+				(if (mystic-type? character)
+					(list 'empower 'acumen 'shield 'wind-walk)
+					(list 'vampiric-rage 'might 'death-whisper 'focus 'shield 'guidance)
+				)
+			))
+			(("phr") (lambda (character)
+				(cond
+					((protagonist? character) (list))
+					((or (fighter-type? character) (eq? (ref character 'race) 'orc))
+						(case (ref me 'class)
+							((shillien-elder) (list 'vampiric-rage 'might 'death-whisper))
+							(else (list 'focus 'shield 'wind-walk))
+						)
+					)
+					((mystic-type? character)
+						(case (ref me 'class)
+							((shillien-elder) (list 'empower 'shield))
+							(else (list 'acumen 'wind-walk))
+						)
+					)
+					(else (list))
 				)
 			))
 			(("rb") (lambda (character)
 				(cond
-					((protagonist? character) (list 'acumen))
-					((fighter-type? character)
-						(case (get-class me)
-							((shillien-elder)
-								(let ((buffs (list 'vampiric-rage 'death-whisper 'might))) ; Gracia.
-									(if (string-ci=? (ref character 'name) "Ekon") (cons 'guidance buffs) buffs) ; C-grade penalty.
-								)
-							)
-							(else (list #|'holy-weapon|# 'focus 'shield)) ; Agate.
+					((protagonist? character) (list))
+					((or (tank-class? character) (member (ref character 'name) (list "Ekon" "Evdem")))
+						(case (ref me 'class)
+							((shillien-elder) (list 'guidance 'vampiric-rage 'death-whisper 'might)) ; C-grade penalty.
+							(else (list 'focus 'shield))
 						)
 					)
-					((support-class? character) (list #|'wind-walk 'acumen|#))
+					((fighter-type? character)
+						(case (ref me 'class)
+							((shillien-elder) (list 'death-whisper 'might))
+							(else (list 'focus))
+						)
+					)
+					((support-class? character) (list 'acumen))
 					((wizard-class? character) (list 'empower 'acumen))
-					((and (eq? (ref character 'race) 'orc) (mystic-type? character)) (list 'empower 'acumen))
+					((and (eq? (ref character 'race) 'orc) (mystic-type? character)) (list 'acumen))
 					; TODO Orc's buffs.
 					(else (list))
+				)
+			))
+			(("holy") (lambda (character)
+				(if (or (fighter-type? character) (eq? (ref character 'race) 'orc))
+					(list 'holy-weapon)
+					(list)
 				)
 			))
 			(else (const (list)))

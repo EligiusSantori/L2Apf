@@ -87,6 +87,7 @@
 		(cons 1012 'cure-poision)
 		(cons 1018 'purify)
 		(cons 1020 'vitalize)
+		(cons 21 'poison-recovery)
 		(cons 34 'bandage)
 		(cons 61 'cure-bleeding)
 
@@ -107,16 +108,23 @@
 		(cons 1006 'chant-of-fire)
 		(cons 1009 'chant-of-shielding)
 		(cons 1007 'chant-of-battle)
-
 		(cons 77 'attack-aura)
 		(cons 91 'defense-aura)
+
+		(cons 76 'bear-spirit-totem)
 		(cons 78 'war-cry)
 		(cons 82 'majesty)
+		(cons 83 'wolf-spirit-totem)
+		(cons 94 'rage)
 		(cons 110 'ultimate-defense)
+		(cons 111 'ultimate-evasion)
+		(cons 112 'deflect-arrow)
+		(cons 121 'battle-roar)
 
 		; Toggles.
 		(cons 256 'accuracy)
 		(cons 312 'vicious-stance)
+		(cons 1001 'soul-cry)
 
 		; Strikes.
 		(cons 3 'power-strike)
@@ -131,6 +139,7 @@
 		(cons 36 'whirlwind)
 		(cons 92 'shield-stun)
 
+		(cons 1177 'wind-strike)
 		(cons 1239 'hurricane)
 		(cons 1267 'shadow-flare)
 
@@ -139,7 +148,7 @@
 		(cons 1190 'life-drain)
 		(cons 1234 'vampiric-claw)
 
-		; Poisoning and bleeding.
+		; Poisoning, bleeding, mana burning.
 		(cons 129 'poison)
 		(cons 223 'sting)
 		(cons 1095 'venom)
@@ -147,6 +156,7 @@
 		(cons 1107 'frost-flame)
 		(cons 1168 'curse-poison)
 		(cons 1209 'seal-of-poison)
+		(cons 1102 'aura-sink)
 
 		; Curses.
 		(cons 1064 'silence)

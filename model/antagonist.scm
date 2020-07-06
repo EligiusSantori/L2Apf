@@ -8,7 +8,7 @@
 	)
 	(provide (contract-out
 		(antagonist? (-> any/c boolean?))
-		(make-antagonist (-> list? box?))
+		(make-antagonist (-> list? any/c box?))
 		(update-antagonist! (-> box? list? list?))
 	))
 
@@ -16,8 +16,8 @@
 		(object-of-type? object 'antagonist)
 	)
 
-	(define (make-antagonist data)
-		(let ((character (make-character data)))
+	(define (make-antagonist data db)
+		(let ((character (make-character data db)))
 			(let ((type (cons 'antagonist (ref character 'type))))
 				(box (cons (cons 'type type) (alist-delete 'type character)))
 			)

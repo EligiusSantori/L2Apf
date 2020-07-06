@@ -28,6 +28,7 @@
 	))
 
 	(define creature (list
+		(cons 'level (negate =))
 		(cons 'name (negate string=?))
 		(cons 'title (negate string=?))
 

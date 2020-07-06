@@ -36,6 +36,7 @@
 		[timer-thread #:auto]
 
 		[world #:auto]
+		[db #:auto]
 	) #:mutable)
 
 	(define (read-buffer port)

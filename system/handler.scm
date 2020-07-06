@@ -144,10 +144,10 @@
 			creature
 		)
 	)
-	(define (create-or-update-character! ec wr data)
+	(define (create-or-update-character! ec wr db data)
 		(let* ((object-id (ref data 'object-id)) (character (object-ref wr object-id)))
 			(if (not character)
-				(let ((character (make-antagonist data)))
+				(let ((character (make-antagonist data db)))
 					(register-object! wr character)
 					(trigger ec 'creature-create object-id)
 					character
@@ -169,7 +169,7 @@
 						(packet-handler/system-message cn ec wr (game-server-packet/system-message ev)) ; Special case.
 						(let ((row (hash-ref handlers-table (get-packet-id ev) #f)))
 							(if row
-								((cdr row) ec wr ((car row) ev))
+								((cdr row) ec wr (connection-db cn) ((car row) ev))
 								(apf-debug "Unhandled packet ~v" ev) ; TODO apf-warn
 							)
 						)
@@ -303,7 +303,7 @@
 		)
 	)
 
-	(define (packet-handler/user-info ec wr packet)
+	(define (packet-handler/user-info ec wr db packet)
 		(let* ((me (world-me wr)) (changes (update-protagonist! me packet)))
 			(if (not (object-ref wr (ref packet 'object-id)))
 				(begin
@@ -314,13 +314,13 @@
 			)
 		)
 	)
-	(define (packet-handler/char-info ec wr packet)
-		(create-or-update-character! ec wr packet)
+	(define (packet-handler/char-info ec wr db packet)
+		(create-or-update-character! ec wr db packet)
 	)
-	(define (packet-handler/npc-info ec wr packet)
+	(define (packet-handler/npc-info ec wr db packet)
 		(let* ((object-id (ref packet 'object-id)) (npc (object-ref wr object-id)))
 			(if (not npc)
-				(let ((npc (make-npc packet)))
+				(let ((npc (make-npc packet db)))
 					(register-object! wr npc)
 					(trigger ec 'creature-create object-id)
 				)
@@ -330,7 +330,7 @@
 			)
 		)
 	)
-	(define (packet-handler/status-update ec wr packet)
+	(define (packet-handler/status-update ec wr db packet)
 		(let* ((creature (object-ref wr (ref packet 'object-id))) (changes (cond
 					((protagonist? creature) (update-protagonist! creature packet))
 					((antagonist? creature) (update-antagonist! creature packet))
@@ -341,7 +341,7 @@
 			)
 		)
 	)
-	(define (packet-handler/magic-effects ec wr packet)
+	(define (packet-handler/magic-effects ec wr db packet)
 		(printf "{magic-effects ~a}~n" packet)(flush-output)
 		; (define (make-effects data)
 		; 	(fold (lambda ()
@@ -356,7 +356,7 @@
 		; (trigger ec 'creature-update (object-id me) (cons 'effects (cons new old)))
 	)
 
-	(define (packet-handler/inventory-info ec wr packet)
+	(define (packet-handler/inventory-info ec wr db packet)
 		(let ((inv (world-inventory wr)))
 			(hash-clear! inv)
 			(map (lambda (item)
@@ -364,7 +364,7 @@
 			) (ref packet 'items))
 		)
 	)
-	(define (packet-handler/inventory-update ec wr packet)
+	(define (packet-handler/inventory-update ec wr db packet)
 		(let ((inv (world-inventory wr)))
 			(map (lambda (item)
 				(case (ref item 'change)
@@ -376,22 +376,22 @@
 			) (ref packet 'items))
 		)
 	)
-	(define (packet-handler/spawn-item ec wr packet)
+	(define (packet-handler/spawn-item ec wr db packet)
 		(let ((item (make-item packet)))
 			(register-object! wr item)
 			(trigger ec 'item-spawn (object-id item) #f)
 		)
 	)
-	(define (packet-handler/drop-item ec wr packet)
+	(define (packet-handler/drop-item ec wr db packet)
 		(let ((item (make-item packet)))
 			(register-object! wr item)
 			(trigger ec 'item-spawn (object-id item) (ref packet 'subject-id))
 		)
 	)
-	(define (packet-handler/pick-item ec wr packet) ; Происходит перед object-delete.
+	(define (packet-handler/pick-item ec wr db packet) ; Происходит перед object-delete.
 		(trigger ec 'item-pick (ref packet 'object-id) (ref packet 'subject-id) (ref packet 'position))
 	)
-	(define (packet-handler/object-deleted ec wr packet)
+	(define (packet-handler/object-deleted ec wr db packet)
 		(let* ((object-id (ref packet 'object-id)) (object (object-ref wr object-id)))
 			(when (creature? object) ; Clear targets to deleted object.
 				(objects wr (lambda (subject)
@@ -404,10 +404,10 @@
 		)
 	)
 
-	(define (packet-handler/move-to-point ec wr packet) ; Происходит, когда существо бежит к точке.
+	(define (packet-handler/move-to-point ec wr db packet) ; Происходит, когда существо бежит к точке.
 		(handle-creature-update! ec wr packet)
 	)
-	(define (packet-handler/move-to-pawn ec wr packet) ; Происходит, когда существо бежит к другому существу или когда начинается каст (возможно атака тоже).
+	(define (packet-handler/move-to-pawn ec wr db packet) ; Происходит, когда существо бежит к другому существу или когда начинается каст (возможно атака тоже).
 		(let ((creature (object-ref wr (ref packet 'object-id))) (target (object-ref wr (ref packet 'target-id))))
 ; (when (antagonist? creature) (printf "<~a> {move-to-pawn ~a}~n" (format-time) packet)(flush-output))
 			(if (and creature target)
@@ -429,10 +429,10 @@
 			)
 		)
 	)
-	(define (packet-handler/validate-location ec wr packet)
+	(define (packet-handler/validate-location ec wr db packet)
 		(handle-creature-update! ec wr packet)
 	)
-	(define (packet-handler/stop-moving ec wr packet)
+	(define (packet-handler/stop-moving ec wr db packet)
 		(handle-creature-update! ec wr (list
 			(cons 'object-id (ref packet 'object-id))
 			(cons 'position (ref packet 'position))
@@ -440,7 +440,7 @@
 			(cons 'angle (ref packet 'angle))
 		))
 	)
-	(define (packet-handler/change-move-type ec wr packet)
+	(define (packet-handler/change-move-type ec wr db packet)
 		(let ((creature (object-ref wr (ref packet 'object-id)))) (when creature
 			(handle-creature-update! ec wr (list
 				(cons 'object-id (object-id creature))
@@ -449,7 +449,7 @@
 			))
 		))
 	)
-	(define (packet-handler/change-wait-type ec wr packet)
+	(define (packet-handler/change-wait-type ec wr db packet)
 		(handle-creature-update! ec wr (list
 			(cons 'object-id (ref packet 'object-id))
 			(cons 'position (ref packet 'position))
@@ -458,20 +458,20 @@
 		))
 	)
 
-	(define (packet-handler/target-selected ec wr packet)
+	(define (packet-handler/target-selected ec wr db packet)
 		(handle-creature-update! ec wr packet)
 	)
-	(define (packet-handler/target-unselected ec wr packet)
+	(define (packet-handler/target-unselected ec wr db packet)
 		(handle-creature-update! ec wr (cons (cons 'target-id #f) packet))
 	)
-	(define (packet-handler/my-target-selected ec wr packet)
+	(define (packet-handler/my-target-selected ec wr db packet)
 		(handle-creature-update! ec wr (list
 			(cons 'object-id (object-id (world-me wr)))
 			(cons 'target-id (ref packet 'target-id))
 		))
 	)
 
-	(define (packet-handler/attack ec wr packet)
+	(define (packet-handler/attack ec wr db packet)
 		(define (group-hits hits)
 			(hash->list (fold (lambda (hit map)
 				(let* ((target-id (ref hit 'target-id)) (bucket (hash-ref map target-id (list))))
@@ -519,14 +519,14 @@
 			)
 		))
 	)
-	(define (packet-handler/social-action ec wr packet)
+	(define (packet-handler/social-action ec wr db packet)
 		(trigger ec 'gesture
 			(ref packet 'object-id)
 			(ref packet 'action)
 		)
 	)
 
-	(define (packet-handler/skill-list ec wr packet)
+	(define (packet-handler/skill-list ec wr db packet)
 		(let ((skills (world-skills wr)))
 			(hash-clear! skills)
 			(apply hash-set*! skills (apply append (map (lambda (i)
@@ -536,7 +536,7 @@
 			) (ref packet 'list))))
 		)
 	)
-	(define (packet-handler/skill-started ec wr packet)
+	(define (packet-handler/skill-started ec wr db packet)
 		(define (update-or-create-skill packet)
 			(or
 				(and (= (object-id (world-me wr)) (ref packet 'object-id))
@@ -567,7 +567,7 @@
 			)
 		))
 	)
-	(define (packet-handler/skill-launched ec wr packet)
+	(define (packet-handler/skill-launched ec wr db packet)
 		(define (find-or-create-skill creature packet)
 			(or
 				(ref creature 'casting)
@@ -589,7 +589,7 @@
 			)
 		))
 	)
-	(define (packet-handler/skill-canceled ec wr packet)
+	(define (packet-handler/skill-canceled ec wr db packet)
 		(let ((creature (object-ref wr (ref packet 'object-id)))) (when creature
 			(let ((skill (ref creature 'casting)))
 				(update-creature! creature (list
@@ -601,19 +601,19 @@
 		))
 	)
 
-	(define (packet-handler/ask-join-clan ec wr packet)
+	(define (packet-handler/ask-join-clan ec wr db packet)
 		(trigger ec 'ask/join-clan (ref packet 'name))
 	)
-	(define (packet-handler/ask-join-party ec wr packet)
+	(define (packet-handler/ask-join-party ec wr db packet)
 		(trigger ec 'ask/join-party (ref packet 'name) (ref packet 'loot))
 	)
-	(define (packet-handler/ask-be-friends ec wr packet)
+	(define (packet-handler/ask-be-friends ec wr db packet)
 		(trigger ec 'ask/be-friends (ref packet 'name))
 	)
-	(define (packet-handler/ask-join-alliance ec wr packet)
+	(define (packet-handler/ask-join-alliance ec wr db packet)
 		(trigger ec 'ask/join-alliance (ref packet 'name))
 	)
-	(define (packet-handler/reply-join-party ec wr packet)
+	(define (packet-handler/reply-join-party ec wr db packet)
 		(when (not (ref packet 'accept?))
 			(trigger ec 'reject/join-party
 				; (cons 'object-id ?) ; TODO
@@ -622,13 +622,13 @@
 		)
 	)
 
-	(define (packet-handler/party-all-members ec wr packet)
+	(define (packet-handler/party-all-members ec wr db packet)
 		(let ((me (world-me wr)) (leader-id (ref packet 'leader-id)))
 			(set-world-party! wr (apply make-party
 				(ref packet 'loot-mode)
 				leader-id
 				(fold (lambda (data members)
-					(let ((character (create-or-update-character! ec wr data)))
+					(let ((character (create-or-update-character! ec wr db data)))
 						(if (not (member (object-id character) (list (object-id me) leader-id)))
 							(cons (object-id character) members) ; Regular member.
 							members ; Party leader.
@@ -642,21 +642,21 @@
 			(trigger ec 'party-join (party-loot party) (party-members party))
 		)
 	)
-	(define (packet-handler/party-add-member ec wr packet)
-		(let ((character (create-or-update-character! ec wr packet)))
+	(define (packet-handler/party-add-member ec wr db packet)
+		(let ((character (create-or-update-character! ec wr db packet)))
 			(when (not (in-party? (world-party wr) (object-id character)))
 				(party-add! wr (object-id character))
 				(trigger ec 'party-memeber-join (object-id character))
 			)
 		)
 	)
-	(define (packet-handler/party-member-update ec wr packet)
-		(create-or-update-character! ec wr packet)
+	(define (packet-handler/party-member-update ec wr db packet)
+		(create-or-update-character! ec wr db packet)
 	)
-	(define (packet-handler/party-member-position ec wr packet)
+	(define (packet-handler/party-member-position ec wr db packet)
 		(map (lambda (data) (handle-creature-update! ec wr data)) (ref packet 'members))
 	)
-	(define (packet-handler/party-delete-member ec wr packet)
+	(define (packet-handler/party-delete-member ec wr db packet)
 		(let ((object-id (ref packet 'object-id)))
 			(party-kick! wr object-id)
 			(if (world-party wr)
@@ -666,14 +666,14 @@
 			(trigger ec 'party-memeber-leave object-id)
 		)
 	)
-	(define (packet-handler/party-clear-members ec wr packet)
+	(define (packet-handler/party-clear-members ec wr db packet)
 		(when (world-party wr)
 			(party-clear! wr)
 			(trigger ec 'party-leave)
 		)
 	)
 
-	(define (packet-handler/chat-message ec wr packet)
+	(define (packet-handler/chat-message ec wr db packet)
 		(trigger ec 'message
 			(ref packet 'object-id)
 			(ref packet 'channel)
@@ -708,7 +708,7 @@
 			(trigger ec 'system-message message-id arguments)
 		)
 	)
-	(define (packet-handler/confirm ec wr packet)
+	(define (packet-handler/confirm ec wr db packet)
 		(let ((arguments (ref packet 'arguments)))
 			(case (ref packet 'message-id)
 				((1510)
@@ -721,7 +721,7 @@
 		)
 	)
 
-	(define (packet-handler/die ec wr packet)
+	(define (packet-handler/die ec wr db packet)
 		(let ((creature (object-ref wr (ref packet 'object-id)))) (when creature
 			(cond
 				((protagonist? creature)
@@ -755,7 +755,7 @@
 			(trigger ec 'die (object-id creature) (if (protagonist? creature) (ref packet 'return) #f))
 		))
 	)
-	(define (packet-handler/revive ec wr packet)
+	(define (packet-handler/revive ec wr db packet)
 		(let ((creature (object-ref wr (ref packet 'object-id)))) (when creature
 			(cond
 				((protagonist? creature)
@@ -775,7 +775,7 @@
 		))
 	)
 
-	(define (packet-handler/teleport ec wr packet)
+	(define (packet-handler/teleport ec wr db packet)
 		(let ((creature (handle-creature-update! ec wr (cons (cons 'destination #f) packet)))) (when creature
 			(trigger ec 'teleport (object-id creature) (ref creature 'position))
 
@@ -795,7 +795,7 @@
 		))
 	)
 
-	(define (packet-handler/logout ec wr packet)
+	(define (packet-handler/logout ec wr db packet)
 		(trigger ec 'logout)
 	)
 

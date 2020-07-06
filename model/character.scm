@@ -3,19 +3,19 @@
 		(only-in srfi/1 fold alist-delete)
 		(only-in racket/function negate)
 		racket/contract
+		; "../library/extension.scm"
 		"../library/geometry.scm"
-		"../packet/game/class.scm"
 		"../system/structure.scm"
+		"../system/database.scm"
 		"object.scm"
 		"creature.scm"
 	)
 	(provide (contract-out
 		(character? (-> any/c boolean?))
-		(make-character (-> list? list?))
+		(make-character (-> list? any/c list?))
 		(update-character (-> list? list? (values list? list? list?)))
 		(update-character! (-> box? list? list?))
 
-		(get-class (-> character? symbol?))
 		(fighter-type? (-> character? boolean?))
 		(mystic-type? (-> character? boolean?))
 		(wizard-class? (-> character? any))
@@ -24,10 +24,10 @@
 		(summoner-class? (-> character? any))
 		(artisan-class? (-> character? any))
 		(scavenger-class? (-> character? any))
+		(tank-class? (-> character? any))
 	))
 
 	(define character (list
-		(cons 'level (negate =))
 		(cons 'cp (negate =))
 		(cons 'max-cp (negate =))
 		(cons 'karma (negate =))
@@ -56,18 +56,24 @@
 
 		(cons 'cubics (negate equal?)) ; TODO use set
 		(cons 'fish (negate point/3d=?))
+
+		(cons 'class #f)
+		(cons 'specialty #f)
+		(cons 'mystic? #f)
 	))
 
 	(define (character? object)
 		(object-of-type? object 'character)
 	)
 
-	(define (make-character data)
-		(let ((creature (make-creature data)))
-			(let ((type (cons 'character (ref creature 'type))))
-				(fold
+	(define (make-character data db) ; TODO Can be optimized.
+		(let* ((creature (make-creature data)) (type (cons 'character (ref creature 'type))))
+			(append
+				(list (cons 'type type))
+				(db-character db (ref data 'class-id))
+				(fold ; TODO extract class-id
 					(lambda (p r) (if (and p (assoc (car p) character eq?)) (cons p r) r)) ; If field belongs to character.
-					(cons (cons 'type type) (alist-delete 'type creature))
+					(alist-delete 'type creature eq?) ; TODO extract type
 					data
 				)
 			)
@@ -88,16 +94,13 @@
 
 	; TODO Use shared database.
 	(define (fighter-type? character)
-		(if (find-class-name (ref character 'class-id) (caddr (car classes))) #t #f)
+		(if (ref character 'mystic?) #f #t)
 	)
 	(define (mystic-type? character)
-		(if (find-class-name (ref character 'class-id) (caddr (cadr classes))) #t #f)
-	)
-	(define (get-class character)
-		(find-class-name (ref character 'class-id))
+		(if (ref character 'mystic?) #t #f)
 	)
 	(define (wizard-class? character)
-		(let ((class (get-class character)))
+		(let ((class (ref character 'class)))
 			(and (member class (list
 				'sorcerer 'archmage
 				'spellsinger 'mystic-muse
@@ -106,7 +109,7 @@
 		)
 	)
 	(define (support-class? character)
-		(let ((class (get-class character)))
+		(let ((class (ref character 'class)))
 			(and (member class (list
 				'cleric
 					'bishop 'cardinal
@@ -125,7 +128,7 @@
 		)
 	)
 	(define (summoner-class? character)
-		(let ((class (get-class character)))
+		(let ((class (ref character 'class)))
 			(and (member class (list
 				'warlock 'arcana-lord
 				'elemental-summoner 'elemental-master
@@ -134,13 +137,24 @@
 		)
 	)
 	(define (artisan-class? character)
-		(let ((class (get-class character)))
+		(let ((class (ref character 'class)))
 			(and (member class (list 'artisan 'warsmith 'maestro)) class)
 		)
 	)
 	(define (scavenger-class? character)
-		(let ((class (get-class character)))
+		(let ((class (ref character 'class)))
 			(and (member class (list 'scavenger 'bounty-hunter 'fortune-seeker)) class)
+		)
+	)
+	(define (tank-class? character)
+		(let ((class (ref character 'class)))
+			(and (member class (list
+				'human-knight
+					'paladin 'phoenix-knight
+					'dark-avenger 'hell-knight
+				'temple-knight
+				'shillien-knight
+			)) class)
 		)
 	)
 )
