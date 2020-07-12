@@ -45,17 +45,16 @@
 
 	(define (db-skill db skill-id [level 1])
 		(if db
-			(let ((row (query-maybe-row db "SELECT name, level, harmful, toggle, mp_cost, hp_cost, item_id, item_cost FROM skill WHERE id = $1 AND level = $2" skill-id level)))
+			(let ((row (query-maybe-row db "SELECT name, type, harmful, mp_cost, hp_cost, item_id, item_cost FROM skill WHERE id = $1 AND level = $2" skill-id level)))
 				(if row
 					(list
 						(cons 'name (vector-ref row 0))
-						(cons 'level (vector-ref row 1))
+						(cons 'toggle? (= (vector-ref row 1) 1))
 						(cons 'harmful? (if (zero? (vector-ref row 2)) #f #t))
-						(cons 'toggle? (if (zero? (vector-ref row 3)) #f #t))
-						(cons 'mp-cost (vector-ref row 4))
-						(cons 'hp-cost (vector-ref row 5))
-						(cons 'use-id (vector-ref row 6))
-						(cons 'item-cost (vector-ref row 7))
+						(cons 'mp-cost (sql-null->false (vector-ref row 3)))
+						(cons 'hp-cost (sql-null->false (vector-ref row 4)))
+						(cons 'item-id (sql-null->false (vector-ref row 5)))
+						(cons 'item-cost (sql-null->false (vector-ref row 6)))
 					)
 					(list)
 				)

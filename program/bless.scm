@@ -73,21 +73,21 @@
 		(let* ((wr (connection-world cn)) (character (object-ref wr character-id)))
 			(when (not character) (program-error "Don't see the target." character-id))
 			(when (not (character? character)) (program-error "Object is not a character." character-id))
-			(fold (lambda (skill-id heap)
-				(let ((skill (skill-ref wr skill-id)))
+			(fold (lambda (name heap)
+				(let ((skill (find-skill wr name)))
 					(when skill (heap-add! heap skill))
 					heap
 				)
 			) (make-heap (lambda (a b)
 				(<= (will-ready a) (will-ready b))
-			)) (apply select-skills (estimate character)))
+			)) (estimate character))
 		)
 	)
 
 	(define (next-buff cn todo)
 		(let ((skill (heap-min todo)))
 			(when (>= (timestamp) (will-ready skill))
-				(use-skill cn (skill-id skill)) ; Buff is ready, do it.
+				(use-skill cn skill) ; Buff is ready, do it.
 			)
 		)
 	)

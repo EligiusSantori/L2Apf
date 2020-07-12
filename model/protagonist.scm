@@ -7,6 +7,7 @@
 		"../library/extension.scm"
 		"../library/cache.scm"
 		"../system/structure.scm"
+		"../system/database.scm"
 		"object.scm"
 		"character.scm"
 	)
@@ -50,6 +51,7 @@
 		(cons 'statements (negate alist-equal?))
 		(cons 'equipment (negate alist-equal?))
 		(cons 'attackers #f)
+		(cons 'database #f)
 	))
 
 	(define (protagonist? object)
@@ -57,23 +59,34 @@
 	)
 
 	(define (make-protagonist data db)
-		(let ((character (make-character data db)))
-			(let ((type (cons 'protagonist (ref character 'type))))
-				(box (fold
+		(let* ((character (make-character data db)) (type (cons 'protagonist (ref character 'type))) (xp (ref data 'xp)))
+			(box (append
+				(list
+					(cons 'type type)
+					(cons 'level (db-level db xp))
+					(cons 'attackers (make-cache-set 60 =)) ; Default aggro timeout.
+					(cons 'database db)
+				)
+				(fold ; TODO extract xp
 					(lambda (p r) (if (and p (assoc (car p) protagonist eq?)) (cons p r) r)) ; If field belongs to protagonist.
-					(append (alist-delete 'type character) (list
-						(cons 'type type)
-						(cons 'attackers (make-cache-set 60 =)) ; Default aggro timeout.
-					))
+					(alist-except character eq? 'type 'level) ; TODO extract type
 					data
-				))
-			)
+				)
+			))
+		)
+	)
+
+	(define (correct-level data db)
+		(let* ((xp (ref data 'xp)) (level (and xp (db-level db xp))))
+			(if level (cons (cons 'level level) (alist-delete 'level data eq?)) data)
 		)
 	)
 
 	(define (update-protagonist object data)
-		(let-values (((rest updated changes) (update-character object data)))
-			(struct-update data protagonist rest updated changes)
+		(let ((data (correct-level data (ref object 'database))))
+			(let-values (((rest updated changes) (update-character object data)))
+				(struct-update data protagonist rest updated changes)
+			)
 		)
 	)
 	(define (update-protagonist! object data)

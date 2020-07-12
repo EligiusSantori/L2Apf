@@ -1,6 +1,7 @@
 (module library racket/base ; Language extensions and implementaton abstraction layer.
 	(require
 		srfi/1
+		racket/string
 		racket/function
 		(only-in racket/list flatten)
 		(for-syntax racket/base)
@@ -27,6 +28,7 @@
 		alist-equal?
 		string-starts?
 		string-ends?
+		string-id
 		list-try-ref
 		try-first
 		try-second
@@ -156,6 +158,9 @@
 			)
 		)
 	)
+	(define (string-id s)
+		(string-replace (string-normalize-spaces (string-replace (string-downcase s) "-" " ")) " " "-")
+	)
 
 	(define (list-try-ref lst n [default #f])
 		(cond
@@ -261,11 +266,12 @@
 		)
 	)
 
-	(define (hash-filter h p)
+	(define (hash-filter h p [assoc? #t])
 		(define l (list))
 		(hash-for-each h (lambda (k v)
-			(when (p k v)
-				(set! l (cons (cons k v) l))
+			(if assoc?
+				(when (p k v) (set! l (cons (cons k v) l)))
+				(when (p v) (set! l (cons v l)))
 			)
 		))
 		l

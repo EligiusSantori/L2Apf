@@ -34,7 +34,7 @@
 			skill
 		)
 	)
-	(define (find-skill wr me skills) ; First fit.
+	(define (choose-skill wr me skills) ; First fit.
 		(let ((target (get-target wr me)))
 			(fold (lambda (p found)
 				(or found (should-skill? me target (skill-ref wr (car p)) (cdr p)))
@@ -42,13 +42,11 @@
 		)
 	)
 	(define (parse-skills wr skills)
-		(let ((skill-ids (apply select-skills (map car skills))))
-			(fold (lambda (skill-id p r)
-				(let ((skill (skill-ref wr skill-id)))
-					(if skill (cons (cons skill-id (cdr p)) r) r)
-				)
-			) (list) skill-ids skills)
-		)
+		(fold (lambda (p r)
+			(let ((skill (find-skill wr (car p))))
+				(if skill (cons (cons (skill-id skill) (cdr p)) r) r)
+			)
+		) (list) skills)
 	)
 
 	;(define (slay/soldier ...) ...)
@@ -60,11 +58,13 @@
 	(define (slay cn wr me victim-id skills action)
 		(let ((target-id (ref me 'target-id)))
 			(if (and target-id (= victim-id target-id))
-				(let ((skill (find-skill wr me skills)))
-					(cond
-						(skill (use-skill cn (skill-id skill) #t))
-						(action (action me (get-target wr me)))
-						(else (attack cn))
+				(when (not (ref me 'casting))
+					(let ((skill (choose-skill wr me skills)))
+						(cond
+							(skill (use-skill cn skill #t))
+							(action (action me (get-target wr me)))
+							(else (attack cn))
+						)
 					)
 				)
 				(target cn victim-id)
@@ -86,14 +86,12 @@
 							)
 						)
 						('creature-update (subject-id changes)
-							(when (and
-										(member subject-id (list (object-id me) victim-id) =)
-										(not (ref me 'casting))
-										(or
-											(fold (lambda (c r) (or r (member (car c) on-changes eq?))) #f changes)
-											(and (not (= subject-id victim-id)) (assoc 'mp changes eq?))
-										)
-									)
+							(and
+								(member subject-id (list (object-id me) victim-id) =)
+								(or
+									(fold (lambda (c r) (or r (member (car c) on-changes eq?))) #f changes)
+									(and (not (= subject-id victim-id)) (assoc 'mp changes eq?))
+								)
 								(do-slay)
 							)
 						)

@@ -248,7 +248,7 @@
 						(delayed-skill-reused! cn skill)
 					)
 					((eq? (object-id me) target-id) ; I'm target.
-						(when (skill-harmful? (skill-id skill))
+						(when (ref skill 'harmful?)
 							(attackers-add! me subject-id)
 						)
 					)
@@ -260,7 +260,7 @@
 			)
 			('skill-launched (subject-id skill target-ids)
 				(let ((me (world-me wr)))
-					(when (and (member (object-id me) target-ids =) (skill-harmful? (skill-id skill)))
+					(when (and (member (object-id me) target-ids =) (ref skill 'harmful?))
 						(attackers-add! me subject-id)
 					)
 				)
@@ -416,13 +416,13 @@
 						(list
 							(cons 'object-id (object-id creature))
 							(cons 'target-id (object-id target))
-							(cons 'position (ref packet 'position))
+							(assq 'position packet)
 							(cons 'destination (get-position target))
 						)
 					)
 					(list
 						(cons 'object-id (object-id creature))
-						(cons 'position (ref packet 'position))
+						(assq 'position packet)
 					)
 				) creature)
 				(apf-warn "World object ~v is missed, handler: move-to-pawn." (ref packet 'target-id))
@@ -434,10 +434,10 @@
 	)
 	(define (packet-handler/stop-moving ec wr db packet)
 		(handle-creature-update! ec wr (list
-			(cons 'object-id (ref packet 'object-id))
-			(cons 'position (ref packet 'position))
+			(assq 'object-id packet)
+			(assq 'position packet)
 			(cons 'destination #f)
-			(cons 'angle (ref packet 'angle))
+			(assq 'angle packet)
 		))
 	)
 	(define (packet-handler/change-move-type ec wr db packet)
@@ -445,16 +445,16 @@
 			(handle-creature-update! ec wr (list
 				(cons 'object-id (object-id creature))
 				(cons 'position (get-position creature))
-				(cons 'walking? (ref packet 'walking?))
+				(assq 'walking? packet)
 			))
 		))
 	)
 	(define (packet-handler/change-wait-type ec wr db packet)
 		(handle-creature-update! ec wr (list
-			(cons 'object-id (ref packet 'object-id))
-			(cons 'position (ref packet 'position))
+			(assq 'object-id packet)
+			(assq 'position packet)
 			(cons 'destination #f)
-			(cons 'sitting? (ref packet 'sitting?))
+			(assq 'sitting? packet)
 		))
 	)
 
@@ -467,7 +467,7 @@
 	(define (packet-handler/my-target-selected ec wr db packet)
 		(handle-creature-update! ec wr (list
 			(cons 'object-id (object-id (world-me wr)))
-			(cons 'target-id (ref packet 'target-id))
+			(assq 'target-id packet)
 		))
 	)
 
@@ -505,12 +505,12 @@
 		(let ((subject (object-ref wr (ref packet 'object-id))) (hits (group-hits (ref packet 'hits)))) (when subject
 			(let ((in-combat? (fold (bind-head handle-taget subject) #f hits)))
 				(handle-creature-update! ec wr (list ; Fix missing change-moving event & subject in-combat? state.
-					(cons 'object-id (ref packet 'object-id))
-					(cons 'position (ref packet 'position))
+					(assq 'object-id packet)
+					(assq 'position packet)
 					(cons 'destination #f)
 					(if in-combat? (cons 'in-combat? #t) #f)
-					(if (not (assoc (ref subject 'target-id) hits eq?))
-						(assoc 'target-id (car (ref packet 'hits)) eq?)
+					(if (not (assq (ref subject 'target-id) hits))
+						(assq 'target-id (car (ref packet 'hits)))
 						#f
 					)
 				) subject)
@@ -529,11 +529,13 @@
 	(define (packet-handler/skill-list ec wr db packet)
 		(let ((skills (world-skills wr)))
 			(hash-clear! skills)
-			(apply hash-set*! skills (apply append (map (lambda (i)
-				(let ((skill-id (ref i 'skill-id)) (level (ref i 'level)) (active? (ref i 'active?)))
-					(list skill-id (make-skill skill-id level active?))
-				)
-			) (ref packet 'list))))
+			(apply hash-set*! skills
+				(fold (lambda (s r)
+					(let ((skill (make-skill s db)))
+						(cons (skill-id skill) (cons skill r))
+					)
+				) (list) (ref packet 'list))
+			)
 		)
 	)
 	(define (packet-handler/skill-started ec wr db packet)
@@ -542,14 +544,23 @@
 				(and (= (object-id (world-me wr)) (ref packet 'object-id))
 					(let ((skill (skill-ref wr (ref packet 'skill-id)))) (and skill (begin
 						(update-skill! skill (list
-							(cons 'level (ref packet 'level))
+							(assq 'level packet)
+							(and (ref skill 'toggle?)
+								(cons 'enabled? (not (ref skill 'enabled?)))
+							)
 							(cons 'last-usage (timestamp))
-							(cons 'reuse-delay (ref packet 'reuse-delay))
+							(assq 'reuse-delay packet)
 						))
 						skill
 					)))
 				)
-				(make-skill (ref packet 'skill-id) (ref packet 'level) #t (timestamp) (ref packet 'reuse-delay))
+				(make-skill (list
+					(assq 'skill-id packet)
+					(assq 'level packet)
+					(cons 'active? #t)
+					(cons 'last-usage (timestamp))
+					(assq 'reuse-delay packet)
+				) db)
 			)
 		)
 
@@ -558,7 +569,7 @@
 				(handle-creature-update! ec wr (list
 					(cons 'object-id (object-id creature))
 					; (cons 'target-id (ref packet 'target-id)) ; It's possible to cast on self without target changing.
-					(cons 'position (ref packet 'position))
+					(assq 'position packet)
 					(cons 'destination #f)
 					(cons 'casting skill)
 				) creature)
@@ -574,7 +585,11 @@
 				(and (protagonist? creature)
 					(skill-ref wr (ref packet 'skill-id))
 				)
-				(make-skill (ref packet 'skill-id) (ref packet 'level) #t)
+				(make-skill (list
+					(assq 'skill-id packet)
+					(assq 'level packet)
+					(cons 'active? #t)
+				) db)
 			)
 		)
 
@@ -713,8 +728,8 @@
 			(case (ref packet 'message-id)
 				((1510)
 					(trigger ec 'confirm/resurrect
-						(cdr (assoc 'text arguments eq?))
-						(cdr (assoc 'number arguments eq?))
+						(ref arguments 'text)
+						(ref arguments 'number)
 					)
 				)
 			)

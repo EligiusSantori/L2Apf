@@ -32,18 +32,19 @@
 			(object-ref (-> world? (or/c integer? false/c) (or/c object? false/c)))
 			(skill-ref (-> world? (or/c integer? false/c) (or/c skill? false/c)))
 			(inv-ref (-> world? (or/c integer? false/c) (or/c item? false/c)))
-			(find-character (world? string? . -> . (or/c character? false/c)))
-			(get-target (world? creature? . -> . (or/c creature? false/c))) ; FIXME move to creature?
-			(get-angle (world? creature? . -> . rational?))
+			(find-character (-> world? string? (or/c character? false/c)))
+			(find-skill (-> world? (or/c symbol? string?) (or/c skill? false/c)))
+			(get-target (-> world? creature? (or/c creature? false/c))) ; FIXME move to creature?
+			(get-angle (-> world? creature? rational?))
 			(get-destination (-> world? creature? (or/c point/3d? false/c)))
-			(attackable? (any/c . -> . boolean?)) ; FIXME move to creature
-			(aimed-to? (creature? creature? . -> . boolean?)) ; FIXME move to creature
+			(attackable? (-> any/c boolean?)) ; FIXME move to creature
+			(aimed-to? (-> creature? creature? boolean?)) ; FIXME move to creature
 			(behind? (->* (creature? creature?) (rational?) boolean?)) ; FIXME move to map
-			(alive? (creature? . -> . boolean?)) ; FIXME
-			(party-add! (world? integer? . -> . void?))
-			(party-kick! (world? integer? . -> . void?))
-			(party-leader! (world? integer? . -> . void?))
-			(party-clear! (world? . -> . void?))
+			(alive? (-> creature? boolean?)) ; FIXME
+			(party-add! (-> world? integer? void?))
+			(party-kick! (-> world? integer? void?))
+			(party-leader! (-> world? integer? void?))
+			(party-clear! (-> world? void?))
 			(equip-sword? (-> character? boolean?))
 			(equip-blunt? (-> character? boolean?))
 			(equip-dagger? (-> character? boolean?))
@@ -156,6 +157,13 @@
 			(if found (cdr found) #f)
 		)
 	)
+	(define (find-skill wr name)
+		(let ((fid (if (symbol? name) (symbol->string name) (string-id name))))
+			(fold-skills (world-skills wr) #f (lambda (skill r)
+				(or r (and (string=? (string-id (or (ref skill 'name) "")) fid) skill))
+			))
+		)
+	)
 
 	(define (attackable? creature)
 		(and
@@ -260,7 +268,7 @@
 	; (define (creature-shield ...)) => item-id or #f ; TODO
 	(define (equip-sword? character)
 		; #t ; TODO item-id in creature.clothing
-		(if (member (ref character 'clothing 'right-hand) (list 68) eq?) #t #f)
+		(if (member (ref character 'clothing 'right-hand) (list 2369 68) eq?) #t #f)
 	)
 	(define (equip-blunt? character)
 		#t ; TODO item-id in creature.clothing

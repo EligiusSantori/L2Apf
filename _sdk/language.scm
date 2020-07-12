@@ -165,19 +165,20 @@
 	)
 
 	(define (command-skill cn arguments)
-		(let ((what (try-first arguments))) (case what
-			(("arr") (use-skill cn (car (select-skills 'deflect-arrow))))
+		(let ((what (try-first arguments)) (wr (connection-world cn)))
+			(case what
+				(("arr") (use-skill cn (find-skill wr 'deflect-arrow)))
 
-			(("lif") (use-skill cn (car (select-skills 'chant-of-life))))
+				(("lif") (use-skill cn (find-skill wr 'chant-of-life)))
 
-			; (("hate") (use-skill cn (car (select-skills 'hate))))
-			(("con") (use-skill cn (car (select-skills 'confusion))))
-			(("pic") (use-skill cn (car (select-skills 'charm))))
-			(("mad") (use-skill cn (car (select-skills 'madness))))
-			(else (let ((skill-id (string->number what)))
-				(when skill-id (use-skill cn skill-id))
-			))
-		))
+				(("con") (use-skill cn (find-skill wr 'confusion)))
+				(("pic") (use-skill cn (find-skill wr 'charm)))
+				(("mad") (use-skill cn (find-skill wr 'madness)))
+				(else (let ((skill-id (string->number what)))
+					(when skill-id (use-skill cn (skill-ref wr skill-id)))
+				))
+			)
+		)
 	)
 	(define (command-repeat cn br skill author-id arguments)
 		(let* ((wr (connection-world cn)) (author (object-ref wr author-id)))
@@ -194,9 +195,7 @@
 		)
 	)
 
-	(define (skill-exists wr name)
-		(skill-ref wr (car (select-skills name)))
-	)
+	(define (skill-exists wr name) (find-skill wr name))
 	(define (medium-damage-skill-pointful? me target)
 		(>= (or (ref target 'hp) 0) (* (ref me 'hp) 2/3)) ; Target.HP > (2/3)Me.HP
 	)
@@ -219,22 +218,20 @@
 	(define (mp-plenty? me) (> (mp-ratio me) 2/3))
 	(define (mp>reserve? me) (> (mp-ratio me) 1/3))
 	(define (mp>shortage? me) (>= (mp-ratio me) 1/5))
-	(define (mp>critical? me) (>= (mp-ratio me) 1/10))
 	(define (hp-danger? me) (<= (hp-ratio me) 1/5))
 	(define (hp-critical? me) (<= (hp-ratio me) 1/10))
 	(define (skill-settings wr)
 		(list
 			(cons 'wind-strike (lambda (me target skill) (and
-				(mp>critical? me)
+				(< (ref me 'specialty) 1)
 				(medium-damage-skill-pointful? me target)
 				(>= (- (timestamp) (or (ref skill 'last-usage) 0)) 7) ; Delay 7s.
 			)))
 
 			(cons 'power-strike (lambda (me target . rest) (and
+				(< (ref me 'specialty) 1)
 				(equip-sword? me)
 				(mp>reserve? me)
-				(not (skill-exists wr 'shield-stun))
-				(not (skill-exists wr 'power-smash))
 				(medium-damage-skill-pointful? me target)
 			)))
 			(cons 'power-smash (lambda (me target . rest) (and
@@ -356,20 +353,16 @@
 				(mp>shortage? me)
 			)))
 			(cons 'bandage (lambda (me . rest) (and
-				(mp>critical? me) ; TODO just check if mp enough.
 				(ref me 'bleeding?)
 			)))
 			#|(cons 'cure-bleeding (lambda (me . rest) (and
-				(mp>critical? me) ; TODO just check if mp enough.
 				(ref me 'bleeding?)
 			)))
 			(cons 'poison-recovery (lambda (me . rest) (and
-				(mp>critical? me) ; TODO just check if mp enough.
 				(ref me 'poisoned?)
 			)))|#
 
 			(cons 'spoil (lambda (me target . rest) (and
-				(mp>critical? me) ; TODO just check if mp enough.
 				(npc? target)
 				(member (ref me 'class) (list 'dwarven-fighter 'scavenger 'bounty-hunter) eq?)
 				(not (or (ref target 'boss?) (ref target 'minion?)))
@@ -377,25 +370,20 @@
 			)))
 
 			(cons 'war-cry (lambda (me target . rest) (and
-				(mp>critical? me) ; TODO just check if mp enough.
 				(or (ref target 'boss?) (ref target 'minion?))
 			)))
 			(cons 'rage (lambda (me target . rest) (and
-				(mp>critical? me) ; TODO just check if mp enough.
 				(or (ref target 'boss?) (ref target 'minion?))
 			)))
 			(cons 'bear-spirit-totem (lambda (me target . rest) (and
-				(mp>critical? me) ; TODO just check if mp enough.
 				(or (ref target 'boss?) (ref target 'minion?))
 			)))
 
 			(cons 'ultimate-defense  (lambda (me . rest) (and
 				(hp-critical? me)
-				(mp>critical? me) ; TODO just check if mp enough.
 			)))
 			(cons 'ultimate-evasion  (lambda (me . rest) (and
 				(<= (hp-ratio me) 1/4)
-				(mp>critical? me) ; TODO just check if mp enough.
 			)))
 		)
 	)
@@ -422,8 +410,8 @@
 			(("ww") (const (list 'wind-walk)))
 			(("solo") (lambda (character)
 				(if (mystic-type? character)
-					(list 'empower 'acumen 'shield 'wind-walk)
-					(list 'vampiric-rage 'might 'death-whisper 'focus 'shield 'guidance)
+					(list 'empower 'acumen 'berserker-spirit 'shield 'wind-walk)
+					(list 'vampiric-rage 'might 'death-whisper 'focus 'shield 'guidance 'regeneration)
 				)
 			))
 			(("phr") (lambda (character)
@@ -450,7 +438,7 @@
 					((or (tank-class? character) (member (ref character 'name) (list "Ekon" "Evdem")))
 						(case (ref me 'class)
 							((shillien-elder) (list 'guidance 'vampiric-rage 'death-whisper 'might)) ; C-grade penalty.
-							(else (list 'focus 'shield))
+							(else (list 'focus 'shield 'regeneration))
 						)
 					)
 					((fighter-type? character)
@@ -471,6 +459,9 @@
 					(list 'holy-weapon)
 					(list)
 				)
+			))
+			(("bers") (lambda (character)
+				(list 'berserker-spirit)
 			))
 			(else (const (list)))
 		)

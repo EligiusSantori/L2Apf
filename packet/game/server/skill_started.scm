@@ -13,12 +13,8 @@
 				(cons 'level (read-int32 #f s))
 				(cons 'cast-origin (read-int32 #f s)) ; TODO clarify
 				(cons 'reuse-delay (/ (read-int32 #f s) 1000))
-				(cons 'position
-					(let ((position (read-point s)))
-						(read-int16 #f s)
-						position
-					)
-				)
+				(cons 'position (read-point s))
+				(cons 'critical? (read-int32 #f s))
 			)
 		)
 	)

@@ -28,7 +28,7 @@
 	)
 
 	(define (find-sweep-skill wr) ; TODO Use spoil-festival if many spoiled corpses nearby.
-		(skill-ref wr (car (select-skills 'sweeper)))
+		(find-skill wr 'sweeper)
 	)
 	(define (item-fit? range center item)
 		(and (on-ground? item) (or (zero? range) (<= (points-distance (ref item 'position) center) range)))
@@ -74,7 +74,7 @@
 			(if (npc? object)
 				(if (eq? (ref (world-me wr) 'target-id) id)
 					(let ((skill (find-sweep-skill wr)))
-						(use-skill cn (skill-id skill))
+						(use-skill cn skill)
 						(cons id #f) ; (+ (timestamp (or (ref skill 'reuse-delay) 0)))
 					)
 					(begin

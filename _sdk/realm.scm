@@ -25,6 +25,7 @@
 		; "api/auto_shot.scm"
 		"api/say.scm"
 		"api/use_skill.scm"
+		"api/toggle_skill.scm"
 		"api/party_crown.scm"
 		"api/return.scm"
 		"api/logout.scm"
@@ -38,7 +39,7 @@
 		"program/report.scm"
 		"program/loot.scm"
 		"program/relax.scm"
-		"program/support.scm"
+		; "program/support.scm"
 		; "program/auto_return.scm"
 		; "program/escape.scm"
 		; "program/travel.scm"
@@ -78,9 +79,6 @@
 			)
 		))
 	)
-)
-(define (skill-exists wr name)
-	(skill-ref wr (car (select-skills name)))
 )
 
 (define (run cn wr me events party)
@@ -124,13 +122,13 @@
 			)
 			('item-spawn (id . rest) ; Auto loot if I'm looter.
 				(when (and (eq? looter (object-id me)) (not (eq? (program-id (brain-active br)) 'program-loot)))
-					(brain-do! br (program program-loot (skill-exists wr 'sweeper) loot-radius))
+					(brain-do! br (program program-loot (find-skill wr 'sweeper) loot-radius))
 				)
 			)
 			('die (subject-id . rest) ; Auto sweep.
 				(when (and (eq? looter (object-id me)) (not (eq? (program-id (brain-active br)) 'program-loot)))
 					(let ((creature (object-ref wr subject-id)))
-						(when (and (npc? creature) (ref creature 'spoiled?) (skill-exists wr 'sweeper))
+						(when (and (npc? creature) (ref creature 'spoiled?) (find-skill wr 'sweeper))
 							(brain-do! br (program program-loot #t loot-radius))
 						)
 					)
@@ -147,18 +145,14 @@
 					(("skill") (command-skill cn (cdr command)))
 					(("rech") (command-repeat cn br 'recharge author-id (cdr command)))
 					(("heal") (command-repeat cn br 'heal author-id (cdr command)))
-					(("power")
-						(use-skill cn (car (select-skills 'vicious-stance)))
-						; (use-skill cn (car (select-skills 'soul-cry)))
-						#|(auto-shot connection
-							(not (string=? (list-try-ref command 1 "on") "off"))
-							(if (fighter-type? me) 'soulshot 'blessed-spiritshot)
-							(weapon-grade me)
-						)|#
-					)
+					(("power") (let ((is? (not (string=? (list-try-ref command 1 "on") "off"))))
+						(toggle-skill cn (find-skill wr 'vicious-stance) is?)
+						; (toggle-skill cn (find-skill wr 'soul-cry) is?)
+						; (auto-shot cn is? (if (fighter-type? me) 'soulshot 'blessed-spiritshot) (weapon-grade me))
+					))
 					(("prep")
-						(use-skill cn (car (select-skills 'majesty)))
-						(use-skill cn (car (select-skills 'battle-roar)))
+						(use-skill cn (find-skill wr 'majesty))
+						(use-skill cn (find-skill wr 'battle-roar))
 					)
 
 					(("invite") (brain-do! br (program program-make-party party 'finder 0.5)))
@@ -200,11 +194,9 @@
 							(>= (mp-ratio me) 1/10)
 							(<= (hp-ratio victim) 1/2)
 						))))
-
-						(cons 'power-strike (const #f))
 						; (cons 'sting (const #f)) ; TODO if not tank
 					)))
-					(("support") (when (support-class? me)
+					#|(("support") (when (support-class? me)
 						(brain-do! br (program program-support
 							(lambda (character)
 								(and
@@ -214,14 +206,14 @@
 							)
 							(lambda (character)
 							 	(and
-									(skill-ref wr (car (select-skills 'recharge)))
+									(skill-ref wr (find-skill wr 'recharge))
 									(mystic-type? character)
 									(<= (mp-ratio character) 19/20)
 									(> (mp-ratio me) 1/10)
 								)
 							) #f)
 						)
-					))
+					))|#
 					(("tank") (let ((name (list-try-ref command 1 "?")))
 						(cond
 							((string-ci=? name "?") (let ((character (object-ref wr tank))) (when character
@@ -243,12 +235,7 @@
 							)
 						)
 					))
-					(("buff")
-						(command-buff cn br author-id (cdr command))
-						(when (and (fighter-type? me) (member (ref me 'race) (list 'light-elf 'dark-elf) eq?)) ; For support level < 44.
-							(use-skill cn (car (select-skills 'defense-aura)))
-						)
-					)
+					(("buff") (command-buff cn br author-id (cdr command)))
 					(("relax") (let ((duration (or (string->number (list-try-ref command 1 "0")) 0)))
 						(brain-clear! br)
 						(brain-do! br (program program-relax duration))
