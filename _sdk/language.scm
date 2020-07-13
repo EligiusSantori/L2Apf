@@ -392,9 +392,10 @@
 			(if author
 				(let ((target-id (ref author 'target-id)) (me (world-me wr)))
 					(when (and (fighter-type? me) target-id (not (in-party? (world-party wr) target-id)))
-						(brain-do! br (program program-slay target-id (alist-merge (skill-settings wr) skills) (lambda (me target)
+						(update-creature! me (list (cons 'casting #f))) ; TODO fix casting on timer.
+						(brain-do! br (program program-slay target-id (alist-merge (skill-settings wr) (filter pair? skills)) (lambda (me target)
 							(if (fighter-type? me) ; (or ... (eq? (ref me 'race) 'orc))
-								(attack cn)
+								(when (not (attacking? me)) (attack cn))
 								(move-to cn (get-position author) 50)
 							)
 						)))

@@ -22,6 +22,7 @@
 		alist?
 		alist-flip
 		alist-ref
+		alist-contains
 		alist-only
 		alist-except
 		alist-merge
@@ -113,6 +114,9 @@
 		(let ((r (memf (lambda (p) (and (pair? p) (eqp key (car p)))) lst)))
 			(if r (cdr (car r)) default)
 		)
+	)
+	(define (alist-contains lst eqp . keys)
+		(fold (lambda (p r) (or r (member (car p) keys eqp))) #f lst)
 	)
 	(define (alist-only lst eqp . keys)
 		(filter (lambda (p)

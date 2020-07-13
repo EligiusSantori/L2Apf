@@ -178,23 +178,28 @@
 					(("assist") (command-assist cn br author-id (list
 						(cons 'hate (lambda (me target skill) (and
 							(eq? tank (object-id me))
-							(>= (mp-ratio me) 1/10)
 							(not (eq? (ref target 'target-id) (object-id me)))
 							(>= (- (timestamp) (or (ref skill 'last-usage) 0)) 5) ; Delay 5s.
 						)))
 						(cons 'charm (lambda (me target skill) (let ((victim (get-target wr target))) (and
 							victim
 							(and tank (not (eq? tank (object-id victim))))
-							(>= (mp-ratio me) 1/10)
 							(<= (hp-ratio victim) 1/2)
 						))))
 						(cons 'confusion (lambda (me target skill) (let ((victim (get-target wr target))) (and
 							victim
 							(or (not tank) (not (eq? tank (object-id victim))))
-							(>= (mp-ratio me) 1/10)
 							(<= (hp-ratio victim) 1/2)
 						))))
-						; (cons 'sting (const #f)) ; TODO if not tank
+						(and (member (ref me 'name) (list "Osiris") string-ci=?)
+							(cons 'power-strike (lambda (me target . rest) (and
+								(equip-sword? me)
+								(or (ref target 'boss?) (ref target 'minion?))
+							)))
+						)
+						(and (member (ref me 'name) (list "Ekon") string-ci=?)
+							(cons 'sting (const #f))
+						)
 					)))
 					#|(("support") (when (support-class? me)
 						(brain-do! br (program program-support

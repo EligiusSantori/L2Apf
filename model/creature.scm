@@ -17,6 +17,7 @@
 		(update-creature! (-> box? list? list?))
 
 		(moving? (-> creature? boolean?))
+		(attacking? (-> creature? boolean?))
 		(casting? (-> creature? boolean?))
 		(get-move-speed (-> creature? rational?))
 		(get-position (-> creature? (or/c point/3d? false/c)))
@@ -41,6 +42,8 @@
 
 		(cons 'sitting? (negate eq?))
 		(cons 'walking? (negate eq?))
+		; (cons 'attacking? (negate eq?))
+		(cons 'last-attack #t)
 		(cons 'in-combat? (negate eq?))
 		(cons 'alike-dead? (negate eq?))
 		(cons 'bleeding? (negate eq?))
@@ -126,6 +129,12 @@
 		(let-values (((rest updated changes) (update-creature (unbox object) data)))
 			(set-box! object (append rest updated))
 			changes
+		)
+	)
+
+	(define (attacking? creature) ; FIXME Very inaccurate formula for PTS.
+		(let ((patkspd (ref creature 'physical-attack-speed)) (last-attack (ref creature 'last-attack)))
+			(and last-attack patkspd (<= (- (timestamp) last-attack) (* (/ 500 patkspd) 1.5)))
 		)
 	)
 
