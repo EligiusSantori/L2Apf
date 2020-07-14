@@ -109,15 +109,6 @@
 		)
 	)
 
-	(define (prepare-creature-data data)
-		(let ((data (filter identity data)))
-			; (if (alist-contains data eq? 'stunned? 'sleeping? 'silenced? 'paralyzed?)
-			; 	(cons (cons 'casting #f) data) ; Stop casting on knockout.
-			; 	data
-			; )
-			data
-		)
-	)
 	(define (resolve-creature creature-or-type data wr db)
 		(let ((id (ref data 'object-id)))
 			(let ((creature (or (and (not (symbol? creature-or-type)) creature-or-type) (object-ref wr id))))
@@ -154,7 +145,7 @@
 		)
 	)
 	(define (handle-creature-update! ec wr db data [creature-or-type #f])
-		(let-values (((creature changes) (resolve-creature creature-or-type (prepare-creature-data data) wr db))) (cond
+		(let-values (((creature changes) (resolve-creature creature-or-type (filter pair? data) wr db))) (cond
 			(changes
 				; On change target.
 				(let ((change (ref changes 'target-id))) (when change
@@ -205,17 +196,17 @@
 
 	; Arguments: connection, event-channel, packet-channel, tick-channel
 	(define (handle-interrupt cn ec pc tc)
-		(let ((wr (connection-world cn)) (ev (sync/enable-break ec pc (connection-read-thread cn))))
+		(let ((wr (connection-world cn)) (db (connection-db cn)) (ev (sync/enable-break ec pc (connection-read-thread cn))))
 			(cond
 				((bytes? ev) ; Incoming packet => handle then wait next.
 					(if (= (get-packet-id ev) #x64)
-						(packet-handler/system-message cn ec wr (game-server-packet/system-message ev)) ; Special case.
+						(packet-handler/system-message cn ec wr db (game-server-packet/system-message ev)) ; Special case.
 						(let ((row (hash-ref handlers-table (get-packet-id ev) #f)))
 							(if row
 								(with-handlers ([exn:error:handler? (lambda (e)
 										(apf-error "Error \"~a\" in handler for #x~a (~v)." (exn-message e) (byte->hex (get-packet-id ev)) cn)
 									)])
-    								((cdr row) ec wr (connection-db cn) ((car row) ev))
+    								((cdr row) ec wr db ((car row) ev))
 								)
 								(apf-debug "Unhandled packet ~v" ev) ; TODO apf-warn
 							)
@@ -244,6 +235,21 @@
 			('creature-create (subject-id)
 				(when (= subject-id (object-id (world-me wr)))
 					(send-packet cn (game-client-packet/refresh-skill-list))
+				)
+				ev
+			)
+			('creature-update (id changes) ; Stop casting on knockout.
+				(when (alist-contains changes eq? 'stunned? 'sleeping? 'silenced? 'paralyzed?)
+					(let ((creature (object-ref wr id))) (when creature
+						(let ((skill (ref creature 'casting))) (when skill
+							(update-creature! creature (list
+								(cons 'casting #f)
+								(cons 'located-at (timestamp)) ; FIXME NO REASON, VALUE WILL BE DROPPED.
+							))
+
+							(trigger! cn (make-event 'skill-canceled id skill))
+						))
+					))
 				)
 				ev
 			)
@@ -321,10 +327,10 @@
 				)
 				ev
 			)
-			('change-moving (subject-id position destination)
+			('change-moving (subject-id position destination) ; Finish moving by timer.
 				(when (not destination)
 					(let ((subject (object-ref wr subject-id)))
-						(when (and (creature? subject) (ref subject 'destination)) ; Stop moving by timer.
+						(when (and (creature? subject) (ref subject 'destination))
 							(update-creature! subject (list
 								(cons 'position position)
 								(cons 'destination destination)
@@ -616,12 +622,12 @@
 			)
 		)
 
-		(let ((creature (object-ref wr (ref packet 'object-id))) (me (world-me wr))) (when creature
+		(let ((creature (object-ref wr (ref packet 'object-id)))) (when creature
 			(let ((skill (find-or-create-skill creature packet)))
-				(handle-creature-update! ec wr db (list
+				(update-creature! creature (list
 					(cons 'casting #f)
 					(cons 'located-at (timestamp)) ; FIXME NO REASON, VALUE WILL BE DROPPED.
-				) creature)
+				))
 
 				(trigger ec 'skill-launched (object-id creature) skill (ref packet 'targets))
 			)
@@ -634,6 +640,7 @@
 					(cons 'casting #f)
 					(cons 'located-at (timestamp)) ; FIXME NO REASON, VALUE WILL BE DROPPED.
 				))
+
 				(trigger ec 'skill-canceled (object-id creature) skill)
 			)
 		))
@@ -719,15 +726,14 @@
 			(ref packet 'text)
 		)
 	)
-	(define (packet-handler/system-message cn ec wr packet)
+	(define (packet-handler/system-message cn ec wr db packet)
 		(let ((message-id (ref packet 'message-id)) (arguments (ref packet 'arguments)))
 			(cond
 				((or (= message-id 612) (= message-id 357)) ; Set spoiled state here bacause there is no other way.
-					(let ((target-id (ref (world-me wr) 'target-id)))
-						(let ((changes (update-npc! (object-ref wr target-id) (list (cons 'spoiled? #t)))))
-							(when (not (null? changes)) (trigger ec 'creature-update target-id changes))
-						)
-					)
+					(handle-creature-update! ec wr db (list
+						(cons 'object-id (ref (world-me wr) 'target-id))
+						(cons 'spoiled? #t)
+					))
 				)
 				((= message-id 48) (let ((skill (skill-ref wr (ref arguments 'skill)))) (when skill
 					(when (skill-ready? skill) ; Fix broken skill-ready?
@@ -761,54 +767,29 @@
 
 	(define (packet-handler/die ec wr db packet)
 		(let ((creature (object-ref wr (ref packet 'object-id)))) (when creature
-			(cond
-				((protagonist? creature)
-					(update-protagonist! creature (list
-						(cons 'hp 0)
-						(cons 'dead? #t)
-						(cons 'alike-dead? #t)
-					))
-				)
-				((npc? creature)
-					(update-npc! creature (list
-						(cons 'spoiled? (ref packet 'spoiled?))
-						(cons 'alike-dead? #t)
-					))
-				)
-				(else
-					(update-creature! creature (list
-						(cons 'alike-dead? #t)
-					))
-				)
-			)
-
-			; Fix missing change-moving event.
 			(handle-creature-update! ec wr db (list
-				(cons 'object-id (object-id creature))
+				(cons 'alike-dead? #t)
+				(cons 'dead? #t)
+				(cons 'hp 0)
+				(assq 'spoiled? packet)
+
+				; Fix missing change-moving event.
 				(cons 'position (get-position creature))
 				(cons 'destination #f)
-			))
+			) creature)
 
 			; Trigger main event.
-			(trigger ec 'die (object-id creature) (if (protagonist? creature) (ref packet 'return) #f))
+			(trigger ec 'die (object-id creature) (and (protagonist? creature) (ref packet 'return)))
 		))
 	)
 	(define (packet-handler/revive ec wr db packet)
-		(let ((creature (object-ref wr (ref packet 'object-id)))) (when creature
-			(cond
-				((protagonist? creature)
-					(update-protagonist! creature (list
-						(cons 'dead? #f)
-						(cons 'alike-dead? #f)
-					))
-				)
-				(else
-					(update-creature! creature (list
-						(cons 'alike-dead? #f)
-					))
-				)
-			)
+		(define data (list
+			(assq 'object-id packet)
+			(cons 'alike-dead? #f)
+			(cons 'dead? #f)
+		))
 
+		(let ((creature (handle-creature-update! ec wr db data))) (when creature
 			(trigger ec 'revive (object-id creature))
 		))
 	)
@@ -885,13 +866,12 @@
 		(cons #x58 (cons game-server-packet/skill-list packet-handler/skill-list))
 		(cons #x60 (cons game-server-packet/move-to-pawn packet-handler/move-to-pawn)) ; change-moving
 		(cons #x61 (cons game-server-packet/validate-location packet-handler/validate-location))
-		; #x63 {FinishRotating}
+		; #x63 FinishRotating
 		; (cons #x64 (cons game-server-packet/system-message packet-handler/system-message)) ; system-message (especial handling).
 		; #x65 StartPledgeWar
 		; #x6d SetupGauge
 		; #x6f ChooseInventoryItem
-		(cons #x76 (cons game-server-packet/skill-launched packet-handler/skill-launched)) ; skill-launched ; TODO 8e?
-		; #x76 SetToLocation
+		(cons #x76 (cons game-server-packet/skill-launched packet-handler/skill-launched)) ; skill-launched
 		(cons #x7d (cons game-server-packet/ask-be-friends packet-handler/ask-be-friends)) ; ask
 		(cons #x7e (cons void packet-handler/logout)) ; logout
 		; (cons #x7f (cons game-server-packet/magic-effects packet-handler/magic-effects)) ; effect (skill-id, level, duration)
@@ -905,9 +885,9 @@
 		(cons #xa8 (cons game-server-packet/ask-join-alliance packet-handler/ask-join-alliance)) ; ask
 		; #xc4 Earthquake
 		; #xc8 NormalCamera
-		; #xce {RelationChanged}
+		; #xce RelationChanged
 		; #xd0 MultiSellList
-		; #xd3 {NetPing}
+		; #xd3 NetPing
 		; #xd4 Dice
 		; #xd5 Snoop
 		; (cons #xe4 'henna-info (cons game-server-packet/henna-info packet-handler/henna-info))
@@ -916,7 +896,7 @@
 		; #xee PartySpelled
 		; #xf5 SSQStatus
 		; (cons #xf8 'signs-sky (cons game-server-packet/signs-sky packet-handler/signs-sky)) SignsSky
-		; #xfa {L2FriendList}
+		; #xfa L2FriendList
 		; (cons #xfe 'Ex* (cons game-server-packet/ packet-handler/))
 
 		; (cons #x?? game-server-packet/ packet-handler/)

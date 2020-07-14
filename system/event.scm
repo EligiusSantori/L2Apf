@@ -54,8 +54,12 @@
 		id
 	)
 	(define (timer-stop! cn timer)
-		(thread-send (connection-timer-thread cn) timer)
-		timer
+		(let ((th (connection-timer-thread cn)))
+			(if (thread-running? th)
+				(begin (thread-send th timer) timer)
+				#f
+			)
+		)
 	)
 
 	(define-syntax case-event

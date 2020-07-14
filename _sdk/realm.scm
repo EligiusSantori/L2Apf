@@ -167,9 +167,10 @@
 						(let* ((target (or (get-target wr author) author))
 								(angle (if (object=? author target) (get-angle wr author) (creatures-angle author target))))
 							(cond
-								((not tank) (move-behind cn target 50 (party-angle wr)))
-								((= (object-id me) tank) (move-behind cn target 50 angle))
-								(else (move-behind cn target 50 (+ (party-angle wr pi/2 tank) angle (- pi/4) pi)))
+								((not (world-party wr)) (move-behind cn target 50)) ; Common.
+								((not tank) (move-behind cn target 50 (party-angle wr))) ; For party.
+								((= (object-id me) tank) (move-behind cn target 50 angle)) ; For tank.
+								(else (move-behind cn target 50 (+ (party-angle wr pi/2 tank) angle (- pi/4) pi))) ; For others.
 							)
 						)
 					)))
