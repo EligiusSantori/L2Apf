@@ -12,6 +12,7 @@
 		(checksum ((and/c bytes? longer-then-4? multiple-of-4?) . -> . bytes?))
 		(heading->angle (integer? . -> . rational?))
 		(angle->heading (rational? . -> . integer?))
+		(parse-item (list? . -> . list?))
 		(parse-abnormal-effects (integer? . -> . list?))
 		(read-point (input-port? . -> . point/3d?))
 		(write-point (point/3d? output-port? . -> . void?))
@@ -170,6 +171,13 @@
 		(exact-round (* (radians->degrees (simple-angle (revert-angle angle))) 182.044444444))
 	)
 
+	(define (parse-item item)
+		(let ((type1 (cdr (assq 'type1 item))) (type2 (cdr (assq 'type2 item))))
+			(filter pair? (append item (list
+				(and (= type1 4) (= type2 3) (cons 'quest? #t))
+			)))
+		)
+	)
 	(define (parse-abnormal-effects data)
 		(list
 			(cons 'bleeding? (bitwise-bit-set? data 0))

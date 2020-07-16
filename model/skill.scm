@@ -26,7 +26,14 @@
 		(cons 'enabled? (negate eq?))
 		(cons 'last-usage (negate =))
 		(cons 'reuse-delay (negate =))
-		(cons 'type #f)
+
+		(cons 'name #f)
+		(cons 'toggle? #f)
+		(cons 'harmful? #f)
+		(cons 'mp-cost #f)
+		(cons 'hp-cost #f)
+		(cons 'item-id #f)
+		(cons 'item-cost #f)
 	))
 
 	(define (skill? skill)
@@ -42,9 +49,9 @@
 	)
 
 	(define (make-skill data db) ; TODO Can be optimized.
-		(let ((id (ref data 'skill-id)))
+		(let ((id (ref data 'skill-id)) (level (or (ref data 'level) 1)))
 			(box (append
-				(db-skill db id)
+				(db-skill db id level)
 				(list
 					(cons 'id id)
 					(cons 'type (list 'skill))

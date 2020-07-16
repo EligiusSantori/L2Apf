@@ -27,8 +27,8 @@
 			(discard-object! (-> world? integer? void?))
 			(objects (->* (world?) (procedure?) list?))
 			(fold-objects (-> world? any/c procedure? any))
-			(near (-> world? point/3d? integer? list?))
-			(towards (-> world? point/3d? integer? list?))
+			(near (->* (world? point/3d? integer?) (procedure?) list?))
+			; (towards (-> world? point/3d? integer? list?))
 			(object-ref (-> world? (or/c integer? false/c) (or/c object? false/c)))
 			(skill-ref (-> world? (or/c integer? false/c) (or/c skill? false/c)))
 			(inv-ref (-> world? (or/c integer? false/c) (or/c item? false/c)))
@@ -45,14 +45,8 @@
 			(party-kick! (-> world? integer? void?))
 			(party-leader! (-> world? integer? void?))
 			(party-clear! (-> world? void?))
-			(equip-sword? (-> character? boolean?))
-			(equip-blunt? (-> character? boolean?))
-			(equip-dagger? (-> character? boolean?))
-			(equip-spear? (-> character? boolean?))
-			(equip-duals? (-> character? boolean?))
-			(equip-fists? (-> character? boolean?))
-			(equip-bow? (-> character? boolean?))
-			(equip-shield? (-> character? boolean?))
+			(get-weapon (-> world? (or/c item? false/c)))
+			(get-shield (-> world? (or/c item? false/c)))
 		)
 	)
 
@@ -123,20 +117,20 @@
 		))
 		r
 	)
-	(define (near wr position radius)
+	(define (near wr position radius [predicate #f])
 		(objects wr (lambda (object)
 			(let ((p (cond ((creature? object) (get-position object)) ((item? object) (ref object 'position)) (else #f))))
-				(and p (<= (points-distance p position) radius))
+				(and p (<= (points-distance p position) radius) (or (not predicate) (predicate object)))
 			)
 		))
 	)
-	(define (towards wr destination radius)
-		(objects wr (lambda (object)
-			(let ((d (if (creature? object) (ref object 'destination) #f)))
-				(and d (<= (points-distance d destination) radius))
-			)
-		))
-	)
+	; (define (towards wr destination radius)
+	; 	(objects wr (lambda (object)
+	; 		(let ((d (if (creature? object) (ref object 'destination) #f)))
+	; 			(and d (<= (points-distance d destination) radius))
+	; 		)
+	; 	))
+	; )
 
 	(define (object-ref wr object-id)
 		(hash-ref (world-objects wr) object-id #f)
@@ -262,33 +256,14 @@
 		)
 	)
 
-	; TODO Use shared database.
-	; (define (creature-weapon ...)) => item-id or #f ; TODO
-	; (define (weapon-type ...)) => symbol ; TODO
-	; (define (creature-shield ...)) => item-id or #f ; TODO
-	(define (equip-sword? character)
-		; #t ; TODO item-id in creature.clothing
-		(if (member (ref character 'clothing 'right-hand) (list 2369 68) eq?) #t #f)
+	(define (get-weapon wr)
+		(let ((item (inv-ref wr (ref (world-me wr) 'equipment 'right-hand))))
+			(and item (weapon? item) item)
+		)
 	)
-	(define (equip-blunt? character)
-		#t ; TODO item-id in creature.clothing
-	)
-	(define (equip-dagger? character)
-		#t ; TODO item-id in creature.clothing
-	)
-	(define (equip-spear? character)
-		#t ; TODO item-id in creature.clothing
-	)
-	(define (equip-duals? character)
-		#t ; TODO item-id in creature.clothing
-	)
-	(define (equip-fists? character)
-		#t ; TODO item-id in creature.clothing
-	)
-	(define (equip-bow? character)
-		#t ; TODO item-id in creature.clothing
-	)
-	(define (equip-shield? character)
-		#t ; TODO item-id in creature.clothing
+	(define (get-shield wr)
+		(let ((item (inv-ref wr (ref (world-me wr) 'equipment 'left-hand))))
+			(and item (shield? item) item)
+		)
 	)
 )

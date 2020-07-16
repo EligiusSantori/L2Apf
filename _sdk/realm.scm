@@ -55,20 +55,26 @@
 (define looter #f)
 (define loot-radius 500)
 
-(define (party-angle wr [arc 2pi] [except-id #f])
-	(let ((members (remove except-id (party-members (world-party wr)) eq?)))
-		(if (not (null? members))
-			(let ((gap (/ arc (- (length members) 1))) (my-id (object-id (world-me wr))))
-				(cdr (fold (lambda (member-id r)
-					(cons
-						(+ (car r) gap)
-						(if (= my-id member-id) (car r) (cdr r))
-					)
-				) (cons 0 #f) (sort (cdr members) <)))
+(define (align cn me pivot members arc [angle 0] [gap 50])
+	(let ((my-id (object-id me)) (count (length members)))
+		(if (and (member my-id members =) (> count 1))
+			(let ((index (index-of (sort members <) my-id =)) (start (- angle (/ arc 2))))
+				(move-behind cn pivot gap (+ start (* (/ arc (- count 1)) index)))
 			)
-			#f
+			(move-behind cn pivot gap angle)
 		)
 	)
+)
+(define (command-affected wr channel author)
+	(remove (object-id author) (case channel
+		((chat-channel/all) (map object-id (near wr (get-position author) 1250 character?)))
+		((chat-channel/shout chat-channel/trade) (map object-id (near wr (get-position author) 16384 character?)))
+		((chat-channel/party) (party-members (world-party wr)))
+		; TODO ((chat-channel/clan) ...)
+		; TODO ((chat-channel/alliance) ...)
+		((chat-channel/tell) (list (object-id (world-me wr))))
+		(else (list))
+	) =)
 )
 (define (aimed-at-me wr)
 	(let ((my-id (object-id (world-me wr))))
@@ -122,14 +128,14 @@
 			)
 			('item-spawn (id . rest) ; Auto loot if I'm looter.
 				(when (and (eq? looter (object-id me)) (not (eq? (program-id (brain-active br)) 'program-loot)))
-					(brain-do! br (program program-loot (find-skill wr 'sweeper) loot-radius))
+					(brain-do! br (program program-loot loot-radius))
 				)
 			)
 			('die (subject-id . rest) ; Auto sweep.
 				(when (and (eq? looter (object-id me)) (not (eq? (program-id (brain-active br)) 'program-loot)))
 					(let ((creature (object-ref wr subject-id)))
 						(when (and (npc? creature) (ref creature 'spoiled?) (find-skill wr 'sweeper))
-							(brain-do! br (program program-loot #t loot-radius))
+							(brain-do! br (program program-loot loot-radius))
 						)
 					)
 				)
@@ -162,18 +168,21 @@
 						(brain-clear! br)
 						(brain-do! br (program program-follow-chase author-id gap))
 					))
-					(("return") (let ((author (object-ref wr author-id))) (when (and author (get-position author))
-						(brain-clear! br)
-						(let* ((target (or (get-target wr author) author))
-								(angle (if (object=? author target) (get-angle wr author) (creatures-angle author target))))
-							(cond
-								((not (world-party wr)) (move-behind cn target 50)) ; Common.
-								((not tank) (move-behind cn target 50 (party-angle wr))) ; For party.
-								((= (object-id me) tank) (move-behind cn target 50 angle)) ; For tank.
-								(else (move-behind cn target 50 (+ (party-angle wr pi/2 tank) angle (- pi/4) pi))) ; For others.
+					(("return") (let ((author (object-ref wr author-id)) (gap (or (string->number (list-try-ref command 1 "50")) 50)))
+						(when (and author (get-position author))
+							(brain-clear! br)
+							(let* ((target (or (get-target wr author) author))
+									(angle (if (object=? author target) (get-angle wr author) (creatures-angle author target)))
+									(members (command-affected wr channel author)))
+								(cond
+									((not members) (align cn me target (list) 0 (+ angle pi) gap)) ; Common.
+									((not tank) (align cn me target members (- 2pi (/ 2pi (length members))) 0 gap)) ; For party.
+									((= (object-id me) tank) (align cn me target (list tank) (/ pi 10) angle gap)) ; For tank.
+									(else (align cn me target (remove tank members =) pi/2 (+ angle pi) gap)) ; For others.
+								)
 							)
 						)
-					)))
+					))
 					(("town") (return cn))
 
 					(("assist") (command-assist cn br author-id (list
@@ -192,11 +201,11 @@
 							(or (not tank) (not (eq? tank (object-id victim))))
 							(<= (hp-ratio victim) 1/2)
 						))))
-						(and (member (ref me 'name) (list "Osiris") string-ci=?)
-							(cons 'power-strike (lambda (me target . rest) (and
-								(equip-sword? me)
-								(or (ref target 'boss?) (ref target 'minion?))
-							)))
+						(and (not (eq? looter (object-id me)))
+							(cons 'spoil (const #f))
+						)
+						(and (member (ref me 'name) (list "Evdem") string-ci=?)
+							(cons 'power-strike (const #f))
 						)
 						(and (member (ref me 'name) (list "Ekon") string-ci=?)
 							(cons 'sting (const #f))
@@ -237,7 +246,7 @@
 							((string-ci=? name "off") (set! looter #f))
 							((string-ci=? name (ref me 'name))
 								(set! looter (object-id me))
-								(brain-do! br (program program-loot #f) #t)
+								(brain-do! br (program program-loot loot-radius) #t)
 							)
 						)
 					))

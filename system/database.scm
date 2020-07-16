@@ -1,5 +1,6 @@
 (module system racket/base
 	(require
+		racket/string
 		racket/contract
 		db/base
 		"../library/extension.scm"
@@ -8,7 +9,7 @@
 		(db-level (-> connection? integer? rational?))
 		(db-class (-> connection? integer? symbol?))
 		(db-item (-> connection? integer? list?))
-		(db-skill (-> connection? integer? list?))
+		(db-skill (-> connection? integer? integer? list?))
 		(db-character (-> connection? integer? list?))
 		(db-npc (-> connection? integer? list?))
 	))
@@ -29,12 +30,28 @@
 
 	(define (db-item db item-id)
 		(if db
-			(let ((row (query-maybe-row db "SELECT name, type, grade FROM item WHERE id = $1" item-id)))
+			(let ((row (query-maybe-row db "SELECT name, type, grade, stack FROM item WHERE id = $1" item-id)))
 				(if row
 					(list
 						(cons 'name (vector-ref row 0))
-						(cons 'item-type (string->symbol (vector-ref row 1)))
-						(cons 'grade (list-ref (list 'ng 'd 'c 'b 'a 's) (vector-ref row 0)))
+						(cons 'item-type (case (vector-ref row 1)
+							; ((-1) 'quest)
+							((1) 'potion) ((2) 'scroll) ((3) 'recipe)
+							((50) 'enchant/weapon) ((51) 'enchant/armor)
+							((100) 'sword) ((101) 'blunt) ((102) 'dagger) ((103) 'spear) ((104) 'bow) ((105) 'duals) ((106) 'fists) ((107) 'wand)
+							((150) 'arrow)
+							((200) 'helmet) ((201) 'gloves) ((202) 'boots) ((203) 'hair)
+							((210) 'full/heavy) ((211) 'body/heavy) ((212) 'legs/heavy)
+							((220) 'full/light) ((221) 'body/light) ((222) 'legs/light)
+							((230) 'full/robe) ((231) 'body/robe) ((232) 'legs/robe)
+							((300) 'shield)
+							((400) 'necklace) ((401) 'earring) ((402) 'ring)
+							((500) 'wolf)
+							((510) 'dragon) ((511) 'strider) ((512) 'wyvern) ((520) 'kookaburra) ((530) 'buffalo) ((540) 'cougar) ((550) 'redeemer)
+							(else 'other)
+						))
+						(cons 'grade (vector-ref row 2))
+						(cons 'stack (vector-ref row 3))
 					)
 					(list)
 				)
@@ -43,19 +60,19 @@
 		)
 	)
 
-	(define (db-skill db skill-id [level 1])
+	(define (db-skill db id level)
 		(if db
-			(let ((row (query-maybe-row db "SELECT name, type, harmful, mp_cost, hp_cost, item_id, item_cost FROM skill WHERE id = $1 AND level = $2" skill-id level)))
+			(let ((row (query-maybe-row db "SELECT name, type, type = 0 and harmful <> 0, mp_cost, hp_cost, item_id, item_cost FROM skill WHERE id = $1 AND level = $2" id level)))
 				(if row
-					(list
+					(filter pair? (list
 						(cons 'name (vector-ref row 0))
-						(cons 'toggle? (= (vector-ref row 1) 1))
-						(cons 'harmful? (if (zero? (vector-ref row 2)) #f #t))
-						(cons 'mp-cost (sql-null->false (vector-ref row 3)))
-						(cons 'hp-cost (sql-null->false (vector-ref row 4)))
-						(cons 'item-id (sql-null->false (vector-ref row 5)))
-						(cons 'item-cost (sql-null->false (vector-ref row 6)))
-					)
+						(and (= (vector-ref row 1) 1) (cons 'toggle? #t))
+						(and (not (zero? (vector-ref row 2))) (cons 'harmful? #t))
+						(let ((v (vector-ref row 3))) (and (not (sql-null? v)) (cons 'mp-cost v)))
+						(let ((v (vector-ref row 4))) (and (not (sql-null? v)) (cons 'hp-cost v)))
+						(let ((v (vector-ref row 5))) (and (not (sql-null? v)) (cons 'item-id v)))
+						(let ((v (vector-ref row 6))) (and (not (sql-null? v)) (cons 'item-cost v)))
+					))
 					(list)
 				)
 			)
@@ -70,7 +87,7 @@
 					(list
 						(cons 'class (string->symbol (vector-ref row 0)))
 						(cons 'specialty (vector-ref row 1))
-						(cons 'mystic? (if (zero? (vector-ref row 2)) #f #t))
+						(cons 'mystic? (not (zero? (vector-ref row 2))))
 					)
 					(list)
 				)
@@ -81,17 +98,24 @@
 
 	(define (db-npc db npc-id)
 		(if db
-			(let ((row (query-maybe-row db "SELECT name, level, aggressive, CASE WHEN type = 1 THEN 1 ELSE 0 END AS monster, CASE WHEN type = 2 THEN 1 ELSE 0 END AS minion, CASE WHEN type = 3 THEN 1 ELSE 0 END AS boss, clan FROM npc WHERE id = $1" npc-id)))
+			(let ((row (query-maybe-row db "SELECT name, level, type, aggro, clan FROM npc WHERE id = $1" npc-id)))
 				(if row
-					(list
+					(filter pair? (list
 						(cons 'name (vector-ref row 0))
 						(cons 'level (vector-ref row 1))
-						(cons 'aggressive? (if (zero? (vector-ref row 2)) #f #t))
-						(cons 'monster? (if (zero? (vector-ref row 3)) #f #t))
-						(cons 'minion? (if (zero? (vector-ref row 4)) #f #t))
-						(cons 'boss? (if (zero? (vector-ref row 5)) #f #t))
-						(cons 'group (sql-null->false (vector-ref row 6)))
-					)
+						(cons 'npc-type (case (vector-ref row 2)
+							; ((-1) 'static)
+							((0) 'person)
+							((1) 'monster) ; TODO bug, beast, ...
+							((2) 'minion)
+							((3) 'boss)
+							(else 'static)
+						))
+						(cons 'aggro (sql-null->false (vector-ref row 3)))
+						(cons 'groups (let ((s (vector-ref row 4)))
+							(if (sql-null? s) (list) (string-split s ","))
+						))
+					))
 					(list)
 				)
 			)

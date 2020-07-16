@@ -20,7 +20,7 @@
 
 	(define (read-items s c [l (list)])
 		(if (> c 0)
-			(let ((i (read-item s)))
+			(let ((i (parse-item (read-item s))))
 				(read-items s (- c 1) (cons i l))
 			)
 			l

@@ -7,6 +7,7 @@
 		(only-in racket/format ~r)
 		(relative-in "../."
 			"library/extension.scm"
+			"library/geometry.scm"
 			"library/date_time.scm"
 			"system/structure.scm"
 			"system/connection.scm"
@@ -92,6 +93,7 @@
 			(("sp") (say cn (format "SP: ~a." (ref me 'sp))))
 			(("hp") (say cn (format "HP: ~a%." (round (* (hp-ratio me) 100)))))
 			(("mp") (say cn (format "MP: ~a%." (round (* (mp-ratio me) 100)))))
+			(("loc") (let ((p (get-position me))) (say cn (format "Location: ~a, ~a, ~a." (point/3d-x p) (point/3d-y p) (point/3d-z p)))))
 		))
 	)
 
@@ -206,7 +208,7 @@
 	(define (stun-skill-pointful? me target) ; Party-tuned. ; TODO Target.HP > (1/5)Party.HP
 		(and
 			(not (ref target 'stunned?))
-			(not (or (ref target 'boss?) (ref target 'minion?))) ; Won't work on boss.
+			(not (or (boss? target) (minion? target))) ; Won't work on boss.
 			(>= (or (ref target 'hp) 0) (* (ref me 'hp) 2)) ; Target.HP > (2)Me.HP
 		)
 	)
@@ -216,6 +218,19 @@
 	(define (slow-decay-skill-pointful? me target) ; Party-tuned. ; TODO Target.HP > (1/2)Party.HP or boss?
 		(>= (or (ref target 'hp) 0) (* (ref me 'hp) 3)) ; Target.HP > (3)Me.HP
 	)
+	(define (weapon-type wr)
+		(let ((item (get-weapon wr)))
+			(and item (ref item 'item-type))
+		)
+	)
+	(define (equip-sword? wr) (eq? (weapon-type wr) 'sword))
+	(define (equip-blunt? wr) (eq? (weapon-type wr) 'blunt))
+	(define (equip-dagger? wr) (eq? (weapon-type wr) 'dagger))
+	(define (equip-spear? wr) (eq? (weapon-type wr) 'spear))
+	(define (equip-duals? wr) (eq? (weapon-type wr) 'duals))
+	(define (equip-fists? wr) (eq? (weapon-type wr) 'fists))
+	(define (equip-bow? wr) (eq? (weapon-type wr) 'bow))
+	(define (equip-shield? wr) (if (get-shield wr) #t #f))
 	(define (mp-plenty? me) (> (mp-ratio me) 2/3))
 	(define (mp>reserve? me) (> (mp-ratio me) 1/3))
 	(define (mp>shortage? me) (>= (mp-ratio me) 1/5))
@@ -230,77 +245,80 @@
 			)))
 
 			(cons 'power-strike (lambda (me target . rest) (and
-				(< (ref me 'specialty) 1)
-				(equip-sword? me)
+				(equip-sword? wr)
 				(mp>reserve? me)
+				(or
+					(< (ref me 'specialty) 1)
+					(member (ref me 'class) (list 'elf-knight 'temple-knight 'evas-templar 'sword-singer 'sword-muse) eq?)
+				)
 				(medium-damage-skill-pointful? me target)
 			)))
 			(cons 'power-smash (lambda (me target . rest) (and
-				(equip-sword? me)
+				(equip-sword? wr)
 				(mp>reserve? me)
-				(if (or (ref target 'boss?) (ref target 'minion?))
+				(if (or (boss? target) (minion? target))
 					(not (skill-exists wr 'vicious-stance))
 					(medium-damage-skill-pointful? me target)
 				)
 			)))
 			(cons 'mortal-blow (lambda (me target . rest) (and
-				(equip-dagger? me)
+				(equip-dagger? wr)
 				(mp>reserve? me)
-				(if (or (ref target 'boss?) (ref target 'minion?))
+				(if (or (boss? target) (minion? target))
 					(not (skill-exists wr 'vicious-stance))
 					(high-damage-skill-pointful? me target)
 				)
 			)))
 			(cons 'iron-punch (lambda (me target . rest) (and
-				(equip-fists? me)
+				(equip-fists? wr)
 				(mp>reserve? me)
 				(medium-damage-skill-pointful? me target)
 			)))
 			#|(cons 'power-shot (lambda (me target . rest) (and
-				(equip-bow? me)
+				(equip-bow? wr)
 				(mp-plenty? me)
 				(medium-damage-skill-fit? me target)
 			)))|#
 			(cons 'wild-sweep (lambda (me target . rest) (and
-				(equip-spear? me)
+				(equip-spear? wr)
 				(mp>reserve? me)
-				(if (or (ref target 'boss?) (ref target 'minion?))
+				(if (or (boss? target) (minion? target))
 					(and
 						(not (skill-exists wr 'vicious-stance))
 						(not (skill-exists wr 'whirlwind))
 					)
 					(and
-						(not (skill-exists wr 'spoil))
+						(or (not (eq? (ref me 'race) 'dwarf)) (artisan-class? me))
 						(medium-damage-skill-pointful? me target)
 					)
 				)
 			)))
 			(cons 'whirlwind (lambda (me target . rest) (and
-				(equip-spear? me)
+				(equip-spear? wr)
 				(mp>reserve? me)
-				(if (or (ref target 'boss?) (ref target 'minion?))
+				(if (or (boss? target) (minion? target))
 					(not (skill-exists wr 'vicious-stance))
 					(and
-						(not (skill-exists wr 'spoil))
+						(or (not (eq? (ref me 'race) 'dwarf)) (artisan-class? me))
 						(medium-damage-skill-pointful? me target)
 					)
 				)
 			)))
 			(cons 'stunning-fist (lambda (me target . rest) (and
-				(equip-fists? me)
+				(equip-fists? wr)
 				(mp>reserve? me)
 				(stun-skill-pointful? me target)
 			)))
 			(cons 'shield-stun (lambda (me target . rest) (and
-				(equip-shield? me)
+				(equip-shield? wr)
 				(mp>reserve? me)
 				(stun-skill-pointful? me target)
 			)))
 			(cons 'sting (lambda (me target . rest) (and
-				(or (equip-duals? me) (equip-sword? me) (equip-dagger? me))
+				(or (equip-duals? wr) (equip-sword? wr) (equip-dagger? wr))
 				(mp>shortage? me)
 				(not (ref target 'bleeding?))
-				(if (or (ref target 'boss?) (ref target 'minion?))
+				(if (or (boss? target) (minion? target))
 					(not (skill-exists wr 'vicious-stance))
 					(fast-decay-skill-pointful? me target)
 				)
@@ -311,7 +329,7 @@
 				(not (ref target 'poisoned?))
 				; (slow-decay-skill-pointful? me target)
 				(not (world-party wr)) ; Too slow casting for party.
-				(not (or (ref target 'boss?) (ref target 'minion?))) ; Too slow casting & too small chances for raid.
+				(not (or (boss? target) (minion? target))) ; Too slow casting & too small chances for raid.
 				(>= (or (ref target 'hp) 0) (ref me 'hp)) ; Target.HP > Me.HP
 			)))
 			#|(cons 'frost-flame (lambda (me target . rest) (and
@@ -319,7 +337,7 @@
 				(not (ref target 'bleeding?)) ; (not (ref target 'burning?)) ; Bug?
 				; (fast-decay-skill-pointful? me target)
 				(or
-					(ref target 'boss?) (ref target 'minion?)
+					(boss? target) (minion? target)
 					(not (world-party wr)) ; Too slow casting for party.
 				)
 			)))
@@ -328,7 +346,7 @@
 				(not (ref target 'poisoned?))
 				; (slow-decay-skill-pointful? me target)
 				(or
-					(ref target 'boss?) (ref target 'minion?)
+					(boss? target) (minion? target)
 					(not (world-party wr)) ; Too slow casting for party.
 				)
 			)))|#
@@ -346,7 +364,7 @@
 			(cons 'drain-health  (lambda (me target . rest) (and
 				(hp-danger? me)
 				(mp>shortage? me)
-				(not (or (ref target 'boss?) (ref target 'minion?))) ; Ineffective for targets with high physical defense.
+				(not (or (boss? target) (minion? target))) ; Ineffective for targets with high physical defense.
 			)))
 
 			(cons 'elemental-heal  (lambda (me . rest) (and
@@ -363,21 +381,22 @@
 				(ref me 'poisoned?)
 			)))|#
 
-			(cons 'spoil (lambda (me target . rest) (and
+			(cons 'spoil (lambda (me target skill) (and
 				(npc? target)
-				(member (ref me 'class) (list 'dwarven-fighter 'scavenger 'bounty-hunter) eq?)
-				(not (or (ref target 'boss?) (ref target 'minion?)))
+				(or (< (ref me 'specialty) 1) (scavenger-class? me))
+				(not (or (boss? target) (minion? target)))
 				(not (ref target 'spoiled?))
+				(>= (ref me 'mp) (+ (or (ref skill 'mp-cost) 0) 3))
 			)))
 
 			(cons 'war-cry (lambda (me target . rest) (and
-				(or (ref target 'boss?) (ref target 'minion?))
+				(or (boss? target) (minion? target))
 			)))
 			(cons 'rage (lambda (me target . rest) (and
-				(or (ref target 'boss?) (ref target 'minion?))
+				(or (boss? target) (minion? target))
 			)))
 			(cons 'bear-spirit-totem (lambda (me target . rest) (and
-				(or (ref target 'boss?) (ref target 'minion?))
+				(or (boss? target) (minion? target))
 			)))
 
 			(cons 'ultimate-defense  (lambda (me . rest) (and
@@ -416,19 +435,28 @@
 					(list 'vampiric-rage 'might 'death-whisper 'focus 'shield 'guidance 'regeneration)
 				)
 			))
-			(("phr") (lambda (character)
+			(("melee") (lambda (character)
 				(cond
 					((protagonist? character) (list))
-					((or (fighter-type? character) (eq? (ref character 'race) 'orc))
+					((fighter-type? character)
 						(case (ref me 'class)
 							((shillien-elder) (list 'vampiric-rage 'might 'death-whisper))
-							(else (list 'focus 'shield 'wind-walk))
+							(else (list 'berserker-spirit 'focus 'shield))
+						)
+					)
+					((eq? (ref character 'race) 'orc)
+						(list 'acumen 'berserker-spirit)
+					)
+					((support-class? character)
+						(case (ref me 'class)
+							((shillien-elder) (list 'shield 'wind-walk))
+							(else (list 'acumen 'berserker-spirit))
 						)
 					)
 					((mystic-type? character)
 						(case (ref me 'class)
-							((shillien-elder) (list 'empower 'shield))
-							(else (list 'acumen 'wind-walk))
+							((shillien-elder) (list 'empower 'shield 'wind-walk))
+							(else (list 'acumen 'berserker-spirit))
 						)
 					)
 					(else (list))

@@ -48,7 +48,7 @@
 						)
 						('change-target (subject-id target-id . rest)
 							(let ((creature (object-ref wr subject-id)))
-								(when (and under-attack (eq? target-id (object-id me)) (npc? creature) (or (ref creature 'boss?) (ref creature 'minion?)))
+								(when (and under-attack (eq? target-id (object-id me)) (npc? creature) (or (boss? creature) (minion? creature)))
 									(say cn (format "Attaked by ~a!" (ref creature 'name)) channel)
 								)
 							)

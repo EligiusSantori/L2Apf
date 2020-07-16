@@ -13,6 +13,11 @@
 		(npc? (-> any/c boolean?))
 		(make-npc (-> list? any/c box?))
 		(update-npc! (-> box? list? list?))
+
+		(person? (-> npc? boolean?))
+		(monster? (-> npc? boolean?))
+		(minion? (-> npc? boolean?))
+		(boss? (-> npc? boolean?))
 	))
 
 	(define npc (list
@@ -22,10 +27,8 @@
 		(cons 'spoiled? (negate eq?))
 		(cons 'summoned? (negate eq?))
 
-		(cons 'aggressive? #f)
-		(cons 'monster? #f)
-		(cons 'minion? #f)
-		(cons 'boss? #f)
+		(cons 'npc-type #f)
+		(cons 'aggro #f)
 		(cons 'group #f)
 	))
 
@@ -57,5 +60,18 @@
 			(set-box! object (append rest updated))
 			changes
 		)
+	)
+
+	(define (person? npc)
+		(eq? (ref npc 'npc-type) 'person)
+	)
+	(define (monster? npc)
+		(eq? (ref npc 'npc-type) 'monster)
+	)
+	(define (minion? npc)
+		(eq? (ref npc 'npc-type) 'minion)
+	)
+	(define (boss? npc)
+		(eq? (ref npc 'npc-type) 'boss)
 	)
 )

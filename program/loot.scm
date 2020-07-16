@@ -61,7 +61,7 @@
 	)
 	(define (next wr me sweep? range center strategy except-id)
 		(let ((position (get-position me)))
-			(let-values (((npcs items) (find-worth wr sweep? range (or center position) except-id)))
+			(let-values (((npcs items) (find-worth wr (and sweep? (find-sweep-skill wr)) range (or center position) except-id)))
 				(or
 					(and (not (null? npcs)) (strategy npcs position))
 					(and (not (null? items)) (strategy items position))
@@ -93,7 +93,7 @@
 
 	(define-program program-loot ; TODO Optimized default strategy.
 		(lambda (cn event config state)
-			(let-values (((sweep? range center strategy) (list->values config)) ((gather-id will-ready) (car+cdr state)))
+			(let-values (((range sweep? center strategy) (list->values config)) ((gather-id will-ready) (car+cdr state)))
 				(let* ((wr (connection-world cn)) (me (world-me wr)) (gather-next (lambda ([except-id #f])
 						(if (or (not will-ready) (>= (timestamp) will-ready))
 							(let ((object (next wr me sweep? range center strategy except-id)))
@@ -117,9 +117,11 @@
 							)
 						)
 						('skill-reused (skill)
-							(if (and sweep? (= (skill-id skill) (skill-id (find-sweep-skill wr))) (eq? (ref me 'target-id) gather-id))
-								(gather-next) ; Sweep now available.
-								state
+							(let ((sweep (find-sweep-skill wr)))
+								(if (and sweep? sweep (= (skill-id skill) (skill-id sweep)) (eq? (ref me 'target-id) gather-id))
+									(gather-next) ; Sweep now available.
+									state
+								)
 							)
 						)
 						('item-pick (id . rest) (if (eq? id gather-id) (gather-next id) state))
@@ -132,11 +134,8 @@
 		)
 
 		#:constructor (lambda (cn config)
-			(let-values (((sweep? range center strategy) (list->values config)))
+			(let-values (((range sweep? center strategy) (list->values config)))
 				(let ((wr (connection-world cn)))
-					(when (and sweep? (not (find-sweep-skill wr)))
-						(program-error "Can't find sweep skill.")
-					)
 					(let ((object (next wr (world-me wr) sweep? range center strategy #f)))
 						(if object (gather cn object) (program-error "Nothing to gather."))
 					)
@@ -145,8 +144,8 @@
 		)
 
 		#:defaults (list
-			#t ; sweep?
 			0 ; range
+			#t ; sweep if possible
 			#f ; center
 			closest ; strategy
 		)

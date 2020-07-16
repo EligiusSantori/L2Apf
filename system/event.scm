@@ -15,7 +15,7 @@
 		(alarm! (->* (connection? rational?) (#:id symbol? event?) symbol?))
 		(timeout! (->* (connection? rational?) (#:id symbol? event?) symbol?))
 		(interval! (->* (connection? rational?) (#:id symbol? event?) symbol?))
-		(timer-stop! (-> connection? symbol? symbol?))
+		(timer-stop! (-> connection? symbol? (or/c symbol? false/c)))
 	))
 	(provide case-event)
 
