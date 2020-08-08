@@ -20,7 +20,7 @@
 			"api/use_skill.scm"
 		)
 	)
-	(provide program-slay)
+	(provide make-program-slay)
 
 	(define (program-error message . args)
 		(apply raise-program-error 'program-slay message args)
@@ -75,9 +75,9 @@
 
 	(define on-changes (list 'hp 'bleeding? 'poisoned? 'burning? 'stunned? 'silenced?))
 
-	(define-program program-slay
-		(lambda (cn event config skills)
-			(let-values (((victim-id _ action) (list->values config)))
+	(define (make-program-slay victim-id [skills (list)] [action #f])
+		(make-program 'program-slay
+			(lambda (cn event skills)
 				(let* ((wr (connection-world cn)) (me (world-me wr)) (do-slay (bind-head slay cn wr me victim-id skills action)))
 					(if (case-event event
 						('change-target (subject-id target-id . rest)
@@ -114,10 +114,8 @@
 					) skills eof)
 				)
 			)
-		)
 
-		#:constructor (lambda (cn config)
-			(let-values (((victim-id skills action) (list->values config)))
+			#:constructor (lambda (cn)
 				(let* ((wr (connection-world cn)) (victim (object-ref wr victim-id)))
 					(when (not victim) (program-error "Don't see the target." victim-id))
 					(when (not (creature? victim)) (program-error "Object is not creature." victim-id))
@@ -129,12 +127,6 @@
 					)
 				)
 			)
-		)
-
-		#:defaults (list
-			undefined ; victim-id (required)
-			(list) ; skills (alist)
-			#f ; default action
 		)
 	)
 )

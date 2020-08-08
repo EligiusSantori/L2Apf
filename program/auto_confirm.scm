@@ -10,21 +10,19 @@
 			"api/reply.scm"
 		)
 	)
-	(provide program-auto-confirm)
+	(provide make-program-auto-confirm)
 
-	(define-program program-auto-confirm
-		(lambda (cn ev config . args)
-			(case-event ev
-				('confirm/resurrect (name exp)
-					(reply cn (event-name ev) ((list-ref config 0) name exp))
+	(define (make-program-auto-confirm [resurrect? (const #t)])
+		(make-program 'program-auto-confirm
+			(lambda (cn ev . args)
+				(case-event ev
+					('confirm/resurrect (name exp)
+						(reply cn (event-name ev) (resurrect? name exp))
+					)
 				)
+
+				(void)
 			)
-
-			(void)
-		)
-
-		#:defaults (list
-			(const #t) ; resurrect
 		)
 	)
 )

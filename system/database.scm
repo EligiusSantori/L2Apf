@@ -6,12 +6,12 @@
 		"../library/extension.scm"
 	)
 	(provide (contract-out
-		(db-level (-> connection? integer? rational?))
-		(db-class (-> connection? integer? symbol?))
-		(db-item (-> connection? integer? list?))
-		(db-skill (-> connection? integer? integer? list?))
-		(db-character (-> connection? integer? list?))
-		(db-npc (-> connection? integer? list?))
+		(db-level (-> (or/c connection? false/c) integer? rational?))
+		(db-class (-> (or/c connection? false/c) integer? symbol?))
+		(db-item (-> (or/c connection? false/c) integer? list?))
+		(db-skill (-> (or/c connection? false/c) integer? integer? list?))
+		(db-character (-> (or/c connection? false/c) integer? list?))
+		(db-npc (-> (or/c connection? false/c) integer? list?))
 	))
 
 	(define (db-level db exp)

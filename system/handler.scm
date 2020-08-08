@@ -671,18 +671,9 @@
 
 	(define (packet-handler/party-all-members ec wr db packet)
 		(let ((me (world-me wr)) (leader-id (ref packet 'leader-id)))
-			(set-world-party! wr (apply make-party
-				(ref packet 'loot-mode)
-				leader-id
-				(fold (lambda (data members)
-					(let ((character (handle-creature-update! ec wr db data 'character)))
-						(if (not (member (object-id character) (list (object-id me) leader-id)))
-							(cons (object-id character) members) ; Regular member.
-							members ; Party leader.
-						)
-					)
-				) (list (object-id me)) (ref packet 'members))
-			))
+			(let ((ids (map (lambda (data) (object-id (handle-creature-update! ec wr db data 'character))) (ref packet 'members))))
+				(set-world-party! wr (apply make-party (ref packet 'loot-mode) leader-id (remove leader-id (cons (object-id me) ids) =)))
+			)
 		)
 
 		(let ((party (world-party wr)))

@@ -16,7 +16,7 @@
 			"api/move_to.scm"
 		)
 	)
-	(provide program-follow-repeat)
+	(provide make-program-follow-repeat)
 
 	(define (raise-dont-see-leader object-id)
 		(raise-program-error 'program-follow-repeat "Don't see the leader." object-id)
@@ -69,40 +69,32 @@
 		)
 	)
 
-	(define (make-state route busy)
-		(cons route busy)
-	)
-
-	(define-program program-follow-repeat
-		(lambda (cn event config state)
-			(let-values (((leader-id skip) (list->values config)) ((route busy) (car+cdr state)))
-				(let ((my-id (object-id (world-me (connection-world cn)))))
-					(cond
-						((and (eq? (event-name event) 'change-moving) (member (second event) (list leader-id my-id) =))
-							(cons route (follow cn (cdr event) leader-id skip route busy))
+	; TODO add (or (ref leader 'collision-radius) 0) to skip?
+	(define (make-program-follow-repeat leader-id [skip 50])
+		(make-program 'program-follow-repeat
+			(lambda (cn event state)
+				(let-values (((route busy) (car+cdr state)))
+					(let ((my-id (object-id (world-me (connection-world cn)))))
+						(cond
+							((and (eq? (event-name event) 'change-moving) (member (second event) (list leader-id my-id) =))
+								(cons route (follow cn (cdr event) leader-id skip route busy))
+							)
+							((and (eq? (event-name event) 'object-delete) (= (second event) leader-id))
+								(raise-dont-see-leader leader-id)
+							)
+							(else state)
 						)
-						((and (eq? (event-name event) 'object-delete) (= (second event) leader-id))
-							(raise-dont-see-leader leader-id)
-						)
-						(else state)
 					)
 				)
 			)
-		)
 
-		#:constructor (lambda (cn config)
-			(let-values (((leader-id skip) (list->values config)))
+			#:constructor (lambda (cn)
 				(let ((route (make-queue)) (point (get-position (get-leader cn leader-id))))
 					(target cn leader-id)
 					(enqueue! route point)
-					(make-state route (follow cn #f leader-id skip route #f))
+					(cons route (follow cn #f leader-id skip route #f))
 				)
 			)
-		)
-
-		#:defaults (list
-			undefined ; leader-id (required)
-			50 ; skip ; TODO add (or (ref leader 'collision-radius) 0)?
 		)
 	)
 )

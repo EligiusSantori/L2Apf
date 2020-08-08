@@ -19,50 +19,10 @@
 			"api/use_skill.scm"
 		)
 	)
-	(provide program-bless)
+	(provide make-program-bless)
 
 	(define (program-error message . args)
 		(apply raise-program-error 'program-bless message args)
-	)
-
-	(define (estimate character)
-		(append (cond
-			((fighter-type? character) (list ; TODO Fill up.
-				; Common.
-				'might
-				'shield
-				'mental-shield
-				'death-whisper
-				'focus
-				'guidance
-
-				; Important.
-				'vampiric-rage
-			))
-			((mystic-type? character) (cond
-				((wizard-class? character) (list ; TODO Fill up.
-					; Common.
-					'shield
-					'mental-shield
-					'concentration
-
-					; Important.
-					'empower
-					'acumen
-				))
-				((support-class? character) (list ; TODO Fill up.
-					; Common.
-					'shield
-					'mental-shield
-					'acumen
-
-					; Important.
-					'concentration
-				))
-				(else (list))
-				))) (list ; Global buffs.
-			'wind-walk
-		))
 	)
 
 	(define (will-ready skill)
@@ -114,60 +74,55 @@
 		)
 	)
 
-	(define-program program-bless
-		(lambda (cn ev config state)
-			(let-values (((target-ids todo) (car+cdr state)))
-				(let* ((estimate (second config)) (wr (connection-world cn)) (me (world-me wr)))
-					(or (case-event ev
-						('change-target (subject-id target-id . rest)
-							(and (= (object-id me) subject-id) target-id (= target-id (car target-ids))
-								(begin (next-buff cn todo) state) ; Start working.
-							)
-						)
-						('skill-launched (subject-id . rest)
-							(and (= (object-id me) subject-id)
-								(begin
-									(heap-remove-min! todo) ; Drop completed buff.
-									(do-buff cn estimate target-ids todo) ; Do next.
+	(define (make-program-bless target-ids estimate)
+		(make-program 'program-bless
+			(lambda (cn ev state)
+				(let-values (((target-ids todo) (car+cdr state)))
+					(let* ((wr (connection-world cn)) (me (world-me wr)))
+						(or (case-event ev
+							('change-target (subject-id target-id . rest)
+								(and (= (object-id me) subject-id) target-id (= target-id (car target-ids))
+									(begin (next-buff cn todo) state) ; Start working.
 								)
 							)
-						)
-						('skill-canceled (subject-id . rest) ; Sort queue then do nearest.
-							(and (= (object-id me) subject-id)
-								(begin (buff-over cn todo) state)
+							('skill-launched (subject-id . rest)
+								(and (= (object-id me) subject-id)
+									(begin
+										(heap-remove-min! todo) ; Drop completed buff.
+										(do-buff cn estimate target-ids todo) ; Do next.
+									)
+								)
 							)
-						)
-						('skill-reusing (skill) ; Sort queue then do nearest.
-							(and (> (heap-count todo) 0) (= (skill-id (heap-min todo)) (skill-id skill))
-								(begin (buff-over cn todo) state)
+							('skill-canceled (subject-id . rest) ; Sort queue then do nearest.
+								(and (= (object-id me) subject-id)
+									(begin (buff-over cn todo) state)
+								)
 							)
-						)
-						('skill-reused (skill)
-							(and (> (heap-count todo) 0) (= (skill-id (heap-min todo)) (skill-id skill))
-								(begin (next-buff cn todo) state) ; Next skill ready, do it.
+							('skill-reusing (skill) ; Sort queue then do nearest.
+								(and (> (heap-count todo) 0) (= (skill-id (heap-min todo)) (skill-id skill))
+									(begin (buff-over cn todo) state)
+								)
 							)
-						)
-						('die (subject-id . rest) ; Exit on die.
-							(if (= (object-id me) subject-id) eof state)
-						)
-					) state)
+							('skill-reused (skill)
+								(and (> (heap-count todo) 0) (= (skill-id (heap-min todo)) (skill-id skill))
+									(begin (next-buff cn todo) state) ; Next skill ready, do it.
+								)
+							)
+							('die (subject-id . rest) ; Exit on die.
+								(if (= (object-id me) subject-id) eof state)
+							)
+						) state)
+					)
 				)
 			)
-		)
 
-		#:constructor (lambda (cn config)
-			(let-values (((target-ids estimate) (list->values config)))
+			#:constructor (lambda (cn)
 				(when (null? target-ids) (program-error "Nothing to do."))
 				(let ((state (do-buff cn estimate target-ids (get-todo cn estimate (car target-ids)))))
 					(when (eof-object? state) (program-error "Nothing to do."))
 					state
 				)
 			)
-		)
-
-		#:defaults (list
-			undefined ; target-ids (required)
-			estimate ; custom buff function
 		)
 	)
 )

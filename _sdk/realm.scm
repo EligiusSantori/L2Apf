@@ -29,10 +29,9 @@
 		"api/party_crown.scm"
 		"api/return.scm"
 		"api/logout.scm"
-		(only-in "program/program.scm" program program-id)
+		(only-in "program/program.scm" program-id)
 		"program/idle.scm"
 		"program/partying.scm"
-		"program/make_party.scm"
 		"program/auto_confirm.scm"
 		"program/follow_chase.scm"
 		; "program/follow_repeat.scm"
@@ -88,12 +87,12 @@
 )
 
 (define (run cn wr me events party)
-	(define br (make-brain cn program-idle))
+	(define br (make-brain cn (make-program-idle)))
 
 	(brain-load! br
-		(program program-partying party)
-		(program program-auto-confirm)
-		(program program-report)
+		(make-program-partying party)
+		(make-program-auto-confirm)
+		(make-program-report)
 	)
 
 	(do ((ev (sync events) (sync events))) ((eq? (car ev) 'disconnect))
@@ -117,7 +116,7 @@
 					(when (and (npc? creature) (mystic-type? me) (not (eq? (ref me 'race) 'orc)) (world-party wr))
 						(cond
 							((eq? target-id (object-id me))
-								(brain-do! br (program program-follow-chase (party-leader (world-party wr)) 50) #t)
+								(brain-do! br (make-program-follow-chase (party-leader (world-party wr)) 50) #t)
 							)
 							((and (eq? previous-id (object-id me)) (eq? (program-id (brain-active br)) 'program-follow-chase))
 								(brain-stop! br (brain-active br))
@@ -128,14 +127,14 @@
 			)
 			('item-spawn (id . rest) ; Auto loot if I'm looter.
 				(when (and (eq? looter (object-id me)) (not (eq? (program-id (brain-active br)) 'program-loot)))
-					(brain-do! br (program program-loot loot-radius))
+					(brain-do! br (make-program-loot loot-radius))
 				)
 			)
 			('die (subject-id . rest) ; Auto sweep.
 				(when (and (eq? looter (object-id me)) (not (eq? (program-id (brain-active br)) 'program-loot)))
 					(let ((creature (object-ref wr subject-id)))
 						(when (and (npc? creature) (ref creature 'spoiled?) (find-skill wr 'sweeper))
-							(brain-do! br (program program-loot loot-radius))
+							(brain-do! br (make-program-loot loot-radius))
 						)
 					)
 				)
@@ -153,7 +152,7 @@
 					(("heal") (command-repeat cn br 'heal author-id (cdr command)))
 					(("power") (let ((is? (not (string=? (list-try-ref command 1 "on") "off"))))
 						(toggle-skill cn (find-skill wr 'vicious-stance) is?)
-						; (toggle-skill cn (find-skill wr 'soul-cry) is?)
+						(toggle-skill cn (find-skill wr 'soul-cry) is?)
 						; (auto-shot cn is? (if (fighter-type? me) 'soulshot 'blessed-spiritshot) (weapon-grade me))
 					))
 					(("prep")
@@ -161,12 +160,11 @@
 						(use-skill cn (find-skill wr 'battle-roar))
 					)
 
-					(("invite") (brain-do! br (program program-make-party party 'finder 0.5)))
-					(("crown") (party-crown cn name))
+					(("give") (command-give cn br name (cdr command)))
 
 					(("follow") (let ((gap (or (string->number (list-try-ref command 1 "30")) 30))) ; TODO comb style
 						(brain-clear! br)
-						(brain-do! br (program program-follow-chase author-id gap))
+						(brain-do! br (make-program-follow-chase author-id gap))
 					))
 					(("return") (let ((author (object-ref wr author-id)) (gap (or (string->number (list-try-ref command 1 "50")) 50)))
 						(when (and author (get-position author))
@@ -175,7 +173,7 @@
 									(angle (if (object=? author target) (get-angle wr author) (creatures-angle author target)))
 									(members (command-affected wr channel author)))
 								(cond
-									((not members) (align cn me target (list) 0 (+ angle pi) gap)) ; Common.
+									((null? members) (align cn me target (list) 0 (+ angle pi) gap)) ; Common.
 									((not tank) (align cn me target members (- 2pi (/ 2pi (length members))) 0 gap)) ; For party.
 									((= (object-id me) tank) (align cn me target (list tank) (/ pi 10) angle gap)) ; For tank.
 									(else (align cn me target (remove tank members =) pi/2 (+ angle pi) gap)) ; For others.
@@ -211,8 +209,9 @@
 							(cons 'sting (const #f))
 						)
 					)))
+					; (("raid") ...)
 					#|(("support") (when (support-class? me)
-						(brain-do! br (program program-support
+						(brain-do! br (make-program-support
 							(lambda (character)
 								(and
 									(<= (hp-ratio character) 2/3)
@@ -246,14 +245,14 @@
 							((string-ci=? name "off") (set! looter #f))
 							((string-ci=? name (ref me 'name))
 								(set! looter (object-id me))
-								(brain-do! br (program program-loot loot-radius) #t)
+								(brain-do! br (make-program-loot loot-radius) #t)
 							)
 						)
 					))
 					(("buff") (command-buff cn br author-id (cdr command)))
 					(("relax") (let ((duration (or (string->number (list-try-ref command 1 "0")) 0)))
 						(brain-clear! br)
-						(brain-do! br (program program-relax duration))
+						(brain-do! br (make-program-relax duration))
 					))
 
 					(("clear") (brain-clear! br))
@@ -315,8 +314,8 @@
 (define (prepare)
 	(let-values (((host port password bunches config) (parse-shell)))
 		(apply append (fold (lambda (bunch r)
-			(let* ((names (parse-bunch bunch config)) (party (if (null? (cdr names)) #f names)) (rest (if party (cdr party) names))) ; Skip leader.
-				(cons (map (lambda (name) (bind instance host port name password name party)) rest) r)
+			(let* ((names (parse-bunch bunch config)) (party (if (> (length names) 1) names #f)))
+				(cons (map (lambda (name) (bind instance host port name password name party)) names) r)
 			)
 		) (list) bunches))
 	)

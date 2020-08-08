@@ -19,7 +19,7 @@
 			"api/drop.scm"
 		)
 	)
-	(provide program-drop)
+	(provide make-program-drop)
 
 	(define (program-error message . args)
 		(apply raise-program-error 'program-drop message args)
@@ -31,9 +31,9 @@
 		)
 	)
 
-	(define-program program-drop
-		(lambda (cn ev config items)
-			(let-values (((selector radius center delay) (list->values config)))
+	(define (make-program-drop [selector #f] [radius 30] [center #f] [delay 1/2])
+		(make-program 'program-drop (list selector radius center delay)
+			(lambda (cn ev items)
 				(let ((me (world-me (connection-world cn))))
 					(case-event ev
 						('item-spawn (id . rest) ; Auto loot if I'm looter.
@@ -55,10 +55,8 @@
 					)
 				)
 			)
-		)
 
-		#:constructor (lambda (cn config)
-			(let-values (((selector radius center delay) (list->values config)))
+			#:constructor (lambda (cn)
 				(let* ((wr (connection-world cn)) (me (world-me wr)))
 					(let ((items (items (world-inventory wr) (or selector (lambda (item) (not (equipped? me (object-id item))))))))
 						(when (null? items) (program-error "Nothing to drop."))
@@ -67,13 +65,6 @@
 					)
 				)
 			)
-		)
-
-		#:defaults (list
-			#f ; selector
-			30 ; radius
-			#f ; center
-			1/2 ; delay
 		)
 	)
 )

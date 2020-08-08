@@ -15,11 +15,11 @@
 			"api/say.scm"
 		)
 	)
-	(provide program-report)
+	(provide make-program-report)
 
-	(define-program program-report
-		(lambda (cn event config . rest)
-			(let-values (((low-hp support-low-mp under-attack channel) (list->values config)))
+	(define (make-program-report [low-hp 1/3] [support-low-mp 1/4] [under-attack #t] [channel 'chat-channel/all])
+		(make-program 'program-report
+			(lambda (cn event . rest)
 				(let* ((wr (connection-world cn)) (me (world-me wr)))
 					(case-event event
 						('creature-update (id changes)
@@ -56,13 +56,6 @@
 					)
 				)
 			)
-		)
-
-		#:defaults (list
-			1/3 ; Low HP.
-			1/4 ; Support low MP.
-			#t ; Under attack by boss or minion.
-			'chat-channel/all
 		)
 	)
 )

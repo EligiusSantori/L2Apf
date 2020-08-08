@@ -17,7 +17,7 @@
 			"api/move_to.scm"
 		)
 	)
-	(provide program-follow-chase)
+	(provide make-program-follow-chase)
 
 	(define (raise-dont-see-leader object-id)
 		(raise-program-error 'program-follow-chase "Don't see the leader." object-id)
@@ -36,9 +36,9 @@
 		(void)
 	)
 
-	(define-program program-follow-chase
-		(lambda (cn event config state)
-			(let-values (((leader-id margin) (list->values config)))
+	(define (make-program-follow-chase leader-id [margin 30])
+		(make-program 'program-follow-chase
+			(lambda (cn event state)
 				(cond
 					((and (eq? (car event) 'change-moving) (= (second event) leader-id))
 						(follow cn (get-leader cn leader-id) margin)
@@ -49,20 +49,13 @@
 					(else (void))
 				)
 			)
-		)
 
-		#:constructor (lambda (cn config)
-			(let-values (((leader-id margin) (list->values config)))
+			#:constructor (lambda (cn)
 				(let ((leader (get-leader cn leader-id)))
 					(target cn leader-id)
 					(follow cn leader margin)
 				)
 			)
-		)
-
-		#:defaults (list
-			undefined ; leader-id (required)
-			30 ; margin
 		)
 	)
 )

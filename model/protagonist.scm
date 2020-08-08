@@ -59,20 +59,22 @@
 	)
 
 	(define (make-protagonist data db)
-		(let* ((character (make-character data db)) (type (cons 'protagonist (ref character 'type))) (xp (ref data 'xp)))
-			(box (append
-				(list
-					(cons 'type type)
-					(cons 'level (db-level db xp))
-					(cons 'attackers (make-cache-set 60 =)) ; Default aggro timeout.
-					(cons 'database db)
-				)
-				(fold ; TODO extract xp
-					(lambda (p r) (if (and p (assoc (car p) protagonist eq?)) (cons p r) r)) ; If field belongs to protagonist.
-					(alist-except character eq? 'type 'level) ; TODO extract type
-					data
-				)
-			))
+		(let* ((character (make-character data db)) (type (cons 'protagonist (ref character 'type))))
+			(let ((xp (ref data 'xp)) (level (ref data 'level)))
+				(box (append
+					(list
+						(cons 'type type)
+						(cons 'level (or (db-level db xp) level))
+						(cons 'attackers (make-cache-set 60 =)) ; Default aggro timeout.
+						(cons 'database db)
+					)
+					(fold ; TODO extract xp
+						(lambda (p r) (if (and p (assoc (car p) protagonist eq?)) (cons p r) r)) ; If field belongs to protagonist.
+						(alist-except character eq? 'type 'level) ; TODO extract type
+						data
+					)
+				))
+			)
 		)
 	)
 

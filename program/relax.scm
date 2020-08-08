@@ -13,7 +13,7 @@
 			"api/sit.scm"
 		)
 	)
-	(provide program-relax)
+	(provide make-program-relax)
 
 	(define (program-error message . args) (apply raise-program-error 'program-relax message args))
 	(define (error-already-restored hp mp) (program-error "Already restored." hp mp))
@@ -21,53 +21,51 @@
 	(define (hp-max? creature) (= (ref creature 'hp) (ref creature 'max-hp)))
 	(define (mp-max? creature) (= (ref creature 'mp) (ref creature 'max-mp)))
 
-	(define-program program-relax
-		(lambda (cn event config timer)
-			(let ((duration (car config)) (me (world-me (connection-world cn))))
-				(if (case-event event ; End on fully restored or timeout.
-					('creature-update (id changes)
-						(and
-							(= id (object-id me))
-							(or (assq 'hp changes) (assq 'mp changes))
-							(hp-max? me)
-							(mp-max? me)
+	(define (make-program-relax [duration 0])
+		(make-program 'program-relax
+			(lambda (cn event timer)
+				(let ((me (world-me (connection-world cn))))
+					(if (case-event event ; End on fully restored or timeout.
+						('creature-update (id changes)
+							(and
+								(= id (object-id me))
+								(or (assq 'hp changes) (assq 'mp changes))
+								(hp-max? me)
+								(mp-max? me)
+							)
 						)
-					)
-					(timer () #t)
-					(else (if (> (attackers-count me) 0) (error-under-attack (attackers me)) #f))
-				) eof timer)
-			)
-		)
-
-		#:constructor (lambda (cn config)
-			(let* ((duration (car config)) (me (world-me (connection-world cn))))
-				(when (> (attackers-count me) 0)
-					(error-under-attack (attackers me))
-				)
-
-				(if (and (hp-max? me) (mp-max? me))
-					(error-already-restored (ref me 'hp) (ref me 'mp))
-					(begin
-						(when (not (ref me 'sitting?))
-							(sit cn #t)
-						)
-						(if (> duration 0)
-							(timeout! cn duration)
-							(void)
-						)
-					)
+						(timer () #t)
+						(else (if (> (attackers-count me) 0) (error-under-attack (attackers me)) #f))
+					) eof timer)
 				)
 			)
-		)
 
-		#:destructor (lambda (cn config state)
-			(when (ref (world-me (connection-world cn)) 'sitting?)
-				(sit cn #f)
+			#:constructor (lambda (cn)
+				(let ((me (world-me (connection-world cn))))
+					(when (> (attackers-count me) 0)
+						(error-under-attack (attackers me))
+					)
+
+					(if (and (hp-max? me) (mp-max? me))
+						(error-already-restored (ref me 'hp) (ref me 'mp))
+						(begin
+							(when (not (ref me 'sitting?))
+								(sit cn #t)
+							)
+							(if (> duration 0)
+								(timeout! cn duration)
+								(void)
+							)
+						)
+					)
+				)
 			)
-		)
 
-		#:defaults (list
-			0 ; duration
+			#:destructor (lambda (cn . rest)
+				(when (ref (world-me (connection-world cn)) 'sitting?)
+					(sit cn #f)
+				)
+			)
 		)
 	)
 )

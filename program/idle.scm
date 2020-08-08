@@ -3,11 +3,11 @@
 		racket/undefined
 		"program.scm"
 	)
-	(provide
-		program-idle
-	)
+	(provide make-program-idle)
 
-	(define-program program-idle
-		(lambda args (void)) ; Do nothing
+	(define (make-program-idle)
+		(make-program 'program-idle
+			(lambda args (void)) ; Do nothing
+		)
 	)
 )

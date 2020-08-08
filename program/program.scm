@@ -15,10 +15,10 @@
 		)
 	)
 	(provide
-		define-program
+		program-lambda
 		(struct-out exn:error:program)
 		(contract-out
-			(program (->* (program?) #:rest any/c program?))
+			(make-program (->* (symbol? procedure?) (#:constructor procedure? #:destructor procedure?) program?))
 			(program? (-> any/c boolean?))
 			(program-id (-> program? symbol?))
 			(program-equal? (-> program? program? boolean?))
@@ -34,7 +34,7 @@
 		iterator ; Procedure that implements the program iteration.
 		constructor ; Procedure that should be executed when the program loading.
 		destructor ; Procedure that should be executed when the program unloading.
-		config
+		; config
 		[state #:mutable]
 		; compatible : list
 		; incompatible : list
@@ -44,50 +44,16 @@
 	(define program? base-program?)
 	(define program-id base-program-id)
 
-	(define-syntax (define-program STX)
-		(syntax-parse STX
-			((define-program ID ITERATOR
-					(~optional (~seq #:constructor CONSTRUCTOR))
-					(~optional (~seq #:destructor DESTRUCTOR))
-					(~optional (~seq #:defaults CONFIG)))
-				(with-syntax (
-						(CONSTRUCTOR (or (attribute CONSTRUCTOR) void))
-						(DESTRUCTOR (or (attribute DESTRUCTOR) void))
-						(CONFIG (or (attribute CONFIG) #'(list))))
-					#'(define ID (base-program (quote ID) ITERATOR CONSTRUCTOR DESTRUCTOR CONFIG undefined))
-				)
-			)
-		)
+	(define (make-program id iterator #:constructor [constructor void] #:destructor [destructor void])
+		(base-program id iterator constructor destructor undefined)
 	)
-
-	(define (program base . config) ; Create configured instance of the program (instantiate).
-		(define (list-merge to from)
-			(define (equalize a b)
-				(let ((al (length a)) (bl (length b)))
-					(let ((tail (make-list (abs (- al bl)) undefined)))
-						(cond
-							((> al bl) (values a (append b tail)))
-							((> bl al) (values (append a tail) b))
-							(else (values a b))
-						)
-					)
-				)
+	(define-syntax program-lambda
+		(syntax-rules ()
+			((_ (EVENT (STATE INIT)) . BODY)
+				(base-program (gensym) (lambda (connection EVENT STATE) . BODY) void void undefined INIT)
 			)
-
-			(apply map (lambda (t f)
-				(if (eq? f undefined) t f)
-			) (values->list (equalize to from)))
-		)
-
-		(let ((source (base-program-config base)))
-			(struct-copy base-program base
-				[config (if (and (not (null? config)))
-					(if (alist? source)
-						(alist-merge source config) ; TODO deep recursive merge
-						(list-merge source config)
-					)
-					source ; Keep config as is.
-				)]
+			((_ (EVENT STATE) . BODY)
+				(program-lambda (EVENT [STATE undefined]) . BODY)
 			)
 		)
 	)
@@ -101,7 +67,7 @@
 
 	(define (program-load! cn p)
 		(apf-debug "Loading program ~a." (program-id p))
-		(let ((state ((base-program-constructor p) cn (base-program-config p))))
+		(let ((state ((base-program-constructor p) cn)))
 			(when (state? state) (set-base-program-state! p state))
 			(not (eof-object? state))
 		)
@@ -109,12 +75,12 @@
 
 	(define (program-free! cn p)
 		(apf-debug "Unloading program ~a." (program-id p))
-		((base-program-destructor p) cn (base-program-config p) (base-program-state p))
+		((base-program-destructor p) cn (base-program-state p))
 		(void)
 	)
 
 	(define (program-run! cn p event) ; Iterate program for an event.
-		(let ((state ((base-program-iterator p) cn event (base-program-config p) (base-program-state p))))
+		(let ((state ((base-program-iterator p) cn event (base-program-state p))))
 			(when (state? state) (set-base-program-state! p state))
 			(not (eof-object? state))
 		)

@@ -21,7 +21,7 @@
 			"api/use_skill.scm"
 		)
 	)
-	(provide program-loot)
+	(provide make-program-loot)
 
 	(define (program-error message . args)
 		(apply raise-program-error 'program-loot message args)
@@ -91,63 +91,55 @@
 	)
 	(define delayed-gather (gensym))
 
-	(define-program program-loot ; TODO Optimized default strategy.
-		(lambda (cn event config state)
-			(let-values (((range sweep? center strategy) (list->values config)) ((gather-id will-ready) (car+cdr state)))
-				(let* ((wr (connection-world cn)) (me (world-me wr)) (gather-next (lambda ([except-id #f])
-						(if (or (not will-ready) (>= (timestamp) will-ready))
-							(let ((object (next wr me sweep? range center strategy except-id)))
-								(if object (gather cn object) eof)
-							)
-							(begin
-								(alarm! #:id delayed-gather cn will-ready (make-event delayed-gather except-id))
-								state
-							)
-						)
-					)))
-					(case-event event
-						('change-target (subject-id target-id . rest)
-							(if (= subject-id (object-id me))
-								(cond
-									((not target-id) (gather-next gather-id)) ; Corpse has been swept or target broken.
-									((eq? target-id gather-id) (gather cn (object-ref wr gather-id))) ; Spoiled corpse has been selected.
-									(else (program-error "Unexpected target." target-id)) ; TODO
+	; TODO Optimized default strategy.
+	(define (make-program-loot [range 0] [sweep? #t] [center #f] [strategy closest])
+		(make-program 'program-loot
+			(lambda (cn event state)
+				(let-values (((gather-id will-ready) (car+cdr state)))
+					(let* ((wr (connection-world cn)) (me (world-me wr)) (gather-next (lambda ([except-id #f])
+							(if (or (not will-ready) (>= (timestamp) will-ready))
+								(let ((object (next wr me sweep? range center strategy except-id)))
+									(if object (gather cn object) eof)
 								)
-								state
-							)
-						)
-						('skill-reused (skill)
-							(let ((sweep (find-sweep-skill wr)))
-								(if (and sweep? sweep (= (skill-id skill) (skill-id sweep)) (eq? (ref me 'target-id) gather-id))
-									(gather-next) ; Sweep now available.
+								(begin
+									(alarm! #:id delayed-gather cn will-ready (make-event delayed-gather except-id))
 									state
 								)
 							)
+						)))
+						(case-event event
+							('change-target (subject-id target-id . rest)
+								(if (= subject-id (object-id me))
+									(cond
+										((not target-id) (gather-next gather-id)) ; Corpse has been swept or target broken.
+										((eq? target-id gather-id) (gather cn (object-ref wr gather-id))) ; Spoiled corpse has been selected.
+										(else (program-error "Unexpected target." target-id)) ; TODO
+									)
+									state
+								)
+							)
+							('skill-reused (skill)
+								(let ((sweep (find-sweep-skill wr)))
+									(if (and sweep? sweep (= (skill-id skill) (skill-id sweep)) (eq? (ref me 'target-id) gather-id))
+										(gather-next) ; Sweep now available.
+										state
+									)
+								)
+							)
+							('item-pick (id . rest) (if (eq? id gather-id) (gather-next id) state))
+							('object-delete (id) (if (eq? id gather-id) (gather-next id) state))
+							(delayed-gather (except-id) (gather-next except-id))
+							(else state)
 						)
-						('item-pick (id . rest) (if (eq? id gather-id) (gather-next id) state))
-						('object-delete (id) (if (eq? id gather-id) (gather-next id) state))
-						(delayed-gather (except-id) (gather-next except-id))
-						(else state)
 					)
 				)
 			)
-		)
 
-		#:constructor (lambda (cn config)
-			(let-values (((range sweep? center strategy) (list->values config)))
-				(let ((wr (connection-world cn)))
-					(let ((object (next wr (world-me wr) sweep? range center strategy #f)))
-						(if object (gather cn object) (program-error "Nothing to gather."))
-					)
+			#:constructor (lambda (cn)
+				(let* ((wr (connection-world cn)) (object (next wr (world-me wr) sweep? range center strategy #f)))
+					(if object (gather cn object) (program-error "Nothing to gather."))
 				)
 			)
-		)
-
-		#:defaults (list
-			0 ; range
-			#t ; sweep if possible
-			#f ; center
-			closest ; strategy
 		)
 	)
 )

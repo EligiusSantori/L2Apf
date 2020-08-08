@@ -23,16 +23,17 @@ Program can be finite or not. Can be foreground or background. Only one foregrou
 
 ![Scroll of Escape](https://raw.githubusercontent.com/EligiusSantori/L2Apf/master/_sdk/screenshot_soe.jpg)
 
-Run script for solo player:  
-`racket -O 'info@l2apf' _sdk/player.scm l2apf://login:password@host:port/player`.  
+Run minimalistic entry script for solo player:  
+`racket -O 'debug@l2apf' player.scm`.
 
-Run a party of players (you are leader):
-`racket -O 'info@l2apf' _sdk/party.scm config.yaml hunt`.
+Run a party of players (you are leader):  
+`racket -O 'info@l2apf' _sdk/realm.scm config.yaml party.hunt`.
 
-Minimalistic entry script:
+###### player.scm
 ```scheme
 #lang racket
 (require
+	db/sqlite3
 	"library/extension.scm"
 	"system/structure.scm"
 	"system/connection.scm"
@@ -40,7 +41,6 @@ Minimalistic entry script:
 	"system/debug.scm"
 	"model/object.scm"
 	"api/say.scm"
-	(only-in "program/program.scm" program)
 	(only-in "program/brain.scm"
 		make-brain
 		(brain-run! run!)
@@ -54,11 +54,12 @@ Minimalistic entry script:
 )
 
 (global-port-print-handler apf-print-handler)
-(let-values (((cn wr me events) (bootstrap "localhost" 2106 "account" "password" "name")))
-	(define br (make-brain cn program-idle))
+(define db (sqlite3-connect #:database "apf.db" #:mode 'read-only))
+(let-values (((cn wr me events) (bootstrap "localhost" 2106 "account" "password" "name" db)))
+	(define br (make-brain cn (make-program-idle)))
 	(load! br
-		(program program-print)
-		(program program-partying)
+		(make-program-print)
+		(make-program-partying)
 	)
 
 	(do ((event (sync events) (sync events))) ((eq? (car event) 'disconnect))
@@ -86,8 +87,8 @@ Minimalistic entry script:
 host: "localhost"
 password: "123456"
 party:
-  hunt: [you, doc, grumpy, happy]
-  raid: [you, bashful, sleepy, sneezy, dopey]
+  hunt: [doc, grumpy, happy]
+  raid: [bashful, sleepy, sneezy, dopey]
 ```
 
 \* *Some pieces of code may be outdated or not fully implemented but I sustain operability of core and basic flow.*
@@ -99,26 +100,28 @@ You can even port this architecture to another game.
 ### How to write a program
 Start with:
 ```scheme
-(define-program my-program (lambda (event connection config state)
-	; ...
-))
+(define (make-my-program)
+	(make-program 'my-program
+		(lambda (connection event state)
+			; ...
+		)
+	)
+)
 ```
 
 Full syntax:
 ```scheme
-(define-program my-program
-	(lambda (event connection config state) ; Program iterator.
-		; ...
-	)
-	#:constructor (lambda (config) ; On load callback.
-		; ...
-	)
-	#:destructor (lambda (config state) ; On unload callback.
-		; ...
-	)
-	#:defaults (list ; Default config.
-		(cons 'name 'value)
-		; ...
+(define (make-my-program config-param1 . config-paramN)
+	(make-program 'my-program
+		(lambda (connection event state) ; Program iterator.
+			; ...
+		)
+		#:constructor (lambda (connection) ; On load callback.
+			; ...
+		)
+		#:destructor (lambda (connection state) ; On unload callback.
+			; ...
+		)
 	)
 )
 ```

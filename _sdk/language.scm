@@ -11,6 +11,7 @@
 			"library/date_time.scm"
 			"system/structure.scm"
 			"system/connection.scm"
+			(only-in "system/event.scm" case-event)
 			"model/map.scm"
 			"model/skill.scm"
 			"model/object.scm"
@@ -30,7 +31,9 @@
 			"api/target.scm"
 			"api/attack.scm"
 			"api/use_skill.scm"
-			(only-in "program/program.scm" program)
+			"api/party_invite.scm"
+			"api/party_crown.scm"
+			(only-in "program/program.scm" program-lambda)
 			"program/slay.scm"
 			"program/bless.scm"
 			"program/drop.scm"
@@ -46,6 +49,7 @@
 		command-pick
 		command-skill
 		command-repeat
+		command-give
 		command-assist
 		command-buff
 	)
@@ -87,13 +91,43 @@
 		)
 	)
 
+	(define (object-id->name wr id)
+		(let ((creature (object-ref wr id)))
+			(or (and creature (ref creature 'name)) (number->string id))
+		)
+	)
 	(define (command-show cn arguments)
-		(let ((me (world-me (connection-world cn))) (what (try-first arguments))) (case what
+		(let* ((wr (connection-world cn)) (me (world-me wr)) (what (try-first arguments))) (case what
 			(("level") (say cn (format "Level: ~a." (~r (ref me 'level) #:precision (list '= 2)))))
 			(("sp") (say cn (format "SP: ~a." (ref me 'sp))))
 			(("hp") (say cn (format "HP: ~a%." (round (* (hp-ratio me) 100)))))
 			(("mp") (say cn (format "MP: ~a%." (round (* (mp-ratio me) 100)))))
 			(("loc") (let ((p (get-position me))) (say cn (format "Location: ~a, ~a, ~a." (point/3d-x p) (point/3d-y p) (point/3d-z p)))))
+			(("party") (let ((members (map (lambda (id) (object-id->name wr id)) (party-members (world-party wr)))))
+				(if (not (null? members))
+					(say cn (format "Party (~a): ~a." (length members) (string-join members ", ")))
+					(say cn (format "Out of party."))
+				)
+			))
+		))
+	)
+
+	(define (command-give cn br author arguments)
+		(let* ((wr (connection-world cn)) (me (world-me wr)) (what (try-first arguments))) (case what
+			(("party") (let ((party (world-party wr)) (to (try-second arguments author)))
+				(if (eq? (party-leader party) (object-id me))
+					(begin
+						(party-invite cn to (party-loot party))
+						(brain-do! br (program-lambda (ev st)
+							(case-event ev
+								('party-memeber-join args (party-crown cn to) eof)
+								('reject/join-party args eof)
+							)
+						) #t)
+					)
+					(say cn (format "Not a leader."))
+				)
+			))
 		))
 	)
 
@@ -141,7 +175,7 @@
 	)
 	(define (command-drop cn br arguments)
 		(let ((what (try-first arguments))) (when what
-			(brain-do! br (program program-drop (drop-selector (connection-world cn) what)) #t)
+			(brain-do! br (make-program-drop (drop-selector (connection-world cn) what)) #t)
 		))
 	)
 
@@ -188,7 +222,7 @@
 			(when author
 				(let ((targets (parse-targets wr author arguments "target")))
 					(if (not (null? targets))
-						(brain-do! br (program program-slay (car targets) (list
+						(brain-do! br (make-program-slay (car targets) (list
 							(cons skill (lambda (me . rest) (> (mp-ratio me) 1/10)))
 						) void))
 						(say cn "Target not found.")
@@ -411,10 +445,10 @@
 		(let* ((wr (connection-world cn)) (author (object-ref wr author-id)))
 			(if author
 				(let ((target-id (ref author 'target-id)) (me (world-me wr)))
-					(when (and (fighter-type? me) target-id (not (in-party? (world-party wr) target-id)))
+					(when (and (or (fighter-type? me) (eq? (ref me 'race) 'orc)) (not (support-class? me)) target-id (not (in-party? (world-party wr) target-id)))
 						; (update-creature! me (list (cons 'casting #f))) ; TODO fix casting on timer.
-						(brain-do! br (program program-slay target-id (alist-merge (skill-settings wr) (filter pair? skills)) (lambda (me target)
-							(if (fighter-type? me) ; (or ... (eq? (ref me 'race) 'orc))
+						(brain-do! br (make-program-slay target-id (alist-merge (skill-settings wr) (filter pair? skills)) (lambda (me target)
+							(if (or (fighter-type? me) (eq? (ref me 'race) 'orc))
 								(when (not (attacking? me)) (attack cn))
 								(move-to cn (get-position author) 50)
 							)
@@ -435,16 +469,16 @@
 					(list 'vampiric-rage 'might 'death-whisper 'focus 'shield 'guidance 'regeneration)
 				)
 			))
-			(("melee") (lambda (character)
+			(("rift") (lambda (character)
 				(cond
 					((protagonist? character) (list))
 					((fighter-type? character)
 						(case (ref me 'class)
-							((shillien-elder) (list 'vampiric-rage 'might 'death-whisper))
-							(else (list 'berserker-spirit 'focus 'shield))
+							((shillien-elder) (list 'vampiric-rage 'might 'death-whisper 'guidance))
+							(else (list 'focus 'shield 'berserker-spirit 'holy-weapon 'wind-walk))
 						)
 					)
-					((eq? (ref character 'race) 'orc)
+					#|((eq? (ref character 'race) 'orc)
 						(list 'acumen 'berserker-spirit)
 					)
 					((support-class? character)
@@ -452,11 +486,11 @@
 							((shillien-elder) (list 'shield 'wind-walk))
 							(else (list 'acumen 'berserker-spirit))
 						)
-					)
+					)|#
 					((mystic-type? character)
 						(case (ref me 'class)
-							((shillien-elder) (list 'empower 'shield 'wind-walk))
-							(else (list 'acumen 'berserker-spirit))
+							((shillien-elder) (list 'empower #|'concentration|# 'shield))
+							(else (list 'acumen 'berserker-spirit 'wind-walk))
 						)
 					)
 					(else (list))
@@ -493,6 +527,12 @@
 			(("bers") (lambda (character)
 				(list 'berserker-spirit)
 			))
+			(("cast") (lambda (character)
+				(if (mystic-type? character)
+					(list 'acumen 'berserker-spirit)
+					(list)
+				)
+			))
 			(else (const (list)))
 		)
 	)
@@ -501,7 +541,7 @@
 			(when (and (support-class? me) (not (null? arguments)))
 				(let ((author (object-ref wr author-id)))
 					(if author
-						(brain-do! br (program program-bless
+						(brain-do! br (make-program-bless
 							(parse-targets wr author (cdr arguments) "target")
 							(parse-buffs me (car arguments))
 						))
