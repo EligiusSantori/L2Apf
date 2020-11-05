@@ -17,6 +17,8 @@
 		(update-creature! (-> box? list? list?))
 
 		(moving? (-> creature? boolean?))
+		(running? (-> creature? boolean?))
+		(standing? (-> creature? boolean?))
 		(attacking? (-> creature? boolean?))
 		(casting? (-> creature? boolean?))
 		(get-move-speed (-> creature? rational?))
@@ -137,17 +139,21 @@
 			(and last-attack patkspd (<= (- (timestamp) last-attack) (* (/ 500 patkspd) 1.5)))
 		)
 	)
-
 	(define (casting? creature)
 		(if (ref creature 'casting) #t #f)
 	)
-
 	(define (moving? creature)
 		(if (and
 			(ref creature 'destination)
 			(not (casting? creature))
 			; TODO not immobilized effect
 		) #t #f)
+	)
+	(define (running? creature)
+		(if (ref creature 'walking?) #f #t)
+	)
+	(define (standing? creature)
+		(if (ref creature 'sitting?) #f #t)
 	)
 
 	(define (get-move-speed creature)

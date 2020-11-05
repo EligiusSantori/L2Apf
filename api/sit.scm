@@ -7,6 +7,6 @@
 	(provide sit)
 
 	(define (sit connection is?)
-		(send-packet connection (game-client-packet/change-wait-type is?))
+		(begin (send-packet connection (game-client-packet/change-wait-type is?)) #t)
 	)
 )

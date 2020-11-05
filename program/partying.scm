@@ -46,6 +46,7 @@
 							(or (and names (not (world-party wr)) (string-ci=? (car names) (ref me 'name))
 								(let ((creature (object-ref wr id)))
 									(and (character? creature) (not (object=? creature me)) (member (ref creature 'name) names string-ci=?)
+										; (fold (lambda (n q) (enqueue! q n)) (make-queue) names)
 										(timeout! cn delay)
 									)
 								)
@@ -59,7 +60,6 @@
 						)
 						('party-join args
 							(if timer (timeout! #:id timer cn 1) timer)
-
 						)
 						('party-memeber-join args
 							(if timer (timeout! #:id timer cn 1) timer)

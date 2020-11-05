@@ -38,7 +38,8 @@
 		"program/report.scm"
 		"program/loot.scm"
 		"program/relax.scm"
-		; "program/support.scm"
+		"program/bless.scm"
+		"program/support.scm"
 		; "program/auto_return.scm"
 		; "program/escape.scm"
 		; "program/travel.scm"
@@ -52,7 +53,10 @@
 
 (define tank #f)
 (define looter #f)
+(define navigator #f)
 (define loot-radius 500)
+(define wizard-delay 10) ; 10s
+
 
 (define (align cn me pivot members arc [angle 0] [gap 50])
 	(let ((my-id (object-id me)) (count (length members)))
@@ -85,8 +89,64 @@
 		))
 	)
 )
+(define (skill-exists wr name) (find-skill wr name))
+(define (weapon-type wr) (let ((item (get-weapon wr))) (and item (ref item 'item-type))))
+(define (equip-bow? wr) (eq? (weapon-type wr) 'bow))
+(define (medium-damage-skill-pointful? me target)
+	(>= (or (ref target 'hp) 0) (* (ref me 'hp) 2/3)) ; Target.HP > (2/3)Me.HP
+)
+(define (assist cn wr br author-id)
+	(let ((me (world-me wr)))
+		(command-assist cn br author-id (list
+			(cons 'aqua-swirl (lambda (me target skill) (and
+				(< (ref me 'specialty) 2)
+				(medium-damage-skill-pointful? me target)
+				(>= (- (timestamp) (or (ref skill 'last-usage) 0)) wizard-delay)
+			)))
+			(cons 'blaze (lambda (me target skill) (and
+				(< (ref me 'specialty) 2)
+				(medium-damage-skill-pointful? me target)
+				(>= (- (timestamp) (or (ref skill 'last-usage) 0)) wizard-delay)
+			)))
+			(cons 'twister (lambda (me target skill) (and
+				(< (ref me 'specialty) 2)
+				(medium-damage-skill-pointful? me target)
+				(>= (- (timestamp) (or (ref skill 'last-usage) 0)) wizard-delay)
+			)))
+			(cons 'hurricane (lambda (me target skill) (and
+				(medium-damage-skill-pointful? me target)
+				(>= (- (timestamp) (or (ref skill 'last-usage) 0)) wizard-delay)
+			)))
 
-(define (run cn wr me events party)
+			(cons 'hate (lambda (me target skill) (and
+				(eq? tank (object-id me))
+				(not (eq? (ref target 'target-id) (object-id me)))
+				(>= (- (timestamp) (or (ref skill 'last-usage) 0)) 5) ; Delay 5s.
+			)))
+			(cons 'charm (lambda (me target skill) (let ((victim (get-target wr target))) (and
+				victim
+				(and tank (not (eq? tank (object-id victim))))
+				(<= (hp-ratio victim) 1/2)
+			))))
+			(cons 'confusion (lambda (me target skill) (let ((victim (get-target wr target))) (and
+				(character? victim)
+				(or (not tank) (not (eq? tank (object-id victim))))
+				(<= (hp-ratio victim) 1/2)
+			))))
+			(and (not (eq? looter (object-id me)))
+				(cons 'spoil (const #f))
+			)
+			(and (member (ref me 'name) (list "Evdem") string-ci=?)
+				(cons 'power-strike (const #f))
+			)
+			(and (member (ref me 'name) (list "Ekon") string-ci=?)
+				(cons 'sting (const #f))
+			)
+		))
+	)
+)
+
+(define (run cn wr me events party config)
 	(define br (make-brain cn (make-program-idle)))
 
 	(brain-load! br
@@ -102,10 +162,10 @@
 			('creature-update (id changes)
 				(when (= id (object-id me))
 					(cond ; Auto-cure.
-						((and (ref me 'poisoned?) (or (<= (hp-ratio me) 1/3) (and (ref changes 'poisoned?) (<= (hp-ratio me) 2/3))))
+						((and (ref me 'poisoned?) (or (<= (hp-ratio me) 1/5) (and (ref changes 'poisoned?) (<= (hp-ratio me) 2/3))))
 							(command-use cn (list "antidote"))
 						)
-						((and (ref me 'bleeding?) (or (<= (hp-ratio me) 1/3) (and (ref changes 'bleeding?) (<= (hp-ratio me) 2/3))))
+						((and (ref me 'bleeding?) (or (<= (hp-ratio me) 1/5) (and (ref changes 'bleeding?) (<= (hp-ratio me) 2/3))))
 							(command-use cn (list "bandage"))
 						)
 					)
@@ -113,10 +173,10 @@
 			)
 			('change-target (subject-id target-id previous-id) ; Escape under attack if I'm mage.
 				(let ((creature (object-ref wr subject-id)))
-					(when (and (npc? creature) (mystic-type? me) (not (eq? (ref me 'race) 'orc)) (world-party wr))
+					(when (and navigator (npc? creature) (or (mystic-type? me) (equip-bow? wr)))
 						(cond
 							((eq? target-id (object-id me))
-								(brain-do! br (make-program-follow-chase (party-leader (world-party wr)) 50) #t)
+								(brain-do! br (make-program-follow-chase navigator 50) #t)
 							)
 							((and (eq? previous-id (object-id me)) (eq? (program-id (brain-active br)) 'program-follow-chase))
 								(brain-stop! br (brain-active br))
@@ -148,10 +208,12 @@
 					(("use") (command-use cn (cdr command)))
 					(("drop") (command-drop cn br (cdr command)))
 					(("skill") (command-skill cn (cdr command)))
-					(("rech") (command-repeat cn br 'recharge author-id (cdr command)))
-					(("heal") (command-repeat cn br 'heal author-id (cdr command)))
+					(("rech") (when (skill-exists wr 'recharge) (command-repeat cn br 'recharge author-id (cdr command))))
+					(("heal") (when (skill-exists wr 'heal) (command-repeat cn br 'heal author-id (cdr command))))
 					(("power") (let ((is? (not (string=? (list-try-ref command 1 "on") "off"))))
-						(toggle-skill cn (find-skill wr 'vicious-stance) is?)
+						(when (and (not (equip-bow? wr)) (not (eq? (ref me 'race) 'orc)))
+							(toggle-skill cn (find-skill wr 'vicious-stance) is?)
+						)
 						(toggle-skill cn (find-skill wr 'soul-cry) is?)
 						; (auto-shot cn is? (if (fighter-type? me) 'soulshot 'blessed-spiritshot) (weapon-grade me))
 					))
@@ -159,10 +221,12 @@
 						(use-skill cn (find-skill wr 'majesty))
 						(use-skill cn (find-skill wr 'battle-roar))
 					)
+					(("delay") (let ((interval (or (string->number (list-try-ref command 1 "7")) 7))) (set! wizard-delay interval)))
 
 					(("give") (command-give cn br name (cdr command)))
 
 					(("follow") (let ((gap (or (string->number (list-try-ref command 1 "30")) 30))) ; TODO comb style
+						(set! navigator author-id)
 						(brain-clear! br)
 						(brain-do! br (make-program-follow-chase author-id gap))
 					))
@@ -183,51 +247,27 @@
 					))
 					(("town") (return cn))
 
-					(("assist") (command-assist cn br author-id (list
-						(cons 'hate (lambda (me target skill) (and
-							(eq? tank (object-id me))
-							(not (eq? (ref target 'target-id) (object-id me)))
-							(>= (- (timestamp) (or (ref skill 'last-usage) 0)) 5) ; Delay 5s.
-						)))
-						(cons 'charm (lambda (me target skill) (let ((victim (get-target wr target))) (and
-							victim
-							(and tank (not (eq? tank (object-id victim))))
-							(<= (hp-ratio victim) 1/2)
-						))))
-						(cons 'confusion (lambda (me target skill) (let ((victim (get-target wr target))) (and
-							victim
-							(or (not tank) (not (eq? tank (object-id victim))))
-							(<= (hp-ratio victim) 1/2)
-						))))
-						(and (not (eq? looter (object-id me)))
-							(cons 'spoil (const #f))
-						)
-						(and (member (ref me 'name) (list "Evdem") string-ci=?)
-							(cons 'power-strike (const #f))
-						)
-						(and (member (ref me 'name) (list "Ekon") string-ci=?)
-							(cons 'sting (const #f))
-						)
-					)))
-					; (("raid") ...)
-					#|(("support") (when (support-class? me)
-						(brain-do! br (make-program-support
-							(lambda (character)
-								(and
-									(<= (hp-ratio character) 2/3)
-									(> (mp-ratio me) 1/10)
+					(("raid")
+						(set! navigator author-id)
+						(brain-clear! br)
+						(cond
+							((support-class? me)
+								; (brain-do! br (make-program-follow-chase author-id 100))
+								(if (member (ref me 'name) (list "kae" "oakia" "vesta") string-ci=?)
+									(brain-do! br (make-program-support 2/3 1/5 1/2 1/5 #f #t))
+									(brain-do! br (make-program-support 2/3 1/5 #f #f #f #t))
 								)
 							)
-							(lambda (character)
-							 	(and
-									(skill-ref wr (find-skill wr 'recharge))
-									(mystic-type? character)
-									(<= (mp-ratio character) 19/20)
-									(> (mp-ratio me) 1/10)
-								)
-							) #f)
+							(else (assist cn wr br author-id))
 						)
-					))|#
+					)
+					(("assist")
+						(set! navigator author-id)
+						(assist cn wr br author-id)
+					)
+					(("support") (when (support-class? me)
+						(brain-do! br (make-program-support 2/3 1/5 1/2 1/5 #f #f))
+					))
 					(("tank") (let ((name (list-try-ref command 1 "?")))
 						(cond
 							((string-ci=? name "?") (let ((character (object-ref wr tank))) (when character
@@ -249,10 +289,12 @@
 							)
 						)
 					))
-					(("buff") (command-buff cn br author-id (cdr command)))
+					(("buff") (command-buff cn br author-id (cdr command) config))
 					(("relax") (let ((duration (or (string->number (list-try-ref command 1 "0")) 0)))
-						(brain-clear! br)
-						(brain-do! br (make-program-relax duration))
+						; (when (or (> duration 0) (not (eq? (program-id (brain-active br)) 'program-relax)))
+							(brain-clear! br)
+							(brain-do! br (make-program-relax duration))
+						; )
 					))
 
 					(("clear") (brain-clear! br))
@@ -272,12 +314,12 @@
 ; System code.
 
 (define db (sqlite3-connect #:database "apf.db" #:mode 'read-only))
-(define (instance host port account password name party)
+(define (instance host port account password name party config)
 	(apf-info "Running thread for ~a." (string-titlecase name))
 	(let-values (((cn wr me events) (bootstrap host port account password name db)))
 		(apf-info "Player ~a has been logged in." (string-titlecase name))
 		(let ((thev (wrap-evt (thread-receive-evt) (lambda args (make-event (thread-receive))))))
-			(run cn wr me (choice-evt events thev) party)
+			(run cn wr me (choice-evt events thev) party config)
 		)
 		(apf-info "Player ~a has been logged out." (string-titlecase name))
 	)
@@ -299,10 +341,8 @@
 	)
 )
 (define (find-party cfg name)
-	(let ((parties (ref cfg "party")))
-		(let ((party (if parties (ref parties name) #f)))
-			(or party (raise-user-error "Party is not found."))
-		)
+	(let ((party (ref cfg "party" name)))
+		(or party (raise-user-error "Party is not found."))
 	)
 )
 (define (parse-bunch bunch config)
@@ -315,7 +355,7 @@
 	(let-values (((host port password bunches config) (parse-shell)))
 		(apply append (fold (lambda (bunch r)
 			(let* ((names (parse-bunch bunch config)) (party (if (> (length names) 1) names #f)))
-				(cons (map (lambda (name) (bind instance host port name password name party)) names) r)
+				(cons (map (lambda (name) (bind instance host port name password name party config)) names) r)
 			)
 		) (list) bunches))
 	)

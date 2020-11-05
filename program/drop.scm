@@ -32,7 +32,7 @@
 	)
 
 	(define (make-program-drop [selector #f] [radius 30] [center #f] [delay 1/2])
-		(make-program 'program-drop (list selector radius center delay)
+		(make-program 'program-drop
 			(lambda (cn ev items)
 				(let ((me (world-me (connection-world cn))))
 					(case-event ev

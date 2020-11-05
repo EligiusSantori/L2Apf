@@ -1,0 +1,88 @@
+host: "192.168.0.5"
+port: 2106
+password: "123456"
+
+party:
+  tanks:
+  - eos
+  # inul
+  - opis
+  - sidus
+  - fury
+  - evdem
+  - ekon
+  - qera
+  - villard
+
+  mages:
+  - kae
+  - oakia
+  - vesta
+  - jade
+  - canea
+  - moroo
+  - aconis
+  - sunny
+  - nadax
+  - kyoko
+
+  rouges:
+  - gracia
+  - raja
+  - acgi
+  - xiro
+  - ares
+  - tenie
+  - zole
+  - foir
+
+  solders:
+  - agate
+  - rasog
+  - ferox
+  - pyrus
+  - grele
+  - ruby
+  - iris
+  - osiris
+  - lira
+
+  test: [admin, test]
+
+bless:
+   ww: wind-walk
+   bers: berserker-spirit
+   weight: decrease-weight
+   holy:
+     holy-weapon: fighter or orc
+   cast:
+     acumen: mystic
+     berserker-spirit: mystic
+   rb:
+     guidance: name me "gracia" and (name "sidus" or name "fury") # x2
+     death-whisper: name me "gracia" and fighter # x20
+     empower: name me "kae" and wizard # x6
+     vampiric-rage: name me "kae" and tank # x4
+     might: (name me "kae" and tank) or (name me "vesta" and (fighter and not tank)) # x(4+16)
+     shield: name me "kae" and tank # x4
+     regeneration: name me "agate" and tank # x4
+     acumen: name me "agate" and wizard # x6
+     berserker-spirit: (name me "agate" and wizard) or (name me "opis" and (fighter and not tank)) # x(6+16)
+     focus: name me "eos" and fighter # x20
+     agility: name me "vesta" and tank # x4
+     holy-weapon: name me "oakia" and fighter # x20
+   rift:
+     vampiric-rage: class me "shillien-elder" and fighter
+     might: class me "shillien-elder" and fighter
+     death-whisper: class me "shillien-elder" and fighter
+     guidance: class me "shillien-elder" and fighter
+     agility: class me "elven-oracle" and fighter
+     wind-walk: class me "elven-oracle" and (fighter or wizard)
+     shield: class me "elven-oracle" and (fighter or wizard)
+     holy-weapon: class me "cleric" and fighter
+     focus: class me "cleric" and fighter
+     berserker-spirit: class me "cleric" and (fighter or wizard)
+     acumen: class me "cleric" and wizard
+     empower: class me "shillien-elder" and wizard
+     concentration: class me "shillien-elder" and wizard
+

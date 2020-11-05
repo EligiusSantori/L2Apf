@@ -35,7 +35,10 @@
 							)
 						)
 						(timer () #t)
-						(else (if (> (attackers-count me) 0) (error-under-attack (attackers me)) #f))
+						(else (and
+							(> (attackers-count me) 0)
+							(error-under-attack (attackers me))
+						))
 					) eof timer)
 				)
 			)

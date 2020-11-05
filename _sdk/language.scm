@@ -1,9 +1,9 @@
 (module script racket/base
 	(require
-		(only-in srfi/1 fold)
+		(only-in srfi/1 fold list-index split-at delete)
 		(only-in racket/list remove-duplicates)
 		racket/string
-		(only-in racket/function const)
+		(only-in racket/function identity const)
 		(only-in racket/format ~r)
 		(relative-in "../."
 			"library/extension.scm"
@@ -39,6 +39,7 @@
 			"program/drop.scm"
 			"program/brain.scm"
 		)
+		"evaluate.scm"
 	)
 	(provide
 		parse-command
@@ -58,19 +59,32 @@
 		(if (or
 				(member channel (list 'chat-channel/tell 'chat-channel/clan 'chat-channel/trade) eq?)
 				(and (eq? channel 'chat-channel/party) (eq? author-id (party-leader (world-party wr)))))
-			(filter (compose not zero? string-length) (string-split (string-downcase text) " "))
+			(let ((rm (regexp-match #px"^(.+?)(?:\\s+if\\s+(.+))?$" (string-downcase text)))) (and rm
+				(let-values (((cm cd) (list->values (cdr rm))))
+					(with-handlers ((exn:fail? (lambda (e) (printf "Evaluation error \"~a\".~n" (exn-message e)) #f)))
+						(and (or (not cd) (evaluate cd (cons "default" (world-me wr)))) (string-split cm))
+					)
+				)
+			))
 			#f
 		)
 	)
 
-	(define (parse-targets wr author arguments [default #f])
+	(define (party-ids config party wr)
+		(fold (lambda (name ids)
+			(let ((character (find-character wr name)))
+				(if character (cons (object-id character) ids) ids)
+			)
+		) (list) (or (ref config "party" party) (list)))
+	)
+	(define (parse-targets wr author arguments [default #f] [config #f])
 		(if (or (not (null? arguments)) default)
 			(remove-duplicates (fold (lambda (argument result)
 				(case argument
-					(("me") (cons (object-id author) result))
+					(("me") (if author (cons (object-id author) result) result))
 					(("self") (cons (object-id (world-me wr)) result))
-					(("target") (let ((target-id (ref author 'target-id)))
-					 	(if target-id (cons target-id result) result)
+					(("target") (let ((target-id (and author (ref author 'target-id))))
+				 		(if target-id (cons target-id result) result)
 					))
 					(("party") (append (party-members (world-party wr)) result))
 					(("us") (let ((me (world-me wr)))
@@ -82,8 +96,18 @@
 						))
 					))
 					; TODO clan
-					(else (let ((character (find-character wr argument)))
-						(if character (cons (object-id character) result) result)
+					(else (cond
+						((string-starts? argument ".") ; Config party.
+							(if config
+								(let ((ids (party-ids config (substring argument 1) wr)))
+									(append (delete (object-id (world-me wr)) ids =) result)
+								)
+								result
+							)
+						)
+						(else (let ((character (find-character wr argument))) ; By name.
+							(if character (cons (object-id character) result) result)
+						))
 					))
 				)
 			) (list) (if (null? arguments) (list default) arguments)) =)
@@ -257,7 +281,7 @@
 			(and item (ref item 'item-type))
 		)
 	)
-	(define (equip-sword? wr) (eq? (weapon-type wr) 'sword))
+	(define (equip-sword? wr) (eq? (weapon-type wr) 'sword)) ; TODO (equip-x creature db)
 	(define (equip-blunt? wr) (eq? (weapon-type wr) 'blunt))
 	(define (equip-dagger? wr) (eq? (weapon-type wr) 'dagger))
 	(define (equip-spear? wr) (eq? (weapon-type wr) 'spear))
@@ -275,7 +299,21 @@
 			(cons 'wind-strike (lambda (me target skill) (and
 				(< (ref me 'specialty) 1)
 				(medium-damage-skill-pointful? me target)
-				(>= (- (timestamp) (or (ref skill 'last-usage) 0)) 7) ; Delay 7s.
+			)))
+			(cons 'aqua-swirl (lambda (me target skill) (and
+				(< (ref me 'specialty) 2)
+				(or (boss? target) (minion? target) (medium-damage-skill-pointful? me target))
+			)))
+			(cons 'blaze (lambda (me target skill) (and
+				(< (ref me 'specialty) 2)
+				(or (boss? target) (minion? target) (medium-damage-skill-pointful? me target))
+			)))
+			(cons 'twister (lambda (me target skill) (and
+				(< (ref me 'specialty) 2)
+				(or (boss? target) (minion? target) (medium-damage-skill-pointful? me target))
+			)))
+			(cons 'hurricane (lambda (me target skill) (and
+				(or (boss? target) (minion? target) (medium-damage-skill-pointful? me target))
 			)))
 
 			(cons 'power-strike (lambda (me target . rest) (and
@@ -283,7 +321,7 @@
 				(mp>reserve? me)
 				(or
 					(< (ref me 'specialty) 1)
-					(member (ref me 'class) (list 'elf-knight 'temple-knight 'evas-templar 'sword-singer 'sword-muse) eq?)
+					(member (ref me 'class) (list 'elven-knight 'temple-knight 'evas-templar 'sword-singer 'sword-muse) eq?)
 				)
 				(medium-damage-skill-pointful? me target)
 			)))
@@ -291,7 +329,7 @@
 				(equip-sword? wr)
 				(mp>reserve? me)
 				(if (or (boss? target) (minion? target))
-					(not (skill-exists wr 'vicious-stance))
+					#t ; (not (skill-exists wr 'vicious-stance))
 					(medium-damage-skill-pointful? me target)
 				)
 			)))
@@ -299,26 +337,27 @@
 				(equip-dagger? wr)
 				(mp>reserve? me)
 				(if (or (boss? target) (minion? target))
-					(not (skill-exists wr 'vicious-stance))
+					#t ; (not (skill-exists wr 'vicious-stance))
 					(high-damage-skill-pointful? me target)
 				)
 			)))
 			(cons 'iron-punch (lambda (me target . rest) (and
 				(equip-fists? wr)
 				(mp>reserve? me)
-				(medium-damage-skill-pointful? me target)
+				(or (boss? target) (minion? target) (medium-damage-skill-pointful? me target))
 			)))
-			#|(cons 'power-shot (lambda (me target . rest) (and
+			(cons 'power-shot (lambda (me target . rest) (and
 				(equip-bow? wr)
 				(mp-plenty? me)
-				(medium-damage-skill-fit? me target)
-			)))|#
+				(not (or (boss? target) (minion? target))) ; MP lack.
+				(medium-damage-skill-pointful? me target)
+			)))
 			(cons 'wild-sweep (lambda (me target . rest) (and
 				(equip-spear? wr)
 				(mp>reserve? me)
 				(if (or (boss? target) (minion? target))
 					(and
-						(not (skill-exists wr 'vicious-stance))
+						#t ; (not (skill-exists wr 'vicious-stance))
 						(not (skill-exists wr 'whirlwind))
 					)
 					(and
@@ -331,7 +370,7 @@
 				(equip-spear? wr)
 				(mp>reserve? me)
 				(if (or (boss? target) (minion? target))
-					(not (skill-exists wr 'vicious-stance))
+					#t ; (not (skill-exists wr 'vicious-stance))
 					(and
 						(or (not (eq? (ref me 'race) 'dwarf)) (artisan-class? me))
 						(medium-damage-skill-pointful? me target)
@@ -353,7 +392,7 @@
 				(mp>shortage? me)
 				(not (ref target 'bleeding?))
 				(if (or (boss? target) (minion? target))
-					(not (skill-exists wr 'vicious-stance))
+					#t ; (not (skill-exists wr 'vicious-stance))
 					(fast-decay-skill-pointful? me target)
 				)
 			)))
@@ -383,17 +422,13 @@
 					(boss? target) (minion? target)
 					(not (world-party wr)) ; Too slow casting for party.
 				)
-			)))|#
+			)))
 			(cons 'aura-sink (lambda (me target skill) (and
 				(mp>reserve? me)
 				(not (ref target 'bleeding?)) ; TODO check
-				(member (ref target 'name) (list
-					"Kaysha Herald Of Ikaros" ; Bleed.
-					"Soul Scavenger" ; Sleep.
-					"Princess Molrang" ; Poison.
-				) string-ci=?)
+				(boss? target)
 				(>= (- (timestamp) (or (ref skill 'last-usage) 0)) 30) ; Delay 30s.
-			)))
+			)))|#
 
 			(cons 'drain-health  (lambda (me target . rest) (and
 				(hp-danger? me)
@@ -445,10 +480,15 @@
 		(let* ((wr (connection-world cn)) (author (object-ref wr author-id)))
 			(if author
 				(let ((target-id (ref author 'target-id)) (me (world-me wr)))
-					(when (and (or (fighter-type? me) (eq? (ref me 'race) 'orc)) (not (support-class? me)) target-id (not (in-party? (world-party wr) target-id)))
-						; (update-creature! me (list (cons 'casting #f))) ; TODO fix casting on timer.
+					(when (and (or (not (support-class? me)) (eq? (ref me 'race) 'orc) (fighter-type? me))#||# target-id (not (in-party? (world-party wr) target-id)))
+						; TODO fix casting on timer.
+						(update-creature! me (list
+							(cons 'casting #f)
+							(cons 'last-attack #f)
+						))
+
 						(brain-do! br (make-program-slay target-id (alist-merge (skill-settings wr) (filter pair? skills)) (lambda (me target)
-							(if (or (fighter-type? me) (eq? (ref me 'race) 'orc))
+							(if (or (fighter-type? me) (eq? (ref me 'race) 'orc) (support-class? me))
 								(when (not (attacking? me)) (attack cn))
 								(move-to cn (get-position author) 50)
 							)
@@ -460,91 +500,22 @@
 		)
 	)
 
-	(define (parse-buffs me pack)
-		(case pack
-			(("ww") (const (list 'wind-walk)))
-			(("solo") (lambda (character)
-				(if (mystic-type? character)
-					(list 'empower 'acumen 'berserker-spirit 'shield 'wind-walk)
-					(list 'vampiric-rage 'might 'death-whisper 'focus 'shield 'guidance 'regeneration)
-				)
-			))
-			(("rift") (lambda (character)
-				(cond
-					((protagonist? character) (list))
-					((fighter-type? character)
-						(case (ref me 'class)
-							((shillien-elder) (list 'vampiric-rage 'might 'death-whisper 'guidance))
-							(else (list 'focus 'shield 'berserker-spirit 'holy-weapon 'wind-walk))
-						)
-					)
-					#|((eq? (ref character 'race) 'orc)
-						(list 'acumen 'berserker-spirit)
-					)
-					((support-class? character)
-						(case (ref me 'class)
-							((shillien-elder) (list 'shield 'wind-walk))
-							(else (list 'acumen 'berserker-spirit))
-						)
-					)|#
-					((mystic-type? character)
-						(case (ref me 'class)
-							((shillien-elder) (list 'empower #|'concentration|# 'shield))
-							(else (list 'acumen 'berserker-spirit 'wind-walk))
-						)
-					)
-					(else (list))
-				)
-			))
-			(("rb") (lambda (character)
-				(cond
-					((protagonist? character) (list))
-					((or (tank-class? character) (member (ref character 'name) (list "Ekon" "Evdem")))
-						(case (ref me 'class)
-							((shillien-elder) (list 'guidance 'vampiric-rage 'death-whisper 'might)) ; C-grade penalty.
-							(else (list 'focus 'shield 'regeneration))
-						)
-					)
-					((fighter-type? character)
-						(case (ref me 'class)
-							((shillien-elder) (list 'death-whisper 'might))
-							(else (list 'focus))
-						)
-					)
-					((support-class? character) (list 'acumen))
-					((wizard-class? character) (list 'empower 'acumen))
-					((and (eq? (ref character 'race) 'orc) (mystic-type? character)) (list 'acumen))
-					; TODO Orc's buffs.
-					(else (list))
-				)
-			))
-			(("holy") (lambda (character)
-				(if (or (fighter-type? character) (eq? (ref character 'race) 'orc))
-					(list 'holy-weapon)
-					(list)
-				)
-			))
-			(("bers") (lambda (character)
-				(list 'berserker-spirit)
-			))
-			(("cast") (lambda (character)
-				(if (mystic-type? character)
-					(list 'acumen 'berserker-spirit)
-					(list)
-				)
-			))
-			(else (const (list)))
-		)
-	)
-	(define (command-buff cn br author-id arguments)
+	(define (command-buff cn br author-id arguments config)
 		(let* ((wr (connection-world cn)) (me (world-me wr)))
 			(when (and (support-class? me) (not (null? arguments)))
 				(let ((author (object-ref wr author-id)))
 					(if author
-						(brain-do! br (make-program-bless
-							(parse-targets wr author (cdr arguments) "target")
-							(parse-buffs me (car arguments))
-						))
+						(let ((pack (ref config "bless" (car arguments))) (targets (parse-targets wr author (cdr arguments) "target" config)))
+							(when pack (brain-do! br (make-program-bless targets (lambda (target)
+								(cond
+									((hash? pack) (map car (hash-filter pack (lambda (s e)
+										(evaluate e (cons "target" target) (cons "me" me))
+									))))
+									((string? pack) (list pack))
+									(else pack)
+								)
+							))))
+						)
 						(say cn "Don't see the requester.")
 					)
 				)

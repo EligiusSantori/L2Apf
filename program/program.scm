@@ -50,7 +50,7 @@
 	(define-syntax program-lambda
 		(syntax-rules ()
 			((_ (EVENT (STATE INIT)) . BODY)
-				(base-program (gensym) (lambda (connection EVENT STATE) . BODY) void void undefined INIT)
+				(base-program (gensym) (lambda (connection EVENT STATE) . BODY) void void INIT)
 			)
 			((_ (EVENT STATE) . BODY)
 				(program-lambda (EVENT [STATE undefined]) . BODY)
